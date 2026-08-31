@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import re
 import time
+import unicodedata
 from dataclasses import dataclass
 
 from .erros import ErroMoodle
@@ -56,12 +57,19 @@ class Resolucao:
 
 
 def _normalizar(texto: str) -> str:
-    """"psi 3323", "PSI-3323", " psi3323 " → "PSI3323".
+    """"psi 3323", "PSI-3323", " psi3323 " → "PSI3323"; "eletronica" → "ELETRONICA".
 
-    Quem pergunta escreve como fala. A normalização é a mesma ideia da do
-    Jupiter, e é ela que faz o teste T61 valer para o que o usuário digita.
+    Quem pergunta escreve como fala, e em português escreve sem acento.
+
+    **O `NFD` é a linha que faz isso funcionar**, e não é decoração: ele separa
+    "ô" em "o" + marca combinante, e aí o filtro abaixo descarta só a marca,
+    sobrando o "o". Sem ele, o filtro descartava o "ô" INTEIRO — "Eletrônica"
+    virava "ELETRNICA", "eletronica" virava "ELETRONICA", e os dois deixavam de
+    casar entre si. Bug real, achado ao vivo em 31/08 porque o dono digitou sem
+    acento; T83 fica vermelho se alguém remover o `NFD` por parecer supérfluo.
     """
-    return re.sub(r"[^A-Z0-9]", "", (texto or "").upper())
+    decomposto = unicodedata.normalize("NFD", texto or "")
+    return re.sub(r"[^A-Z0-9]", "", decomposto.upper())
 
 
 def projetar_disciplinas(bruto) -> list[Disciplina]:

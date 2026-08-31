@@ -1291,3 +1291,36 @@ não é observar ausência, e é exatamente o erro que este §9 já registrou ho
 na captura de 28/08 e tem 31 sem `assign` hoje. O espaço da disciplina muda
 durante o semestre — a fixture é retrato, não espelho, e teste que dependa da
 contagem exata envelhece.
+
+### 31/08/2026 — acento: a normalização apagava a letra em vez de dobrá-la
+
+Achado ao vivo, na primeira pergunta que o dono fez em linguagem natural em vez
+de sigla. `_normalizar` fazia `re.sub(r"[^A-Z0-9]", "")` direto: `"Eletrônica"`
+virava `ELETRNICA` e `"eletronica"` virava `ELETRONICA`. Os dois deixavam de
+casar entre si — e quem pergunta em português digita sem acento.
+
+Corrigido com `unicodedata.normalize("NFD", ...)` **antes** do filtro: o NFD
+separa "ô" em "o" + marca combinante, e aí o filtro descarta só a marca. T83 fica
+vermelho se alguém remover o NFD por parecer supérfluo — verificado por sabotagem.
+
+**A suíte não pegava, e o motivo é estrutural:** a higienização do §3.3 embaralha
+`fullname`, então nenhum teste tinha nome de disciplina real para casar. O bug
+morava exatamente no vão entre "o que a fixture preserva" e "o que o usuário
+digita". T83 testa contra lista sintética, que é o que dá para fazer sem
+desfazer a higienização.
+
+**Confirmado ao vivo depois do conserto:** `"eletronica"` passou de "não achou"
+para ambíguo com três candidatas (`PSI3321-REOF-2025`, `PSI3322-2026-REOF`,
+`PSI3323-2026`) — que é a resposta certa, e é o Invariante 6 não escolhendo
+sozinho. `"laboratorio de eletronica"` resolve direto.
+
+**Continua não resolvendo abreviação:** `"lab de eletronica"` não acha, porque
+"lab" não é pedaço de "laboratorio". Casamento aproximado é decisão de escopo,
+não correção de bug, e fica fora até alguém pedir.
+
+**Erro de processo desta sessão, registrado porque quase custou a correção.**
+Rodei `git checkout` num arquivo com a correção ainda não commitada, para
+desfazer uma sabotagem — e apaguei o conserto junto. O teste denunciou na hora
+(T83 vermelho). A lição não é sobre git: **sabotagem tem que ser desfeita pelo
+inverso exato da sabotagem**, nunca por um comando que restaura "o estado
+anterior" quando o estado anterior inclui trabalho novo.

@@ -356,3 +356,30 @@ def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
     assert not (politica.ALLOWLIST & politica.BLOQUEIO_PERMANENTE)
     for funcao in politica.ALLOWLIST:
         assert politica.decidir(funcao).permitida
+
+
+@pytest.mark.politica
+def test_t83_acento_nao_impede_o_casamento_por_nome():
+    """Quem pergunta em português digita sem acento.
+
+    A primeira versão descartava o caractere acentuado: "Eletrônica" virava
+    "ELETRNICA" e "eletronica" virava "ELETRONICA" — nenhum casava com o outro.
+    Achado ao vivo, com a pergunta do dono escrita sem acento; a suíte não pegava
+    porque a higienização embaralha `fullname` e nenhum teste usava nome real.
+
+    Lista sintética pelo mesmo motivo do T62: a regra não depende do dado real,
+    e contra a fixture ela não é exercitável.
+    """
+    lista = [
+        disc.Disciplina(courseid=1, sigla="PSI3323", rotulo="PSI3323-2026",
+                        nome="Laboratório de Eletrônica I"),
+        disc.Disciplina(courseid=2, sigla="MAT2455", rotulo="MAT2455-2026",
+                        nome="Cálculo Diferencial e Integral III"),
+    ]
+    for escrito in ("eletronica", "eletrônica", "ELETRONICA", "Laboratorio de Eletronica"):
+        r = disc.resolver(lista, escrito)
+        assert r.disciplina is not None, f"{escrito!r} não resolveu: {r.motivo}"
+        assert r.disciplina.courseid == 1
+
+    # A sigla continua ganhando de qualquer casamento por nome.
+    assert disc.resolver(lista, "MAT2455").disciplina.courseid == 2
