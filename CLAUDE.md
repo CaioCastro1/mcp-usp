@@ -14,20 +14,30 @@ cardápio dos bandejões (RUCard), prazos e material do e-Disciplinas (Moodle),
 catálogo de disciplinas do JupiterWeb. Projeto não-oficial, sem vínculo com a
 universidade, sobre APIs não documentadas descobertas por observação.
 
-**Estado: Fase 1 (descoberta) concluída, Fase 2 (desenho) não começou.** Não há
-servidor MCP ainda — o que existe é fixture, medição e registro de decisão. O
-critério para uma ferramenta existir está no §5 do `SPEC1.md`, e ele não foi
-aplicado ainda.
+**Este arquivo não guarda estado, de propósito.** Nada aqui sobre que fase está
+aberta, o que já foi construído ou quantos testes passam. Estado escrito em dois
+lugares diverge, e este é o arquivo que toda sessão lê primeiro — a divergência
+aqui é a mais cara de todas, porque contamina a sessão inteira antes da primeira
+pergunta. Já aconteceu: por dois dias este parágrafo afirmou que não havia
+servidor MCP nenhum enquanto dois rodavam (§9, 31/08).
+
+**Onde ver o estado:** a última entrada do `§9 do SPEC1.md` diz o que foi
+decidido e com que dado; o `README.md` resume em um parágrafo; o
+`docs/decisions/BACKLOG-correcoes.md` lista a dívida aberta; e
+`./scripts/gate.sh` responde em segundos o que de fato está verde. Nenhum dos
+quatro é este arquivo.
 
 ## 2. Onde as coisas moram
 
 | Caminho | O que é |
 |---|---|
 | `SPEC1.md` | Autoridade: fatos verificados, invariantes, questões abertas, registro de decisões (§9) |
+| `usp_mcp/` | Código dos servidores MCP, um pacote por sistema |
+| `tests/` | Suíte em três camadas: `politica` e `contrato` offline, `live` atrás de env var |
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
-| `scripts/` | Chamadores usados na descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) |
+| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) e o gate (`gate.sh`) |
 | `.env` / `.env.example` | Credenciais por env var; `.env` no gitignore |
 | `docs/` | Este scaffold: domínios, convenções, handoffs, backlog |
 
@@ -49,11 +59,18 @@ python3 scripts/reduzir.py
 # Cardápio de um RU (dado público, sem credencial pessoal)
 curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCARD_HASH"
 
+# O venv é POR DIRETÓRIO e não vem no git: todo worktree novo precisa do seu,
+# senão o .mcp.json falha com ENOENT em `.venv/bin/python`.
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+
 # Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
 # Rodar TODOS os testes, inclusive a camada que fala com a USP de verdade
 USP_MCP_LIVE=1 .venv/bin/python -m pytest
+
+# O que dá para checar do servidor sem tocar a rede nem gastar chamada da conta
+.venv/bin/python -m usp_mcp.<sistema>.server --auto-verificar
 ```
 
 ## 4. Regras críticas (não negociáveis)
@@ -93,9 +110,14 @@ contrário. Os que mordem em toda sessão:
    teste real é a **credencial**, não a rede: o token é pessoal e cada chamada
    fica no log da conta. Por isso a camada `live` fica atrás de `USP_MCP_LIVE=1`,
    e por isso ela é decisão do dono, não limitação de infraestrutura.
-10. **Fase 2 não começa por conveniência.** Questão aberta do §4 fecha com dado
-    registrado no §9, não com opinião nem com o que a API oferece. O Anexo A (§7) é
-    a lista de ferramentas derivada da API — está lá para ser confrontada, não seguida.
+10. **Ferramenta não nasce por conveniência.** O critério para uma existir é o §5
+    do `SPEC1.md`, e questão aberta do §4 fecha com dado registrado no §9 — não com
+    opinião nem com o que a API oferece. O Anexo A (§7) é a lista de ferramentas
+    derivada da API: está lá para ser confrontada, não seguida.
+11. **Verde na suíte não é verde no que ela não alcança.** Já custou três bugs num
+    dia só, um deles um entrypoint que nunca tinha funcionado com a suíte inteira
+    verde. Antes de confiar num parâmetro, asserte sobre o parâmetro **enviado**,
+    não sobre a saída — o dublê devolve o que o teste mandou.
 
 ## 5. Fluxo padrão de uma mudança
 
@@ -127,5 +149,7 @@ tanto quanto mudança de código: entra no `SPEC1.md` — fato no §1, decisão 
 
 ---
 
-*Mantenha este arquivo curto. Se algo aqui ficar grande, mova o detalhe para
-`SPEC1.md`/`docs/` e deixe só o ponteiro.*
+*Mantenha este arquivo curto e **sem estado**. Se algo aqui ficar grande, mova o
+detalhe para `SPEC1.md`/`docs/` e deixe só o ponteiro. Se for a resposta de "em
+que pé estamos", não escreva aqui: aqui ela envelhece calada e a próxima sessão
+começa com o mapa errado.*
