@@ -14,6 +14,7 @@ import os
 
 import pytest
 
+from tests.moodle.conftest import ARQUIVO_ENV
 from usp_mcp.moodle import politica
 from usp_mcp.moodle.cliente import ClienteMoodle
 
@@ -24,9 +25,19 @@ pytestmark = [pytest.mark.live, pytest.mark.contrato]
 def cliente_real():
     token = os.environ.get("MOODLE_TOKEN")
     if not token:
+        # Duas causas distintas, duas curas distintas (Invariante 6). A versão
+        # anterior desta mensagem mandava copiar o .env.example para quem já
+        # tinha o .env preenchido — o conftest é que não carregava o arquivo.
+        if ARQUIVO_ENV is None:
+            pytest.fail(
+                "USP_MCP_LIVE=1 mas MOODLE_TOKEN está vazio, e nenhum .env foi "
+                "encontrado (nem na raiz da suíte, nem no checkout principal). "
+                "Copie .env.example para .env (§8 do SPEC1)."
+            )
         pytest.fail(
-            "USP_MCP_LIVE=1 mas MOODLE_TOKEN está vazio. "
-            "Copie .env.example para .env (§8 do SPEC1)."
+            f"USP_MCP_LIVE=1 mas MOODLE_TOKEN está vazio. O .env FOI encontrado "
+            f"em {ARQUIVO_ENV} e carregado — então a chave está ausente ou vazia "
+            "lá dentro. Não é o arquivo que falta (§8 do SPEC1)."
         )
     return ClienteMoodle(
         token=token,
