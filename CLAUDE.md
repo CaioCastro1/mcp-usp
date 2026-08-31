@@ -55,6 +55,9 @@ curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCAR
 # Checar um servidor MCP sem tocar a rede da USP (vale para os três sistemas)
 .venv/bin/python -m usp_mcp.rucard.server --auto-verificar
 
+# Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
+.venv/bin/python -m pytest tests/handshake
+
 # Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
