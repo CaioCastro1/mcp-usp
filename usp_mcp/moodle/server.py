@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 
+from ..env import carregar_env
 from .cliente import ClienteMoodle
 from .erros import ErroMoodle
 from .o_que_vence import o_que_vence
@@ -88,6 +89,13 @@ def chamar_ferramenta(nome: str, argumentos: dict) -> str:
             f"por este servidor é {_NOME_FERRAMENTA!r}."
         )
 
+    # O `.env` é a única casa do token (§8, gitignorado) — decisão de
+    # 31/08/2026. `carregar_env` usa `setdefault`, então o bloco `env` de um
+    # cliente MCP, se existir, ganha do arquivo. Chamado aqui e não no import
+    # do módulo para que importar `server` continue sendo livre de efeito
+    # colateral (é o que os testes de contrato fazem).
+    carregar_env()
+
     # Credencial só é lida aqui, na hora de montar o cliente — nunca logada
     # nem exposta (Invariante 3). Este caminho não é exercitado por teste
     # offline (T44 só cobre o nome desconhecido); ele fala com a rede da USP,
@@ -105,42 +113,97 @@ def chamar_ferramenta(nome: str, argumentos: dict) -> str:
     return resposta.texto
 
 
-def main() -> None:  # pragma: no cover — casca stdio, sem teste offline.
+def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     """Adaptador stdio real. Import do SDK fica AQUI dentro, não no topo do
     módulo: os testes de contrato importam `usp_mcp.moodle.server` sem o SDK
     do MCP instalado, e um import de topo quebraria a coleta inteira da
-    suíte por causa de uma dependência que este entrypoint nem chegou a usar.
+    suíte por causa de uma dependência que as funções puras nem chegam a usar.
+
+    Sem teste automático de propósito — exercitar isto exigiria subir um
+    processo stdio e um cliente MCP falso, o que testaria o SDK e não este
+    projeto. O que dá para verificar sem rede está em `--auto-verificar`, e a
+    verificação que importa é plugar num cliente de verdade e perguntar.
     """
     try:
-        import mcp.server.stdio
-        from mcp.server import Server
-        from mcp.types import TextContent, Tool
+        from mcp.server import MCPServer
     except ImportError as exc:
         raise SystemExit(
-            "O SDK do MCP (pacote `mcp`) não está instalado. Instale-o para "
-            "rodar este entrypoint stdio; as funções `listar_ferramentas` e "
-            "`chamar_ferramenta` funcionam sem ele."
+            "O SDK do MCP (pacote `mcp`) não está instalado. Rode "
+            "`.venv/bin/python -m pip install -r requirements.txt`. As funções "
+            "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
-    servidor = Server("usp-mcp-moodle")
+    descritor = listar_ferramentas()[0]
+    servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
-    @servidor.list_tools()
-    async def _listar() -> list[Tool]:
-        return [Tool(**f) for f in listar_ferramentas()]
+    @servidor.tool(name=descritor["name"], description=descritor["description"])
+    def _o_que_vence(dias: int = 14, limite: int | None = None) -> str:
+        # Assinatura explícita em vez de `**kwargs`: o SDK deriva o schema que
+        # o modelo vê a partir dela, e um `**kwargs` produziria uma ferramenta
+        # sem parâmetro nenhum. Mantida em sincronia com o `inputSchema` de
+        # `listar_ferramentas` — `_auto_verificar` compara os dois.
+        return chamar_ferramenta(descritor["name"], {"dias": dias, "limite": limite})
 
-    @servidor.call_tool()
-    async def _chamar(nome: str, argumentos: dict) -> list[TextContent]:
-        texto = chamar_ferramenta(nome, argumentos or {})
-        return [TextContent(type="text", text=texto)]
+    servidor.run(transport="stdio")
 
-    async def _rodar() -> None:
-        async with mcp.server.stdio.stdio_server() as (leitura, escrita):
-            await servidor.run(leitura, escrita, servidor.create_initialization_options())
 
-    import asyncio
+def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de comando
+    """`python -m usp_mcp.moodle.server --auto-verificar`: o que dá para
+    checar sem tocar a rede da USP nem gastar uma chamada da conta.
 
-    asyncio.run(_rodar())
+    Existe porque `main()` não tem teste: sem isto, a única forma de saber que
+    o adaptador casa com o SDK instalado seria plugar num cliente e ver
+    falhar. Não substitui essa verificação — reduz o que ela precisa descobrir.
+    """
+    from .. import env as _env
+
+    print("ferramentas expostas :", [f["name"] for f in listar_ferramentas()])
+
+    arquivo = _env.achar_env()
+    print(".env encontrado      :", arquivo or "NÃO — copie .env.example (§8)")
+    _env.carregar_env()
+    # Forma, nunca valor (Invariante 3).
+    token = os.environ.get("MOODLE_TOKEN") or ""
+    print(
+        "MOODLE_TOKEN         :",
+        f"presente, {len(token)} chars" if token else "AUSENTE",
+    )
+    print("MOODLE_URL           :", os.environ.get("MOODLE_URL", _URL_PADRAO))
+
+    try:
+        from mcp.server import MCPServer  # noqa: F401
+    except ImportError:
+        print("SDK do MCP           : AUSENTE — pip install -r requirements.txt")
+        return 1
+    print("SDK do MCP           : presente")
+
+    # O schema que o modelo vê tem de casar com a assinatura que o adaptador
+    # registra; divergir aqui é o erro que só apareceria em uso real.
+    declarados = set(listar_ferramentas()[0]["inputSchema"]["properties"])
+    import inspect
+
+    from mcp.server import MCPServer as _M
+
+    servidor = _M(name="verificacao", version="0.0.0")
+
+    @servidor.tool(name="o_que_vence", description="verificação")
+    def _sonda(dias: int = 14, limite: int | None = None) -> str:
+        return ""
+
+    reais = set(inspect.signature(_sonda).parameters)
+    print("schema x assinatura  :", "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}")
+    if declarados != reais:
+        return 1
+
+    print()
+    print("Nada acima tocou a rede da USP. O que falta é plugar num cliente")
+    print("MCP e perguntar — só isso exercita chamar_ferramenta de verdade.")
+    return 0
 
 
 if __name__ == "__main__":  # pragma: no cover
+    import sys
+
+    if "--auto-verificar" in sys.argv:
+        raise SystemExit(_auto_verificar())
     main()

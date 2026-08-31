@@ -89,7 +89,10 @@ como validada contra a USP de verdade.
 - **Três caminhos de código não têm teste offline**, e nenhum deles é coberto
   pelo verde: o transporte HTTP real de `cliente._transporte_padrao`, o caminho
   autenticado de `server.chamar_ferramenta` e o adaptador stdio de
-  `server.main()`. Verde na suíte não é verde neles.
+  `server.main()`. Verde na suíte não é verde neles — e isso **deixou de ser
+  hipótese** em 31/08: o `main()` estava escrito contra a API antiga do SDK e
+  não funcionava, com a suíte 99/99 verde. Ver §9. Use
+  `python -m usp_mcp.moodle.server --auto-verificar` antes de confiar neles.
 - **O import do SDK do MCP fica dentro de `server.main()`.** Movê-lo para o topo
   do módulo quebra a coleta da suíte inteira, porque o SDK não é dependência de
   teste. Isso parece um erro de estilo e não é.
