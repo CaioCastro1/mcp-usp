@@ -1,11 +1,12 @@
 """Camada 2 — o cliente: transporte, política na fronteira, e erro legível.
 
-LIMITAÇÃO DECLARADA, e ela decide o que estes testes podem afirmar: a Fase 1 só
-capturou respostas bem-sucedidas. Não existe fixture de erro do Moodle. Logo,
-estes testes asseguram o CONTRATO DESTA CAMADA — o que ela devolve dado um erro
-— e nunca a forma exata do erro do Moodle, que continua não verificada. Capturar
-um `invalidtoken` real é barato e seguro (token propositalmente inválido, não
-toca na conta) e está no backlog, fora desta fatia.
+LIMITAÇÃO PARCIALMENTE FECHADA em 31/08/2026. A Fase 1 só capturou respostas
+bem-sucedidas, então estes testes nasceram assegurando o CONTRATO DESTA CAMADA —
+o que ela devolve dado um erro — e nunca a forma exata do erro do Moodle. O
+`invalidtoken` real foi capturado desde então (`fixtures/moodle/erro_invalidtoken.json`,
+com `wstoken=""`: não usa credencial, não toca conta nenhuma) e T52 abaixo liga
+os dois. Os outros modos de falha — `accessexception`, HTML de manutenção,
+timeout — seguem sendo contrato de camada, com a forma real não verificada.
 """
 from __future__ import annotations
 
@@ -150,3 +151,24 @@ def test_o_cliente_nao_tem_metodo_que_itere_funcoes():
     proibidos = {"chamar_varias", "sweep", "varrer", "todas_as_funcoes", "descobrir"}
     assert not (proibidos & set(dir(ClienteMoodle)))
     assert not hasattr(mod_cliente, "listar_funcoes_disponiveis")
+
+
+def test_o_erro_real_do_moodle_vira_TokenInvalido(erro_invalidtoken):
+    """T52 — a forma do erro deixou de ser suposição, para este modo de falha.
+
+    Os outros testes de erro montam o dicionário à mão, o que verifica o
+    contrato da camada mas não que o Moodle fale desse jeito. Este usa a
+    resposta crua capturada de `edisciplinas.usp.br` em 31/08/2026.
+
+    O que a captura desmentiu: o `exception` real é
+    `core\\exception\\moodle_exception`, com namespace — não o
+    `moodle_exception` pelado que os testes acima supõem. Passa ileso porque o
+    cliente casa em `errorcode`, nunca em `exception`; se algum dia alguém
+    trocar o critério, este teste é que pega.
+    """
+    assert erro_invalidtoken["errorcode"] == "invalidtoken"
+    c = _cliente(lambda **kw: erro_invalidtoken)
+    with pytest.raises(TokenInvalido) as e:
+        c.chamar("core_calendar_get_action_events_by_timesort")
+    assert "§8" in str(e.value) or ".env" in str(e.value).lower()
+    assert TOKEN_FALSO not in str(e.value)
