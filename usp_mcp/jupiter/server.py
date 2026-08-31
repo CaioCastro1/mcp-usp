@@ -163,10 +163,16 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     )
 
 
-def main() -> None:  # pragma: no cover — casca stdio
+def main() -> None:
     """Adaptador stdio real. O import do SDK fica aqui dentro, não no topo: a
     suíte importa este módulo sem o SDK instalado, e um import de topo quebraria
-    a coleta por causa de uma dependência que as funções puras nem usam."""
+    a coleta por causa de uma dependência que as funções puras nem usam.
+
+    **Tem teste** (T45-T48, `tests/jupiter/test_server_stdio.py`): a suíte roda
+    isto de verdade contra o SDK instalado, substituindo só `run()`, que
+    bloquearia no stdin. Foi assim que a trilha do Moodle descobriu tarde que o
+    `main()` dela falava a API antiga do SDK com a suíte inteira verde.
+    """
     try:
         from mcp.server import MCPServer
     except ImportError as exc:
