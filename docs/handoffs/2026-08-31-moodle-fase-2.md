@@ -1,108 +1,147 @@
 # HANDOFF — Fase 2 do Moodle (fatia vertical `o_que_vence`) — 2026-08-31 — sessão de implementação
 
 > Este handoff existe para o que NÃO cabe no §9 nem no git: o que ficou fora de
-> escopo, o que não tem teste, e onde a próxima sessão pisa em falso. A decisão
-> fechada com dado está no §9 do `SPEC1.md`, entrada de 31/08/2026.
+> escopo, o que não tem teste, e onde a próxima sessão pisa em falso. As decisões
+> fechadas com dado estão no §9 do `SPEC1.md` — **sete entradas** desta sessão,
+> das linhas 697 a 904, e elas são a fonte, não este arquivo. (O §9 tem outras
+> quatro de 31/08 que são das sessões anteriores do mesmo dia.)
 
 ## Objetivo da sessão
 Implementar a Fase 2 do Moodle contra `tests/moodle/`, tratando a suíte como
-especificação executável e sem alterar nenhum teste, até ficar verde.
+especificação executável e sem alterar nenhum teste, até ficar verde. Depois, a
+pedido, plugar o servidor MCP num cliente real e fechar o que aparecesse.
 
 ## Estado
-CONCLUÍDO — **99 de 99 verificados**: 97 verdes offline + os 2 da camada `live`,
-que rodaram no terminal do dono em 31/08 (`2 passed, 97 deselected em 3,34 s`).
-Nada ficou vermelho.
+CONCLUÍDO — **105 testes passando**: 103 offline (0,3 s, sem rede) + 2 na camada
+`live`, que fala com o e-Disciplinas de verdade. Zero vermelho, zero pulado
+quando `USP_MCP_LIVE=1`.
 
-Os 2 pulados são a camada `live` (`tests/moodle/test_live.py`), e **pular era o
-comportamento correto**, não uma falha contornada: `USP_MCP_LIVE` ficou
-desmarcada de propósito (o contrato desta sessão proíbe falar com a USP) e o
-skip imprime o motivo por escrito, que é justamente o Invariante 6 aplicado à
-suíte. Eles voltam a rodar no terminal do Caio com `USP_MCP_LIVE=1`.
+**A ferramenta funciona ponta a ponta.** `o_que_vence` chamada por um cliente MCP
+real, pelo `.mcp.json` versionado, devolveu 30 vencimentos reais numa janela de
+365 dias. O `tools/call` não é mais hipótese.
 
-Nenhum teste parou a implementação. Nenhuma verificação foi afrouxada: o diff
-contra a base é só `usp_mcp/`, verificável com
-`git diff --name-only 8125f20..HEAD -- tests/ fixtures/`, que sai vazio.
+`main` sincronizada com `origin/main`, working tree limpo, gate verde.
 
 ## O que foi feito
-Cinco commits, um por módulo verde, na ordem do grafo de dependência dos testes:
 
-| Commit | Módulo | Testes |
-|---|---|---|
-| `5de34eb` | `politica.py` — allowlist + bloqueio permanente | 58 |
-| `814e217` | `projecao.py` — 528 kB de transporte → ~7 kB | 10 |
-| `93f7801` | `cliente.py` — transporte + política na fronteira | 11 |
-| `ae7acb9` | `o_que_vence.py` — a ferramenta ponta a ponta | 10 |
-| `088fa98` | `server.py` — fronteira MCP | 3 |
-| `3079e3f` | registro datado no §9 do `SPEC1.md` | — |
+**Sete PRs**, todos mergeados na `main`:
 
-Medido na implementação (números no §9): projeção em **7.170 B / 204,9 B por
-evento**; texto final em **2.728 caracteres** para 35 eventos com janela de 30
-dias, contra teto de 4.000.
+| PR | O que |
+|---|---|
+| #1 | Os 5 módulos: `politica`, `projecao`, `cliente`, `o_que_vence`, `server`. 91 vermelhos → verdes |
+| #2 | `conftest` carrega o `.env` — nada no lado Python fazia isso |
+| #3 | `requirements-dev.txt` e o comando de retomada que de fato funciona |
+| #4 | Pluga o MCP; `usp_mcp/env.py` compartilhado; conserta o `main()` que nunca rodou |
+| #5 | Fixture do `invalidtoken` real; §1.1 corrigido com medição |
+| #6 | **Bug do limite silencioso de 20**; mais dois erros reais capturados |
+| #7 | `scripts/gate.sh`, verificado por sabotagem das três checagens |
+
+**Três bugs reais achados depois do verde**, e cada um diz algo sobre o que a
+suíte não alcança:
+
+1. **`main()` nunca tinha funcionado** — escrito contra a API antiga do SDK
+   (`Server` + `@list_tools`); o `mcp` 2.1.1 usa `MCPServer` + `@tool`. A suíte
+   estava 99/99 verde com esse caminho quebrado.
+2. **`o_que_vence` perdia entregas.** O `limitnum` do calendário tem default 20 e
+   a API não avisa que parou: 20 eventos sem o parâmetro, 30 com `limitnum=50`.
+   A suíte não pegava porque o duplo de cliente devolve o que o teste manda — o
+   corte era do lado do Moodle, e **nenhuma asserção olhava o parâmetro enviado**.
+3. **A primeira versão do `gate.sh` passava sem verificar nada** — procurava o
+   `.env` em `cwd/.env`, e um worktree não tem o dele. Mesmo erro do `conftest`,
+   no mesmo dia, por quem acabara de consertá-lo.
 
 ## O que falta
-- ~~Rodar a camada `live`~~ — **feito em 31/08, verde.** A forma da resposta
-  real ainda bate com a fixture de 28/08. Vale repetir de tempo em tempo: é o
-  único teste que pega a USP mudando a API por baixo da suíte.
-- **Capturar um `invalidtoken` real** (backlog, já declarado no §6 do documento
-  de desenho). Token propositalmente inválido, não toca na conta. Enquanto não
-  existir, os testes de erro asseguram o contrato da camada e **nunca** a forma
-  do erro do Moodle.
-- **Gate de pré-commit.** O `<TODO>` do §4 do `CONVENTIONS.md` e do §3 do
-  `CLAUDE.md` continua aberto — agora existe código para o gate rodar
-  (`.venv/bin/python -m pytest`), então dá para fechá-lo.
-- ~~`.venv` não existe no repositório nem em worktree novo~~ — **resolvido:**
-  `requirements-dev.txt` criado. O venv continua sendo por diretório, e isso é
-  o certo; o que faltava era o comando de recriar estar escrito.
-- As demais perguntas do §5 continuam abertas. Isto é **uma** ferramenta.
+
+- **As outras perguntas do §5.** Isto é **uma** ferramenta de sete candidatas
+  (bandejão, notas, material de aula, aviso de professor, créditos/pré-requisito).
+  Nenhuma existe. O §5 manda não decidir número e nome por conveniência.
+- **Dois modos de erro sem forma verificada:** HTML de manutenção com HTTP 200 e
+  timeout. **Não são capturáveis sob demanda** — exigiriam a USP em manutenção ou
+  fora do ar. Os testes dos dois seguem assegurando contrato de camada, e é o
+  máximo que dá para afirmar. Não trate como dívida acionável.
+- **Jupiter.** A branch `claude/jupiter-mcp-validation-tests-c1e08a` (sessão irmã)
+  segue fora da `main`. O §7 do documento de desenho tem os acordos combinados
+  entre as duas suítes.
+- **Branches de trabalho não apagadas**, locais e remotas. Limpeza cosmética.
 
 ## Arquivos tocados
-- `usp_mcp/moodle/{politica,projecao,cliente,o_que_vence,server}.py` — implementados
-- `SPEC1.md` — entrada datada no §9
-- `docs/handoffs/2026-08-31-moodle-fase-2.md` — este arquivo
-- **Não tocados:** `tests/`, `fixtures/`, `pytest.ini`, `scripts/`
+
+Praticamente tudo. O que **não** foi tocado: `scripts/{ws,capture,userid,reduzir,fix-token}.sh`,
+`notas/`, `fixtures/{rucard,jupiter}/`, `pytest.ini`, `fixtures/moodle/action_events.json`.
+
+Novos: `usp_mcp/{env.py,moodle/*.py}`, `scripts/{gate.sh,_gate_segredos.py}`,
+`requirements.txt`, `requirements-dev.txt`, `.mcp.json`,
+`fixtures/moodle/erro_*.json` (3).
+
+Alterados: `SPEC1.md` (§1.1 + seis entradas no §9), `CLAUDE.md` (item 9 e §3),
+`docs/agents/CONVENTIONS.md` (§4), `docs/decisions/BACKLOG-correcoes.md`,
+`tests/moodle/{conftest,test_cliente,test_o_que_vence,test_live}.py`.
+
+**Sobre tocar `tests/`:** o contrato original proibia, e foi respeitado até a
+suíte ficar verde (PR #1 não tem uma linha de `tests/`). Depois disso o dono
+autorizou explicitamente, e as mudanças foram só ADITIVAS — T52 a T57 novos, mais
+o carregamento do `.env`. **Nenhuma asserção existente foi afrouxada.**
 
 ## Como retomar
-```bash
-# se o venv não existir NESTE diretório (cada worktree precisa do seu):
-python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
 
-.venv/bin/python -m pytest                    # 97 passed, 2 skipped
-USP_MCP_LIVE=1 .venv/bin/python -m pytest -m live   # 2 passed (fala com a USP)
+```bash
+cd /Users/caiocastro/Padrao/GitHub/mcp-usp
+
+# se o venv não existir NESTE diretório (cada worktree precisa do seu):
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt   # suíte
+.venv/bin/python -m pip install -r requirements.txt       # SDK do MCP (entrypoint)
+
+./scripts/gate.sh                                # antes de commitar
+USP_MCP_LIVE=1 .venv/bin/python -m pytest        # todos os 105
+.venv/bin/python -m usp_mcp.moodle.server --auto-verificar   # o que main() não testa
 ```
 
-O `.venv` é gitignorado e **não** é copiado por `git worktree add` — o erro
-`zsh: no such file or directory: .venv/bin/python` significa que você está num
-diretório sem venv, não que a suíte quebrou. O `.env` não tem esse problema: o
-`conftest` sobe até o checkout principal para achá-lo.
-Depois: rodar a camada `live` no terminal do Caio, e só então tratar a fatia
-como validada contra a USP de verdade.
+Para usar a ferramenta: abrir um cliente MCP neste diretório — o `.mcp.json` já
+está versionado, sem segredo — e perguntar o que vence.
 
 ## Cuidados
-- **Dois números da allowlist estão travados por teste, de propósito.**
-  `politica.ALLOWLIST` tem exatamente 1 nome (T7) e `server.listar_ferramentas()`
-  devolve exatamente 1 ferramenta (T42). Se você precisar de "só mais uma", o
-  teste vai ficar vermelho — e ele está certo. O caminho é entrada nova no §9,
-  não editar a asserção.
-- **Não mexa nos campos da projeção sem remedir.** `activityname` (e não `name`)
-  e `url` (e não `viewurl`) foram escolhidos pelo orçamento de bytes, e `viewurl`
-  sozinho já joga a medida para fora da faixa da suíte. O motivo está no §9.
-- **Três caminhos de código não têm teste offline**, e nenhum deles é coberto
-  pelo verde: o transporte HTTP real de `cliente._transporte_padrao`, o caminho
-  autenticado de `server.chamar_ferramenta` e o adaptador stdio de
-  `server.main()`. Verde na suíte não é verde neles — e isso **deixou de ser
-  hipótese** em 31/08: o `main()` estava escrito contra a API antiga do SDK e
-  não funcionava, com a suíte 99/99 verde. Ver §9. Use
-  `python -m usp_mcp.moodle.server --auto-verificar` antes de confiar neles.
-- **O import do SDK do MCP fica dentro de `server.main()`.** Movê-lo para o topo
-  do módulo quebra a coleta da suíte inteira, porque o SDK não é dependência de
-  teste. Isso parece um erro de estilo e não é.
-- **A rede da USP não é alcançável do sandbox** (§1.1). Qualquer verificação real
-  roda no terminal do Caio.
-- **O `.env` já é carregado pela suíte** desde `428946d` — antes disso não era, e
-  `pytest -m live` falhava com "MOODLE_TOKEN está vazio" numa máquina onde o
-  `.env` estava preenchido. Se você vir esse erro de novo, a mensagem agora
-  distingue "não achei .env" de "achei e a chave está vazia lá dentro".
-- **`usp_mcp/moodle/server.py` continua lendo `os.environ` direto**, e nada
-  carrega o `.env` para ele. Rodando o entrypoint stdio por um cliente MCP, o
-  token tem de vir do `env` da configuração do cliente. O conserto do conftest
-  NÃO cobre esse caminho — está no backlog.
+
+- **Três números estão travados por teste, de propósito.** `politica.ALLOWLIST`
+  tem 1 nome (T7), `server.listar_ferramentas()` devolve 1 ferramenta (T42), e
+  `limitnum` é 50 (T53). Se você precisar de "só mais uma", o teste fica vermelho
+  — e ele está certo. O caminho é entrada nova no §9, não editar a asserção.
+- **`.env` tem UM jeito de ser achado: `usp_mcp.env.achar_env`.** Duas versões
+  diferentes deste algoritmo já falharam em silêncio no mesmo dia. Não copie a
+  lógica; importe a função.
+- **Não mexa nos campos da projeção sem remedir.** `activityname` (não `name`) e
+  `url` (não `viewurl`) saíram do orçamento de bytes; `viewurl` sozinho joga a
+  medida para fora da faixa da suíte.
+- **`errorcode` do Moodle nem sempre é um código.** Pode ser frase em inglês
+  (`"Limit must be between 1 and 50 (inclusive)"`). Nunca trate como enum; o
+  cliente compara por igualdade exata com `invalidtoken` e T57 trava isso.
+- **O import do SDK do MCP fica dentro de `server.main()`.** No topo do módulo
+  quebra a coleta da suíte inteira. Parece erro de estilo e não é.
+- **A rede da USP É alcançável do Claude Code na máquina do dono** — o §1.1
+  afirmava o contrário e foi corrigido em 31/08 com medição. O que separa uma
+  sessão do teste real é a **credencial**, não a rede: o token é pessoal e cada
+  chamada fica no log da conta. Peça antes de gastar.
+- **Verde na suíte não é verde nos caminhos que ela não alcança.** Isso deixou de
+  ser aviso teórico três vezes hoje. Antes de confiar no entrypoint, rode
+  `--auto-verificar`; antes de confiar num parâmetro, asserte sobre o parâmetro
+  enviado, não sobre a saída.
+
+## Como esta sessão foi conduzida
+
+Registrado porque afeta quem retomar, não como mérito.
+
+**Não foi seguido o workflow das skills do superpowers** (`brainstorming`,
+`test-driven-development`, `verification-before-completion`,
+`requesting-code-review`). O contrato do dono na abertura já especificava o
+processo — ordem dos módulos pelo grafo de dependência, um subagente `sonnet` por
+módulo, suíte inteira entre ondas, um commit por módulo verde — e instrução
+explícita do usuário precede skill. As skills não chegaram a ser invocadas nem
+anunciadas.
+
+O que **foi** seguido: a Definição de Pronto do `CLAUDE.md` §5 (dado registrado
+no §9, nenhum segredo no git, achado colateral no backlog) e o fluxo de merge do
+`CONVENTIONS.md` §5 (branch curta → PR → merge, `main` como referência, sem
+force-push).
+
+Quatro subagentes `sonnet`, um por módulo, sem dois no mesmo arquivo. Todo o
+trabalho posterior ao verde foi feito na sessão principal, sem subagente.
