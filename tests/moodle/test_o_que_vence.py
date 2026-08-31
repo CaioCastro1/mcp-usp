@@ -117,3 +117,43 @@ def test_nenhuma_escrita_e_emitida_nem_com_a_flag(eventos_brutos, monkeypatch):
     c = ClienteFalso(eventos_brutos)
     o_que_vence(c, dias=14)
     assert [f for f, _ in c.chamadas] == ["core_calendar_get_action_events_by_timesort"]
+
+
+def test_o_teto_da_api_e_pedido_explicitamente(eventos_brutos):
+    """T53 — Invariante 7 do lado do TRANSPORTE, e não só da saída.
+
+    Bug real, achado em 31/08/2026 chamando a API de verdade: sem `limitnum`, o
+    Moodle devolve **20** eventos e não diz que parou. A mesma janela de 365
+    dias devolveu 20 sem o parâmetro e 30 com `limitnum=50`. Dez entregas
+    sumiam, e a ferramenta reportava `truncado=False`.
+
+    A suíte não pegava porque o cliente falso devolve o que o teste mandar — o
+    corte acontecia do lado do Moodle. Por isso a asserção é sobre o PARÂMETRO
+    ENVIADO, que é onde o defeito morava.
+    """
+    c = ClienteFalso(eventos_brutos)
+    o_que_vence(c, dias=30)
+    params = c.chamadas[0][1]
+    assert int(params["limitnum"]) == 50, "voltou a confiar no default de 20"
+
+
+def test_bater_no_teto_da_api_e_declarado(eventos_brutos):
+    """T54 — o par do anterior: pedir o teto não basta, tem de dizer quando bate.
+
+    Se o Moodle devolve exatamente o que pedimos, NÃO dá para saber se existe
+    mais depois — a API não informa. "Não tem mais nada" e "parei de contar em
+    50" são respostas diferentes, e presumir a primeira é o erro que o
+    Invariante 7 proíbe.
+    """
+    no_teto = {"events": (eventos_brutos["events"] * 2)[:50]}
+    r = o_que_vence(ClienteFalso(no_teto), dias=365)
+    assert r.truncado is True
+    assert "50" in r.texto
+    assert "máximo" in r.texto.lower() or "teto" in r.texto.lower()
+
+
+def test_abaixo_do_teto_nao_inventa_aviso(eventos_brutos):
+    """T55 — e o aviso não pode ser decorativo: 35 eventos não bateram em nada."""
+    r = o_que_vence(ClienteFalso(eventos_brutos), dias=30)
+    assert r.truncado is False
+    assert "máximo" not in r.texto.lower()

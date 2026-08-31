@@ -40,6 +40,14 @@ _DIAS_SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
 # um rótulo desconhecido é melhor que um rótulo inventado.
 _TIPOS_PT = {"assign": "tarefa", "quiz": "questionário"}
 
+# Teto de `limitnum` aceito pelo web service, medido em 31/08/2026 contra o
+# e-Disciplinas: `limitnum=-5` responde "Limit must be between 1 and 50
+# (inclusive)". E o DEFAULT, quando não se manda nada, é 20 — silenciosamente.
+# Medido: a mesma janela de 365 dias devolve 20 eventos sem `limitnum` e 30 com
+# `limitnum=50`. Não mandar o parâmetro é perder entrega sem aviso, que é
+# exatamente o que o Invariante 7 proíbe.
+_LIMITE_DA_API = 50
+
 
 @dataclass(frozen=True)
 class RespostaOQueVence:
@@ -83,6 +91,7 @@ def o_que_vence(
         "core_calendar_get_action_events_by_timesort",
         timesortfrom=int(inicio.timestamp()),
         timesortto=int(fim.timestamp()),
+        limitnum=_LIMITE_DA_API,
     )
     # Um erro do cliente (ErroMoodle e subclasses) sobe daqui sem ser
     # capturado: T38 é o outro lado do bug do §9 de 28/08 — falha de
@@ -90,9 +99,14 @@ def o_que_vence(
 
     resultado = projetar_eventos(bruto)
 
+    # Se o Moodle devolveu exatamente o teto que pedimos, NÃO dá para saber se
+    # existe mais depois disso — a API não diz. Declarar a dúvida é o Invariante
+    # 7; presumir que acabou é o bug que essa detecção existe para não repetir.
+    no_teto_da_api = len(bruto.get("events", [])) >= _LIMITE_DA_API
+
     vencimentos = resultado.vencimentos
     total = len(vencimentos)
-    truncado = limite is not None and total > limite
+    truncado = (limite is not None and total > limite) or no_teto_da_api
     if truncado:
         vencimentos = vencimentos[:limite]
 
@@ -113,6 +127,15 @@ def o_que_vence(
         cabecalho = f"Vencimentos nos próximos {dias} dias ({total} encontrados):"
 
     partes = [cabecalho, *linhas]
+
+    if no_teto_da_api:
+        # Sem isto, "não tem mais nada" e "o Moodle parou de contar em 50" são
+        # indistinguíveis para quem lê.
+        partes.append(
+            f"O e-Disciplinas devolve no máximo {_LIMITE_DA_API} eventos por "
+            "consulta e atingiu esse teto: pode haver mais depois do último "
+            "item. Reduza a janela de dias para ver o resto."
+        )
 
     if resultado.sem_data:
         # Invariante 7 de novo: eventos descartados por falta de data usável

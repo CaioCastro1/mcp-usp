@@ -26,6 +26,8 @@ from usp_mcp.env import carregar_env
 RAIZ = Path(__file__).resolve().parents[2]
 FIXTURE_EVENTOS = RAIZ / "fixtures" / "moodle" / "action_events.json"
 FIXTURE_ERRO = RAIZ / "fixtures" / "moodle" / "erro_invalidtoken.json"
+FIXTURE_ERRO_PARAM = RAIZ / "fixtures" / "moodle" / "erro_invalidparameter.json"
+FIXTURE_ERRO_LIMITE = RAIZ / "fixtures" / "moodle" / "erro_limite_fora_da_faixa.json"
 
 
 # O carregador mora em usp_mcp/env.py, não aqui: o entrypoint stdio do Moodle
@@ -102,3 +104,34 @@ def pytest_runtest_setup(item):
             "camada live desligada: exporte USP_MCP_LIVE=1 para falar com "
             "edisciplinas.usp.br. Do sandbox a rede da USP não é alcançável (§1.1)."
         )
+
+
+def _carregar_fixture_erro(caminho: Path, como_recapturar: str) -> dict:
+    if not caminho.exists():
+        pytest.fail(
+            f"Fixture de erro ausente: {caminho}\n{como_recapturar}\n"
+            "Isto FALHA em vez de dar skip de propósito (Invariante 6)."
+        )
+    return json.loads(caminho.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def erro_invalidparameter() -> dict:
+    """Erro real de parâmetro inválido, capturado em 31/08/2026 na MESMA função
+    da allowlist, read-only, com `timesortfrom` textual (Regra de Ouro §3.1)."""
+    return _carregar_fixture_erro(
+        FIXTURE_ERRO_PARAM,
+        "Recapture chamando core_calendar_get_action_events_by_timesort "
+        "com timesortfrom='nao-e-numero'.",
+    )
+
+
+@pytest.fixture(scope="session")
+def erro_limite_fora_da_faixa() -> dict:
+    """O erro que revelou o teto de 50 do `limitnum` — e que `errorcode` nem
+    sempre é um código (§9, 31/08/2026)."""
+    return _carregar_fixture_erro(
+        FIXTURE_ERRO_LIMITE,
+        "Recapture chamando core_calendar_get_action_events_by_timesort "
+        "com limitnum=-5.",
+    )
