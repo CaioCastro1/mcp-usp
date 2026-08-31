@@ -179,7 +179,7 @@ T33 fecha um item de "não verificado" do §8 do recon sem fingir que o fechou.
 | # | Teste |
 |---|---|
 | T34 | Teto absoluto por amostra, com folga declarada no próprio teste. |
-| T35 | Custo do **núcleo estruturado** dentro de 120–180 B. |
+| T35 | Custo do **núcleo estruturado da saída** dentro de 140–210 B. |
 | T36 | **Categórico:** o conjunto de chaves da saída é exatamente o declarado — nenhum `*epa`, nenhum `*igl` sem pedido, nenhum `stackTrace`, nada fora da lista. |
 | T37 | A resposta de erro projetada nunca custa mais que a de sucesso. |
 
@@ -190,6 +190,8 @@ Medido em 31/08, duas amostras (script em scratchpad, não versionado):
 | Objeto DWR inteiro (26 campos) | ~864 tok | ~1.619 tok |
 | Só português, sem campos vazios | ~536 | ~903 |
 | Núcleo: créditos + carga calculada, sem texto livre | ~101 | ~129 |
+| Saída projetada da ferramenta (14 campos) | 2.148 B | 3.615 B |
+| Núcleo estruturado **da saída** (7 campos) | 179 B | 164 B |
 
 | Erro (`handleException`) | tokens |
 |---|---:|
@@ -203,7 +205,8 @@ de uma correção proposta à suíte do Moodle, e ao aplicá-la aqui não sobrev
 |---|---:|---:|---:|
 | Razão vs cru | 1,73 | 1,98 | 14% |
 | Bytes por campo | 126 B | 212 B | **68%** |
-| Núcleo estruturado | 153 B | 138 B | **12%** |
+| Núcleo estruturado (nomes DWR) | 153 B | 138 B | 12% |
+| Núcleo estruturado (nomes da saída) | 179 B | 164 B | **9%** |
 | Texto livre | 1.937 B | 3.419 B | **77%** |
 
 Duas conclusões, e as duas mudam o teste:
@@ -215,7 +218,7 @@ Duas conclusões, e as duas mudam o teste:
    bibliografia), de tamanho intrínseco à disciplina. O que a ferramenta controla é o
    *conjunto de campos*, não o tamanho de cada um.
 
-Daí T35 e T36: o número fica no núcleo estruturado, que é estável em 12%, e a trava
+Daí T35 e T36: o número fica no núcleo estruturado da saída, que é estável em 9%, e a trava
 de regressão é **categórica**. É a mesma lição que a suíte do Moodle tirou do dado
 dela — o que trava regressão é "nenhum objeto `course` sobrevive à projeção", não uma
 razão — chegando ao mesmo lugar por caminhos opostos: lá o numerador é ruidoso, aqui
