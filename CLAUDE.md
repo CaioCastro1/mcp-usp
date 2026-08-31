@@ -35,6 +35,7 @@ quatro é este arquivo.
 | `usp_mcp/` | Código dos servidores MCP, um pacote por sistema |
 | `tests/` | Suíte em três camadas: `politica` e `contrato` offline, `live` atrás de env var |
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
+| `usp_mcp/<sistema>/` | Código: `politica`, `cliente`, ferramenta e `server` por sistema |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
 | `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) e o gate (`gate.sh`) |
@@ -71,6 +72,9 @@ USP_MCP_LIVE=1 .venv/bin/python -m pytest
 
 # O que dá para checar do servidor sem tocar a rede nem gastar chamada da conta
 .venv/bin/python -m usp_mcp.<sistema>.server --auto-verificar
+
+# Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
+.venv/bin/python -m pytest tests/handshake
 ```
 
 ## 4. Regras críticas (não negociáveis)
