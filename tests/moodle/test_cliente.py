@@ -172,3 +172,36 @@ def test_o_erro_real_do_moodle_vira_TokenInvalido(erro_invalidtoken):
         c.chamar("core_calendar_get_action_events_by_timesort")
     assert "§8" in str(e.value) or ".env" in str(e.value).lower()
     assert TOKEN_FALSO not in str(e.value)
+
+
+def test_erro_de_parametro_real_sobe_legivel_e_nao_vira_TokenInvalido(
+    erro_invalidparameter,
+):
+    """T56 — o segundo erro real capturado, e ele NÃO pode virar TokenInvalido.
+
+    `invalidtoken` e `invalidparameter` têm a mesma forma de três chaves. Um
+    cliente que casasse por "contém 'invalid'" mandaria você renovar um token
+    que está perfeito.
+    """
+    c = _cliente(lambda **kw: erro_invalidparameter)
+    with pytest.raises(ErroMoodle) as e:
+        c.chamar("core_calendar_get_action_events_by_timesort")
+    assert not isinstance(e.value, TokenInvalido)
+    assert "invalidparameter" in str(e.value)
+
+
+def test_errorcode_nem_sempre_e_um_codigo(erro_limite_fora_da_faixa):
+    """T57 — fato da API que contraria o nome do campo (§9, 31/08/2026).
+
+    Medido: `limitnum=-5` devolve `errorcode` valendo a FRASE
+    "Limit must be between 1 and 50 (inclusive)", não um identificador. Quem
+    tratar `errorcode` como enum quebra aqui. O cliente sobrevive porque só
+    compara por igualdade exata com `invalidtoken` — este teste trava esse
+    critério, e a mensagem crua chega inteira a quem lê.
+    """
+    assert " " in erro_limite_fora_da_faixa["errorcode"], "virou código estável?"
+    c = _cliente(lambda **kw: erro_limite_fora_da_faixa)
+    with pytest.raises(ErroMoodle) as e:
+        c.chamar("core_calendar_get_action_events_by_timesort")
+    assert not isinstance(e.value, TokenInvalido)
+    assert "between 1 and 50" in str(e.value)
