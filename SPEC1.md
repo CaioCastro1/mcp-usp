@@ -1080,6 +1080,130 @@ inexistente em ressalva escrita. A lição não é sobre rede: **uma restrição
 ambiente citada de memória vale menos que um `curl`**, e o custo de conferir era um
 comando.
 
+### 31/08/2026 — o `main()` do Jupiter ganha teste, e a sabotagem achou um teste fraco
+
+O backlog registrava desde a implementação da Fase 2 que o adaptador stdio do
+Jupiter não tinha teste — o mesmo buraco que, na trilha do Moodle, escondeu um
+`main()` escrito contra a API antiga do SDK com a suíte **99/99 verde**. Fechado
+por `tests/jupiter/test_server_stdio.py` (T45-T48): a suíte roda `main()` de
+verdade contra o SDK instalado, substituindo **só** `run()`, que bloquearia no
+stdin. Tudo antes dela é código de produção casando com o SDK real.
+
+**Cada asserção foi verificada por sabotagem**, porque teste escrito depois da
+implementação passa na primeira tentativa e isso não prova nada:
+
+| Sabotagem na produção | Quem ficou vermelho |
+|---|---|
+| `from mcp.server import Server` (o bug histórico do Moodle) | T45, T46, T47 — `'Server' object has no attribute 'tool'` |
+| assinatura do adaptador perde `ingles` | T46 — schema derivado ≠ declarado |
+| `run(transport="sse")` | T45 |
+| mensagem de SDK ausente perde o comando que cura | T48 |
+| `{"sigla": codhab}` no mapeamento de parâmetros | **ninguém** |
+
+**A quinta linha é o achado.** O dublê de transporte devolve a fixture aconteça o
+que acontecer, então consultar a disciplina `"0"` ainda formatava PSI3323 e o teste
+seguia verde. É o **mesmo erro** do limite silencioso de 20 do calendário,
+registrado neste §9 mais acima: asserção sobre a saída onde só a asserção sobre o
+que **saiu no fio** significa alguma coisa. T47 passou a olhar `string:PSI3323` no
+corpo da requisição, e aí a sabotagem virou vermelha. A regra virou o item 11 do
+§4 do `CLAUDE.md`.
+
+Verificado nos dois cenários que importam: **177 passed, 4 skipped** com o SDK
+instalado, e **174 passed, 7 skipped** com o pacote `mcp` desinstalado de verdade
+— não simulado. A distinção não é preciosismo: a primeira tentativa de simular
+"SDK ausente" plantou um módulo que levanta `ImportError`, e `pytest.importorskip`
+**não pula** nesse caso, de propósito, para não mascarar instalação quebrada.
+Pacote inexistente levanta `ModuleNotFoundError` e pula. Simulação errada teria
+"provado" o contrário do fato.
+
+**O que continua sem teste:** `run()` em si, isto é, o handshake stdio real. Isso
+testaria o SDK, não este projeto, e a verificação que importa segue sendo plugar
+num cliente e perguntar. O `main()` do **Moodle** continua descoberto pelo mesmo
+motivo de sempre — falta um token que não pode entrar em teste. A assimetria é a
+mesma do §6, e agora ela tem uma consequência medida: a fronteira do Jupiter é
+testável ponta a ponta offline, a do Moodle não.
+
+### 31/08/2026 — estado sai do `CLAUDE.md`; ele guarda regra, não notícia
+
+O `CLAUDE.md` afirmava, em negrito e no §1, que a Fase 2 não tinha começado e que
+**não havia servidor MCP nenhum** — enquanto dois rodavam, verificados contra a USP,
+com o §9 registrando os dois. O `README.md` dizia o mesmo. Ficaram assim por dois
+dias e nenhuma das sessões que os leram notou: é a falha silenciosa característica
+de documento de estado, porque nada quebra.
+
+**A causa não é desatenção, é lugar errado.** O `CLAUDE.md` é lido por toda sessão
+antes da primeira pergunta e é o único documento que ninguém revisita ao terminar
+uma tarefa — o §9 recebe a decisão, o backlog recebe o achado, e o §1 do
+`CLAUDE.md` fica falando do mundo de dois dias atrás para quem ainda não sabe o
+suficiente para desconfiar.
+
+**Decidido:** o `CLAUDE.md` não guarda estado. Nada sobre fase aberta, o que já foi
+construído, quantos testes passam. Ele guarda o que não envelhece — produto em 30
+segundos, onde as coisas moram, comandos, regras críticas, fluxo. O estado vive em
+quatro lugares que já têm dono e ritual de atualização: o §9 (decisão, com o dado),
+o `README.md` (um parágrafo para quem chega), o backlog (dívida aberta) e o
+`./scripts/gate.sh` (o que de fato está verde, em segundos e sem confiar em texto).
+
+**Descartado:** manter o estado no `CLAUDE.md` com nota de "atualize ao terminar".
+O repositório já tinha essa instrução, em forma de Definição de Pronto, e ela não
+impediu nada — instrução escrita não compete com o fato de que ninguém reabre o §1
+ao fechar uma tarefa. Regra que depende de lembrança perde para regra que depende
+de lugar.
+
+### 31/08/2026 — a segunda ferramenta do Moodle é material, e a pergunta veio do dono
+
+As três candidatas que sobravam do §5 foram postas ao dono com o custo medido de
+cada uma. A resposta descarta duas e reescreve a terceira:
+
+- **Nota** — "eles usam pouco". Descartada apesar de ser a chamada mais barata do
+  projeto por unidade de informação (70 cursos em ~870 tokens). Barato não é
+  critério; o §5 pede a pergunta que o dono **faz de verdade**.
+- **Aviso do professor** — "não queria usar". Descartada.
+- **"Já entreguei"** — "devo usar um pouco mais". Fica como candidata, não como
+  próxima.
+- **Material** — a pergunta real, e não estava na forma em que o §5 a registrava.
+  Não é "onde está o PDF da aula de hoje": é **descobrir os arquivos do espaço da
+  disciplina**, porque muitos são regras da disciplina, listas de exercícios e
+  provas anteriores. O valor está no acervo, não no arquivo de hoje.
+
+**Medido antes de desenhar**, em cima da captura da Fase 1 e sem gastar chamada
+nova da conta (`course_contents_142033.json`, 58.049 B). Detalhe em
+`notas/fase1-moodle.md`:
+
+| | |
+|---|---|
+| Composição | 22 `resource` + 7 `url` = **29 entradas em `contents`** |
+| Mimetype | **19 PDF**, 1 docx, 1 jpeg, 1 octet-stream, 7 sem (os links externos) |
+| Cru | 58.049 B, ~14.512 tokens por disciplina |
+| **Projetado** | **6.486 B, ~1.621 tokens — 11,2% do cru** |
+
+A projeção é o que torna a ferramenta viável: 1,6k por disciplina cabe folgado,
+14,5k não. Varrer as 10 segue inviável (145k) — **sob demanda, uma por vez**, e a
+ferramenta exige escopo explícito como toda chamada deste projeto.
+
+**Decidido: duas ferramentas, nesta ordem, não uma.** A primeira lista; a segunda,
+depois, traz o conteúdo do arquivo para o modelo ler. O motivo de separar não é
+cautela genérica — é que a segunda tem dois problemas não resolvidos que a
+primeira não tem, e juntá-las seguraria a que já dá para entregar.
+
+**`fileurl` não carrega o token: 0 de 29 entradas.** A resposta como capturada não
+tem segredo dentro. Mas para **baixar**, o token precisa ir junto na URL, e aí o
+Invariante 3 morde: devolver URL pronta põe a credencial no contexto do modelo e
+em todo log por onde ela passar. Enquanto isso não tiver desenho, a ferramenta de
+listagem devolve o que identifica o arquivo, não uma URL autenticada.
+
+**Continua não verificado**, e registrado como tal em vez de suposto: (a) se o
+download com token anexado funciona — é o padrão do Moodle, este repo nunca mediu,
+e custa uma chamada da conta, que é decisão do dono; (b) se `get_contents` expande
+o conteúdo de um `mod_folder` — PSI3323 não tem nenhum, então a amostra não
+responde, e uma disciplina que agrupe as listas numa Pasta é exatamente o caso que
+importa.
+
+**Descartado:** usar `mod_resource_get_resources_by_courses` ou
+`core_search_get_results`. O primeiro é mais estreito e exigiria uma segunda
+chamada para os `url`; o segundo não foi testado. `get_contents` já responde em
+uma chamada, e a questão do §4 sobre ele fechou em 28/08.
+
 ### 31/08/2026 — Fase 2 do RUCard implementada contra a suíte; os três sistemas têm servidor
 
 **Decisão: uma ferramenta, `bandejao`, sobre os quatro RUs da Cidade Universitária.**
