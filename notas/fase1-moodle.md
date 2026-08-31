@@ -68,6 +68,36 @@ viável sob demanda, uma disciplina por vez.
 Tem HTML embutido nos campos de descrição — confirma o que o §1.2 dizia do RUCard e vale
 aqui também.
 
+### Projeção medida — 31/08/2026
+
+Medido em cima da mesma captura (`course_contents_142033.json`, 58.049 B), sem
+nova chamada à conta.
+
+**Composição.** Os 22 `resource` e os 7 `url` produzem **29 entradas em
+`contents`**. Por mimetype: **19 `application/pdf`**, 1 `.docx`, 1 `image/jpeg`,
+1 `application/octet-stream`, e 7 sem mimetype — os links externos, cujos hosts
+saem do domínio da USP (`youtube.com`, `docs.google.com`, `ni.com`).
+
+**Campos de um `contents`:** `filename`, `filesize`, `fileurl`, `mimetype`,
+`timecreated`, `timemodified`, `author`, `userid`, `filepath`, `type`,
+`license`, `isexternalfile`, `sortorder`.
+
+**Projeção.** Guardando só o que responde "que arquivos tem aqui" — seção, nome
+do módulo, tipo, e por arquivo `filename`/`filesize`/`mimetype`/`timemodified` —
+sobram **6.486 B, ~1.621 tokens: 11,2% do cru.** Uma ferramenta de material cabe
+folgado no contexto por disciplina. Varrer as 10 continua inviável (145k crus);
+sob demanda, uma por vez, é confortável.
+
+**O `fileurl` não carrega o token: 0 de 29.** A resposta como capturada não tem
+segredo dentro, o que é bom e é também o aviso — para **baixar** o arquivo o
+token precisa ir junto na URL, e é aí que o Invariante 3 morde. Uma ferramenta
+que devolva URL pronta põe a credencial no contexto do modelo e em todo log por
+onde ela passar. **O download com token anexado não foi verificado neste repo.**
+
+**`author` e `userid` vêm dentro de `contents`** — quem subiu o arquivo. É dado
+pessoal e cai na higienização do §3.3 se isto virar fixture versionada.
+
+
 ## Linha 4 — entregas
 
 **Sem parâmetro, a função devolve as 74 disciplinas: 1 MB, ~251.000 tokens, 303 assigns.**

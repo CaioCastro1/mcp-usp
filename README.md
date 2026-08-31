@@ -8,27 +8,47 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 "está público" não equivale a "liberado para redistribuir" — ver Invariante 8 do
 `SPEC1.md`.
 
-## Estado
+## Estado — 31/08/2026
 
-**Fase 1 (descoberta) concluída nos três sistemas. Fase 2 implementada como uma fatia
-vertical em cada um** — uma pergunta real, ponta a ponta, com suíte e custo medido:
+**Três servidores MCP rodando, uma ferramenta cada, todas verificadas contra a USP.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
-| `usp-rucard` | `bandejao` | o que tem no bandejão hoje, e onde vale a pena comer |
-| `usp-moodle` | `o_que_vence` | o que eu tenho que entregar, e até quando |
-| `usp-jupiter` | `disciplina` | créditos, ementa e pré-requisito de uma disciplina |
+| `usp-rucard` | `bandejao` | O que tem no bandejão hoje, e onde vale a pena comer |
+| `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
+| `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
 
-O que **não** existe: histórico de cardápio, horário/sala de turma, grade curricular,
-notas, material — e nenhuma escrita (Invariante 1).
+O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter e o RUCard não
+usam credencial nenhuma e por isso seguem candidatos a servidor hospedado (§6 do
+`SPEC1.md`). Suíte: testes offline em segundos — incluindo um handshake stdio que sobe
+cada servidor de verdade — mais uma camada `live` atrás de `USP_MCP_LIVE=1` que fala com
+a USP.
+
+**O que ainda não existe:** notas, material de aula, aviso de professor — e nada de
+histórico de cardápio, saldo do cartão, horário, sala ou vagas. Nenhuma ferramenta nasce
+por conveniência: o critério está no §5, e as questões abertas do §4 fecham com dado
+registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
 
-- `usp_mcp/<sistema>/` — código: política, cliente, ferramenta e servidor por sistema
+- `usp_mcp/` — os servidores, um pacote por sistema
+- `tests/` — três camadas: política e contrato offline, `live` atrás de env var
 - `notas/` — análise por sistema, com custo medido em bytes e tokens
 - `fixtures/` — respostas cruas capturadas (as do Moodle ficam fora do git: têm dado pessoal)
-- `scripts/` — chamadores da descoberta, e `gate.sh` antes de cada commit
+- `scripts/` — chamadores da descoberta e o gate de pré-commit
+- `docs/decisions/BACKLOG-correcoes.md` — a dívida que está em aberto
+
+## Rodando
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+./scripts/gate.sh
+```
+
+O `.mcp.json` versionado já registra os dois servidores, sem segredo. Abra um cliente
+MCP neste diretório e pergunte.
 
 ## Configuração
 

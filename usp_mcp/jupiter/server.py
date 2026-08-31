@@ -163,14 +163,20 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     )
 
 
-def main() -> None:  # pragma: no cover — casca stdio
+def main() -> None:
     """Adaptador stdio real. O import do SDK fica aqui dentro, não no topo: a
     suíte importa este módulo sem o SDK instalado, e um import de topo quebraria
     a coleta por causa de uma dependência que as funções puras nem usam.
 
-    Coberto por `tests/handshake/` desde 31/08/2026: aquele teste sobe este
-    processo, aperta a mão e compara o que sai no fio com o que
-    `listar_ferramentas()` declara."""
+    **Tem teste, por dois caminhos que não se substituem.** T45-T48
+    (`tests/jupiter/test_server_stdio.py`) rodam isto em processo, substituindo
+    só `run()`, e alcançam o que o processo esconde: o corpo enviado e a
+    mensagem de SDK ausente. `tests/handshake/` sobe o processo de verdade e
+    compara o que sai NO FIO com o que `listar_ferramentas()` declara — foi lá
+    que apareceu o schema mais pobre que o declarado. Foi este buraco que, na
+    trilha do Moodle, escondeu um `main()` falando a API antiga do SDK com a
+    suíte inteira verde.
+    """
     try:
         from mcp.server import MCPServer
     except ImportError as exc:
