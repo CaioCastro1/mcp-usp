@@ -9,3 +9,8 @@ fixtures/moodle/raw/
 # Fica no disco como evidência do §6 do recon (scraping frágil); não vai para o
 # repositório sem a higienização do §3.3. Ver notas/jupiter-recon.md.
 fixtures/jupiter/html-obterTurma-*.html
+
+# ambiente local de teste
+.venv/
+.pytest_cache/
+__pycache__/
