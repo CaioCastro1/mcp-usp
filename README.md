@@ -24,7 +24,7 @@ vivo — cada chamada consome credencial pessoal e fica no log da conta.
 
 O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter não usa
 credencial nenhuma e por isso segue candidato a servidor hospedado (§6 do `SPEC1.md`).
-Suíte: 201 testes offline em poucos segundos, mais uma camada `live` atrás de
+Suíte: 203 testes offline em poucos segundos, mais uma camada `live` atrás de
 `USP_MCP_LIVE=1` que fala com a USP de verdade.
 
 **O que ainda não existe:** bandejão, notas, "já entreguei?", aviso de professor.
