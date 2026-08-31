@@ -1,0 +1,9 @@
+# Dependência do ENTRYPOINT stdio do Moodle, e só dele.
+#
+#   .venv/bin/python -m pip install -r requirements.txt
+#
+# O núcleo (politica, projecao, cliente, o_que_vence) e as funções puras de
+# server.py são stdlib pura e funcionam sem isto — é por isso que o import do
+# SDK mora dentro de main(), não no topo do módulo, e por isso a suíte de
+# testes não precisa deste arquivo (ver requirements-dev.txt).
+mcp>=2,<3

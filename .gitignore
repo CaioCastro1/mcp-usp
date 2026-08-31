@@ -10,7 +10,7 @@ fixtures/moodle/raw/
 # repositório sem a higienização do §3.3. Ver notas/jupiter-recon.md.
 fixtures/jupiter/html-obterTurma-*.html
 
-# Ambiente virtual da suíte de testes (requirements-dev.txt).
+# ambiente local de teste
 .venv/
-__pycache__/
 .pytest_cache/
+__pycache__/

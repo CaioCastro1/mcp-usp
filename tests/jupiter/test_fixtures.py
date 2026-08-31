@@ -9,7 +9,7 @@ import subprocess
 
 import pytest
 
-from conftest import FATIA, FIXTURES, RAIZ, caminho
+from tests.jupiter.conftest import FATIA, FIXTURES, RAIZ, caminho
 
 pytestmark = pytest.mark.politica
 

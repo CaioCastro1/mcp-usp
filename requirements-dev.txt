@@ -1,1 +1,11 @@
-pytest>=8.0
+# Ambiente de teste. Runtime é stdlib pura — nada aqui é dependência do produto,
+# só da suíte (§9 do SPEC1.md, 31/08/2026).
+#
+#   python3 -m venv .venv
+#   .venv/bin/python -m pip install -r requirements-dev.txt
+#   .venv/bin/python -m pytest
+#
+# O .venv é gitignorado e NÃO é copiado por `git worktree add`: cada worktree
+# precisa do seu. O mesmo vale para o .env — o conftest sabe subir até o
+# checkout principal para achá-lo, mas o venv não tem esse truque.
+pytest>=8,<10

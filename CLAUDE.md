@@ -84,9 +84,12 @@ contrário. Os que mordem em toda sessão:
 8. **Nunca ler uma resposta crua acima de ~200 kB.** `capture.sh` imprime medida, não
    payload, exatamente para isso. `core_enrol_get_users_courses` sozinha já custa
    ~26.200 tokens.
-9. **A rede da USP não é alcançável do sandbox** (§1.1). `uspdigital.usp.br` e
-   `edisciplinas.usp.br` saem por proxy com allowlist. Todo teste real roda no
-   terminal do Caio; sessão sem a rede dele trabalha contra fixture.
+9. **Antes de dizer que a rede da USP não dá, MEÇA** (§1.1). Do sandbox em nuvem
+   do Cowork ela realmente não sai (proxy com allowlist), mas do Claude Code na
+   máquina do dono ela sai — verificado em 31/08/2026. O que separa uma sessão do
+   teste real é a **credencial**, não a rede: o token é pessoal e cada chamada
+   fica no log da conta. Por isso a camada `live` fica atrás de `USP_MCP_LIVE=1`,
+   e por isso ela é decisão do dono, não limitação de infraestrutura.
 10. **Fase 2 não começa por conveniência.** Questão aberta do §4 fecha com dado
     registrado no §9, não com opinião nem com o que a API oferece. O Anexo A (§7) é
     a lista de ferramentas derivada da API — está lá para ser confrontada, não seguida.

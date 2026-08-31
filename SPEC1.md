@@ -24,10 +24,23 @@ resolver em silêncio.
 
 ### 1.1 Restrição de ambiente que determina onde se trabalha
 
+**A restrição depende do ambiente, e a diferença importa** — corrigido em 31/08/2026,
+ver §9.
+
 `uspdigital.usp.br` e `edisciplinas.usp.br` **não são alcançáveis** do sandbox em nuvem do
 Cowork nem da VM local que ele expõe — ambos saem por um proxy de egress com allowlist que
 só libera um conjunto pequeno de domínios (registries de pacote, `api.anthropic.com`).
 Sintoma: `curl` devolve `000`, ou `403` no túnel CONNECT; DNS falha na VM local.
+
+**Mas do Claude Code rodando na máquina do dono, são alcançáveis.** Medido em 31/08/2026:
+DNS resolve (`edisciplinas.usp.br` → `200.144.235.136`), TCP/443 conecta, HTTPS numa página
+pública devolve `200`, e o web service devolve `invalidtoken` para token vazio. Nenhuma
+variável de proxy no ambiente.
+
+A consequência abaixo continua valendo, mas **por outro motivo**: não é a rede que separa
+uma sessão de agente do teste real, é a credencial. O token é pessoal, cada chamada fica no
+log da conta, e por isso a camada `live` fica atrás de `USP_MCP_LIVE=1` — decisão de quem
+é dono da conta, não limitação de infraestrutura.
 
 Consequência: **todo teste contra a USP roda no terminal do Caio.** O desenvolvimento
 assistido tem que acontecer com acesso à rede dele, ou contra fixtures.
@@ -586,6 +599,58 @@ exatamente a parte frágil. Rate limit não foi observado em 26 requisições, o
 prova** que não exista. E há uma discrepância não explicada: `codcur` aparece como 3033 no
 DWR e 3032 no HTML de requisitos da mesma habilitação.
 
+### 31/08/2026 — a Fase 2 do Moodle ganha especificação executável
+
+A pergunta era "como verificar o MCP do Moodle" quando o MCP não existe. Resposta
+escolhida: escrever a suíte antes, como spec executável de uma **fatia vertical**
+— `o_que_vence`, uma ferramenta ponta a ponta — em vez das seis perguntas medidas
+na Fase 1. Motivo: seis ferramentas vermelhas ao mesmo tempo é TDD no nome e
+waterfall no comportamento.
+
+Runtime: **Python + pytest** (o §6 deixava em aberto). O repo já é bash+python3 e
+não tem `package.json`. Fonte de `o_que_vence`: **web service projetado**, não o
+feed iCal — o iCal exigiria um segundo segredo e devolve ICS sem `courseid`
+utilizável, apesar de custar 1/30.
+
+99 testes em três camadas por marcador: `politica` (58, sem rede nem fixture),
+`contrato` (41, contra fixture higienizada), `live` (2, só com `USP_MCP_LIVE=1`).
+Roda em 0,46 s. Hoje: 91 vermelhos por construção, 6 verdes, 2 pulados.
+
+**`scripts/higienizar.py` existe** — o §3.3 era prosa e virou código. Ele preserva
+a forma, como o §3.3 pede, **e o comprimento em bytes**, que o §3.3 não pede e o
+teste de custo exige: encolher um `summary` de 9 kB apagaria justamente o custo
+que a projeção existe para resolver. `fixtures/moodle/action_events.json` entrou
+no git; o cru continua fora.
+
+**Descoberta que corrige um erro de desenho:** medindo subamostras dos mesmos 35
+eventos, a razão de redução varia 63,5× → 81,1× (28%), porque o `course` de 9,5 kB
+repetido faz a razão medir composição de amostra, não qualidade da projeção. O que
+é estável é **201–205 B por evento projetado** (±2%). Um teste de custo ancorado na
+razão seria frouxo ou quebradiço. Ficou em três asserções: teto absoluto com folga
+declarada, bytes/evento na faixa medida, e a categórica "nenhum `course` sobrevive"
+— esta última é a que trava a regressão de verdade.
+
+Registro de imprecisão: o **1000:1** de `notas/fase1-moodle.md` compara o cru com
+os 132 B/evento dos campos mínimos. A projeção implementável é **76:1**, o mesmo
+1,3% da entrada anterior. Dois números verdadeiros sobre coisas diferentes; o teste
+vive no 76:1.
+
+**Achado colateral, e é uma lacuna da Fase 1:** não existe fixture de erro do
+Moodle. Varredura por `debuginfo`, `backtrace`, `stacktrace`, `exception` e
+`errorcode` deu zero em todas as capturas — só respostas bem-sucedidas. Os testes
+de erro legível asseguram o contrato da camada, nunca a forma do erro do Moodle,
+que segue **não verificada**. Capturar um `invalidtoken` (token propositalmente
+inválido, não toca na conta) está no backlog.
+
+Descartado: suíte contra a API real como canário principal (não descreve o
+servidor a construir), suíte end-to-end só pela fronteira MCP (torna a asserção de
+custo frouxa e a de allowlist quase impossível de escrever por tabela), e fixture
+sintética escrita à mão (a forma sairia da minha leitura das notas, não do
+payload).
+
+Desenho completo em `docs/superpowers/specs/2026-08-31-testes-moodle-design.md`.
+Acordos de nome com a suíte do Jupiter no §7 de lá.
+
 ### 31/08/2026 — o §2.2 era contornável; vira segunda camada de uma allowlist
 
 Catálogo das 447 funções em `notas/moodle-catalogo.md`, produzido **sem nenhuma chamada ao
@@ -629,6 +694,212 @@ Também fecha um item do §1.4: **o `authtoken` do iCal deriva do hash da senha*
 em `calendar/lib.php` (`sha1($user->id . password . $CFG->calendar_exportsalt)`). Se isso
 rotaciona numa conta de SSO sem senha local continua sendo inferência, não fato.
 
+### 31/08/2026 — Fase 2 do Moodle implementada contra a suíte; a fatia vertical fecha
+
+A suíte de `tests/moodle/` (99 testes, escrita antes da implementação e descrita em
+`docs/superpowers/specs/2026-08-31-testes-moodle-design.md`) saiu de **91 vermelhos, 6
+verdes, 2 pulados** para **97 verdes, 0 vermelhos, 2 pulados**. Os 2 pulados são a camada
+`live`, e o skip diz o motivo por escrito: `USP_MCP_LIVE` desmarcada, e do sandbox a rede da
+USP não é alcançável (§1.1). Nenhum teste, nenhuma fixture e nenhum marcador foi alterado —
+verificável em `git diff --name-only 8125f20..HEAD -- tests/ fixtures/`, que sai vazio.
+
+Cinco módulos, um commit cada: `politica`, `projecao`, `cliente`, `o_que_vence`, `server`.
+
+**O que a implementação mediu, e que confirma o desenho.** A projeção fecha em **7.170 B**
+para os 35 eventos da fixture — **204,9 B por evento**, dentro da faixa de 180–230 que a
+suíte fixou a partir de quatro amostras, e a 28% do teto de 10.000 B. O texto que chega ao
+modelo tem **2.728 caracteres** para 35 eventos com janela de 30 dias, contra o teto de
+4.000. Partindo de 531.851 B de fixture crua, a ferramenta inteira entrega a resposta em
+~2,7 kB de texto.
+
+**Duas escolhas de campo foram decididas pelo orçamento de bytes, não por gosto**, e ficam
+registradas porque não são óbvias no código:
+
+- `activityname` em vez de `name`. O `name` do Moodle é a frase pronta para exibição
+  ("*X* está marcado(a) para esta data"), redundante com `disciplina` + `tipo`. Trocar um
+  pelo outro move a medida de 204 para 226 B/evento — ainda dentro da faixa, mas comendo
+  quase toda a folga sem responder nada a mais.
+- `url` em vez de `viewurl`. Mesmo destino prático; `viewurl` custa ~41 B a mais por evento
+  e sozinho leva a medida a 245 B/evento, **fora** da faixa.
+
+**§6 fecha em parte, e por consequência e não por escolha:** a linguagem e o runtime da
+Fase 2 são **Python 3 + stdlib, sem dependência nova**. O transporte do cliente é
+`urllib.request`; o SDK do MCP não é dependência de teste e seu import mora dentro de
+`server.main()`, não no topo do módulo. Isso não foi preferência estética: um import de topo
+quebraria a coleta da suíte inteira por causa de um pacote que as funções puras nem usam.
+Continuam abertos hospedagem e se haverá core compartilhado com o servidor público.
+
+**§5 continua aberto de propósito.** Isto implementou **uma** ferramenta, `o_que_vence`, e
+não o mapeamento pergunta→ferramenta. `politica.ALLOWLIST` tem exatamente um nome e a suíte
+trava esse número (T7); `server.listar_ferramentas()` expõe exatamente uma ferramenta e a
+suíte trava esse número (T42). Crescer qualquer um dos dois é entrada nova aqui no §9, não
+"só mais uma".
+
+**O que NÃO foi verificado, e continua não sendo.** A limitação declarada no §6 do documento
+de desenho vale integralmente depois da implementação: **não existe fixture de erro do
+Moodle**. Os testes de erro do cliente asseguram o contrato da camada — que erro de
+credencial vira `TokenInvalido` com instrução, que HTML de manutenção com HTTP 200 vira
+`RespostaIlegivel`, que timeout vira `MoodleIndisponivel` — e **nunca** a forma real do erro
+do Moodle, que segue não verificada. O caminho de transporte HTTP real e o adaptador stdio
+do `main()` também não têm teste: nenhum roda offline. Capturar um `invalidtoken` real é
+barato e seguro e continua no backlog.
+
+### 31/08/2026 — a camada `live` rodou verde: a API não mudou desde 28/08
+
+`USP_MCP_LIVE=1 pytest -m live` no terminal do dono: **2 passed, 97 deselected em
+3,34 s**. É o canário do §5 do documento de desenho fechando o circuito — a fixture é
+de 28/08 e congela, e sem esta camada a USP poderia mudar a API por baixo com a suíte
+verde. Não mudou: as chaves de topo e os campos do primeiro evento da resposta real
+ainda batem com a fixture. Uma chamada, `limitnum=5`, dentro da Regra de Ouro do §3.1.
+
+Com isso a suíte inteira está verificada: **97 offline + 2 live = 99 de 99**.
+
+**E o caminho até aqui expôs um buraco na própria suíte.** O comando falhava com
+"MOODLE_TOKEN está vazio" numa máquina onde o `.env` estava preenchido, porque **nada
+no lado Python carregava o `.env`** — só `scripts/ws.sh` sourceia o arquivo (`set -a`,
+linha 15). O erro era legível e apontava a cura errada: mandava copiar o
+`.env.example` para quem já tinha o `.env`. É o bug do §9 de 28/08 outra vez, agora
+dentro da ferramenta de teste em vez de na resposta da API.
+
+Duas consequências, ambas corrigidas em `tests/moodle/conftest.py`:
+
+- **O `.env` agora é carregado pela suíte**, procurando na raiz e subindo até o
+  checkout com o `.git` de verdade — um worktree novo não tem `.env`, exatamente como
+  não tem o cru. Parser de stdlib: `python-dotenv` seria a primeira dependência de
+  runtime do projeto, e o formato é `CHAVE=valor` com comentário. `setdefault` e não
+  atribuição, para que quem já está no ambiente ganhe — é o que impede o carregador de
+  ligar a camada live por baixo de quem não pediu.
+- **`test_a_fixture_versionada_nao_contem_segredo_do_env` passava no vácuo.** Ela varre
+  a fixture procurando os segredos do ambiente, e o ambiente não tinha nenhum para
+  procurar: a asserção era verdadeira sobre lista vazia. Agora os três segredos estão
+  carregados quando ela roda, e ela segue verde — a fixture está limpa de fato, não por
+  omissão. Vale como aviso: um teste de segurança que não pode falhar não verifica nada
+  (§6 do `CONVENTIONS.md`).
+
+### 31/08/2026 — o token chega ao servidor pelo `.env`; e o `main()` não casava com o SDK
+
+**Decisão: `usp_mcp/env.py` carrega o `.env`, e os dois lados usam** — a suíte
+(`conftest`) e o entrypoint stdio (`server.chamar_ferramenta`). O `.env` do §8,
+gitignorado, continua sendo a única casa do token, e o `.mcp.json` vai para o git sem
+segredo nenhum.
+
+**Descartado:** o token vir do bloco `env` da configuração do cliente MCP. Ele
+duplicaria o segredo num arquivo de configuração fácil de commitar por acidente, e
+exigiria `export MOODLE_TOKEN` no shell — que é exatamente a etapa que ninguém faz e
+que produziu o erro enganoso do registro anterior. O `setdefault` do carregador
+preserva o melhor dos dois: **quem já está no ambiente ganha**, então um cliente MCP
+que passe a variável continua sobrescrevendo o arquivo.
+
+**O achado que fecha o argumento do registro anterior.** O `main()` — o único caminho
+sem teste offline — **não funcionava**. Foi escrito contra a API antiga do SDK
+(`Server` com decoradores `@servidor.list_tools()` / `@servidor.call_tool()`), e no
+`mcp` 2.1.1 instalado esses decoradores não existem: a API é `MCPServer` com
+`@servidor.tool(...)` e `run(transport="stdio")`. A suíte estava 99/99 verde com esse
+caminho quebrado, porque nenhum teste o alcançava.
+
+Isto é a demonstração do que o §6 do documento de desenho já declarava: **verde na
+suíte não é verde nos caminhos que a suíte não alcança.** O aviso estava escrito antes
+de o bug aparecer, e o bug apareceu exatamente onde o aviso apontava.
+
+**Verificado depois do conserto**, e sem tocar a rede da USP:
+
+- `initialize` por stdio responde `{"name": "usp-mcp-moodle", "version": "0.1.0"}`,
+  protocolo `2024-11-05`.
+- `tools/list` devolve uma ferramenta, `o_que_vence`, com `dias` (int, default 14) e
+  `limite` (int | null) no schema.
+- `python -m usp_mcp.moodle.server --auto-verificar` confere ferramenta, `.env`,
+  presença do token (forma, nunca valor), SDK, e que o `inputSchema` declarado casa com
+  a assinatura que o adaptador registra — a divergência que só apareceria em uso real.
+
+**O que continua não verificado:** `tools/call`. Ele fala com a USP, e a rede da USP não
+é alcançável do sandbox (§1.1). É a última coisa que falta, e só roda no terminal do
+dono.
+
+### 31/08/2026 — o MCP respondeu com dado real; §1.1 estava errado para este ambiente
+
+**A fatia vertical funciona ponta a ponta.** `o_que_vence` chamada por um cliente MCP de
+verdade, pelo `.mcp.json` versionado, devolveu 6 vencimentos reais em 14 dias — PTC3360,
+PSI3472, PME3344 e PTC3314 — em 767 caracteres de texto. É o critério 2 do §5 cumprido de
+fato: uma chamada do ponto de vista do modelo, resposta que cabe em pouco contexto. O
+`tools/call`, último caminho não verificado do registro anterior, fecha aqui.
+
+**§1.1 estava errado para este ambiente, e o erro custou trabalho.** O documento afirmava
+como fato que a rede da USP não é alcançável do sandbox, e isso foi repetido em várias
+decisões desta sessão sem nunca ter sido medido aqui. Medição: DNS resolve
+(`edisciplinas.usp.br` → `200.144.235.136`), TCP/443 conecta, HTTPS público devolve `200`,
+nenhuma variável de proxy no ambiente. A afirmação continua válida para o sandbox em nuvem
+do Cowork; **não** vale para o Claude Code na máquina do dono. §1.1 e o item 9 do
+`CLAUDE.md` reescritos.
+
+O que a correção muda no desenho: **não é a rede que separa uma sessão de agente do teste
+real, é a credencial.** O token é pessoal e cada chamada fica no log da conta. A camada
+`live` atrás de `USP_MCP_LIVE=1` continua certa — por consentimento do dono, não por
+limitação de infraestrutura. Registro fica como aviso: fato herdado de documento e nunca
+remedido é indistinguível de fato verificado, e este atrasou a verificação de ponta a ponta
+sem necessidade.
+
+**A fixture de erro existe** (`fixtures/moodle/erro_invalidtoken.json`, 142 B). Capturada com
+`wstoken=""` — token propositalmente vazio, que não usa credencial e não toca conta nenhuma.
+Fecha a limitação declarada no §6 do documento de desenho, para este modo de falha. A
+resposta real:
+
+- HTTP **200** com corpo de erro — confirma a decisão de checar o corpo e não o status.
+- `errorcode: invalidtoken`, `message: "Token inválido - token não encontrado"`.
+- Sem `debuginfo`, sem `backtrace`. Três chaves só.
+- **`exception: core\exception\moodle_exception`**, com namespace — não o `moodle_exception`
+  pelado que os testes montados à mão supunham. O cliente passa ileso porque casa em
+  `errorcode` e nunca em `exception`; T52 agora trava esse critério.
+
+Os outros modos de falha (`accessexception`, HTML de manutenção com 200, timeout) seguem
+sendo contrato de camada, com a forma real não verificada.
+
+Suíte: **98 offline + 2 live**, com T52 novo.
+
+### 31/08/2026 — limite silencioso de 20 no calendário: bug real, corrigido
+
+**O `limitnum` do `core_calendar_get_action_events_by_timesort` tem default 20, e a API
+não avisa que parou.** Medido na mesma janela de 365 dias: **20 eventos sem o parâmetro,
+30 com `limitnum=50`**. A `o_que_vence` não mandava `limitnum` — então perdia dez entregas
+reais e ainda reportava `truncado=False`.
+
+É o Invariante 7 sendo violado pelo código escrito para respeitá-lo, e vale registrar por
+que passou: **a suíte não podia pegar.** O duplo de cliente devolve o que o teste manda, e
+o corte acontecia do lado do Moodle. Todas as asserções de truncamento olhavam a saída;
+nenhuma olhava o parâmetro enviado — que era onde o defeito morava. T53 agora asserta sobre
+o parâmetro, T54 sobre a declaração do teto, T55 sobre o aviso não ser decorativo.
+
+**Correção:** manda `limitnum=50` (o teto do serviço) e, quando a resposta vem com o teto
+cheio, declara na saída que pode haver mais. A API não informa se há mais depois do último
+item, então declarar a dúvida é a única saída honesta — presumir que acabou é o bug de novo.
+Verificado contra a API real: a janela de 365 dias passou a devolver 30, `truncado=False`.
+
+**O teto é 50**, e isso saiu de um erro capturado: `limitnum=-5` responde
+`"Limit must be between 1 and 50 (inclusive)"`.
+
+### 31/08/2026 — `errorcode` nem sempre é um código
+
+Fato da API que contraria o nome do campo, e que só apareceu ao capturar erro de verdade.
+Duas fixtures novas, ambas na função da allowlist, read-only (Regra de Ouro §3.1):
+
+| Fixture | `errorcode` | `message` |
+|---|---|---|
+| `erro_invalidparameter.json` | `invalidparameter` | `Valor inválido de parâmetro detectado` |
+| `erro_limite_fora_da_faixa.json` | `Limit must be between 1 and 50 (inclusive)` | `error/Limit must be...` |
+
+No segundo, **`errorcode` é uma frase em inglês, não um identificador**, e o `message` vem
+prefixado de `error/` — sinal de que o Moodle não achou a string de idioma correspondente.
+Quem tratar `errorcode` como enum quebra aqui.
+
+O cliente sobrevive porque compara por igualdade exata com `invalidtoken` e repassa o resto
+cru (Invariante 6). T56 trava que `invalidparameter` **não** vire `TokenInvalido` — as duas
+respostas têm a mesma forma de três chaves, e um casamento por "contém `invalid`" mandaria
+renovar um token que está perfeito. T57 trava o critério contra o `errorcode` que é frase.
+
+**Não capturáveis sob demanda, e continuam sem forma verificada:** HTML de manutenção com
+HTTP 200 (exige a USP em manutenção) e timeout (exige a USP fora do ar). Os testes desses
+dois seguem assegurando contrato de camada, e é o máximo que dá para afirmar.
+
+Suíte: **103 offline + 2 live**.
 ### 31/08/2026 — suíte do Jupiter escrita antes da implementação; o gate passa a existir
 
 Desenho em `docs/superpowers/specs/2026-08-31-testes-jupiter-design.md`, plano em
