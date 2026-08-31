@@ -680,3 +680,53 @@ instala por conta é promessa que quebra na primeira atualização — e quebra 
 Também fecha um item do §1.4: **o `authtoken` do iCal deriva do hash da senha**, confirmado
 em `calendar/lib.php` (`sha1($user->id . password . $CFG->calendar_exportsalt)`). Se isso
 rotaciona numa conta de SSO sem senha local continua sendo inferência, não fato.
+
+### 31/08/2026 — Fase 2 do Moodle implementada contra a suíte; a fatia vertical fecha
+
+A suíte de `tests/moodle/` (99 testes, escrita antes da implementação e descrita em
+`docs/superpowers/specs/2026-08-31-testes-moodle-design.md`) saiu de **91 vermelhos, 6
+verdes, 2 pulados** para **97 verdes, 0 vermelhos, 2 pulados**. Os 2 pulados são a camada
+`live`, e o skip diz o motivo por escrito: `USP_MCP_LIVE` desmarcada, e do sandbox a rede da
+USP não é alcançável (§1.1). Nenhum teste, nenhuma fixture e nenhum marcador foi alterado —
+verificável em `git diff --name-only 8125f20..HEAD -- tests/ fixtures/`, que sai vazio.
+
+Cinco módulos, um commit cada: `politica`, `projecao`, `cliente`, `o_que_vence`, `server`.
+
+**O que a implementação mediu, e que confirma o desenho.** A projeção fecha em **7.170 B**
+para os 35 eventos da fixture — **204,9 B por evento**, dentro da faixa de 180–230 que a
+suíte fixou a partir de quatro amostras, e a 28% do teto de 10.000 B. O texto que chega ao
+modelo tem **2.728 caracteres** para 35 eventos com janela de 30 dias, contra o teto de
+4.000. Partindo de 531.851 B de fixture crua, a ferramenta inteira entrega a resposta em
+~2,7 kB de texto.
+
+**Duas escolhas de campo foram decididas pelo orçamento de bytes, não por gosto**, e ficam
+registradas porque não são óbvias no código:
+
+- `activityname` em vez de `name`. O `name` do Moodle é a frase pronta para exibição
+  ("*X* está marcado(a) para esta data"), redundante com `disciplina` + `tipo`. Trocar um
+  pelo outro move a medida de 204 para 226 B/evento — ainda dentro da faixa, mas comendo
+  quase toda a folga sem responder nada a mais.
+- `url` em vez de `viewurl`. Mesmo destino prático; `viewurl` custa ~41 B a mais por evento
+  e sozinho leva a medida a 245 B/evento, **fora** da faixa.
+
+**§6 fecha em parte, e por consequência e não por escolha:** a linguagem e o runtime da
+Fase 2 são **Python 3 + stdlib, sem dependência nova**. O transporte do cliente é
+`urllib.request`; o SDK do MCP não é dependência de teste e seu import mora dentro de
+`server.main()`, não no topo do módulo. Isso não foi preferência estética: um import de topo
+quebraria a coleta da suíte inteira por causa de um pacote que as funções puras nem usam.
+Continuam abertos hospedagem e se haverá core compartilhado com o servidor público.
+
+**§5 continua aberto de propósito.** Isto implementou **uma** ferramenta, `o_que_vence`, e
+não o mapeamento pergunta→ferramenta. `politica.ALLOWLIST` tem exatamente um nome e a suíte
+trava esse número (T7); `server.listar_ferramentas()` expõe exatamente uma ferramenta e a
+suíte trava esse número (T42). Crescer qualquer um dos dois é entrada nova aqui no §9, não
+"só mais uma".
+
+**O que NÃO foi verificado, e continua não sendo.** A limitação declarada no §6 do documento
+de desenho vale integralmente depois da implementação: **não existe fixture de erro do
+Moodle**. Os testes de erro do cliente asseguram o contrato da camada — que erro de
+credencial vira `TokenInvalido` com instrução, que HTML de manutenção com HTTP 200 vira
+`RespostaIlegivel`, que timeout vira `MoodleIndisponivel` — e **nunca** a forma real do erro
+do Moodle, que segue não verificada. O caminho de transporte HTTP real e o adaptador stdio
+do `main()` também não têm teste: nenhum roda offline. Capturar um `invalidtoken` real é
+barato e seguro e continua no backlog.
