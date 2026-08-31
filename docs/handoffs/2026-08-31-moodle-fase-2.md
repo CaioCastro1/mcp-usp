@@ -9,7 +9,9 @@ Implementar a Fase 2 do Moodle contra `tests/moodle/`, tratando a suíte como
 especificação executável e sem alterar nenhum teste, até ficar verde.
 
 ## Estado
-CONCLUÍDO — **97 verdes, 0 vermelhos, 2 pulados**. Nada ficou vermelho.
+CONCLUÍDO — **99 de 99 verificados**: 97 verdes offline + os 2 da camada `live`,
+que rodaram no terminal do dono em 31/08 (`2 passed, 97 deselected em 3,34 s`).
+Nada ficou vermelho.
 
 Os 2 pulados são a camada `live` (`tests/moodle/test_live.py`), e **pular era o
 comportamento correto**, não uma falha contornada: `USP_MCP_LIVE` ficou
@@ -38,10 +40,9 @@ evento**; texto final em **2.728 caracteres** para 35 eventos com janela de 30
 dias, contra teto de 4.000.
 
 ## O que falta
-- **Rodar a camada `live` na máquina do Caio.** É o único pedaço da suíte que
-  esta sessão não pôde executar. `USP_MCP_LIVE=1 .venv/bin/python -m pytest -m live`
-  — uma chamada, `limitnum=5`, compara só a forma. A fixture é de 28/08 e
-  congela; sem esse canário a USP pode mudar a API por baixo com a suíte verde.
+- ~~Rodar a camada `live`~~ — **feito em 31/08, verde.** A forma da resposta
+  real ainda bate com a fixture de 28/08. Vale repetir de tempo em tempo: é o
+  único teste que pega a USP mudando a API por baixo da suíte.
 - **Capturar um `invalidtoken` real** (backlog, já declarado no §6 do documento
   de desenho). Token propositalmente inválido, não toca na conta. Enquanto não
   existir, os testes de erro asseguram o contrato da camada e **nunca** a forma
@@ -87,3 +88,11 @@ como validada contra a USP de verdade.
   teste. Isso parece um erro de estilo e não é.
 - **A rede da USP não é alcançável do sandbox** (§1.1). Qualquer verificação real
   roda no terminal do Caio.
+- **O `.env` já é carregado pela suíte** desde `428946d` — antes disso não era, e
+  `pytest -m live` falhava com "MOODLE_TOKEN está vazio" numa máquina onde o
+  `.env` estava preenchido. Se você vir esse erro de novo, a mensagem agora
+  distingue "não achei .env" de "achei e a chave está vazia lá dentro".
+- **`usp_mcp/moodle/server.py` continua lendo `os.environ` direto**, e nada
+  carrega o `.env` para ele. Rodando o entrypoint stdio por um cliente MCP, o
+  token tem de vir do `env` da configuração do cliente. O conserto do conftest
+  NÃO cobre esse caminho — está no backlog.
