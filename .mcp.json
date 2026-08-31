@@ -2,7 +2,17 @@
   "mcpServers": {
     "usp-moodle": {
       "command": ".venv/bin/python",
-      "args": ["-m", "usp_mcp.moodle.server"]
+      "args": [
+        "-m",
+        "usp_mcp.moodle.server"
+      ]
+    },
+    "usp-jupiter": {
+      "command": ".venv/bin/python",
+      "args": [
+        "-m",
+        "usp_mcp.jupiter.server"
+      ]
     }
   }
 }

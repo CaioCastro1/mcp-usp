@@ -1,9 +1,13 @@
-# Dependência do ENTRYPOINT stdio do Moodle, e só dele.
+# Dependência dos ENTRYPOINTS stdio (Moodle e Jupiter), e só deles.
 #
 #   .venv/bin/python -m pip install -r requirements.txt
 #
-# O núcleo (politica, projecao, cliente, o_que_vence) e as funções puras de
-# server.py são stdlib pura e funcionam sem isto — é por isso que o import do
-# SDK mora dentro de main(), não no topo do módulo, e por isso a suíte de
-# testes não precisa deste arquivo (ver requirements-dev.txt).
+# O núcleo dos dois (politica, projecao/dwr, cliente, a ferramenta) e as
+# funções puras de server.py são stdlib pura e funcionam sem isto — é por isso
+# que o import do SDK mora dentro de main(), não no topo do módulo, e por isso
+# a suíte de testes não precisa deste arquivo (ver requirements-dev.txt).
+#
+# Nota sobre o Jupiter: ele não exige credencial nenhuma (bean público e
+# stateless), então o §6 do SPEC1 o mantém como candidato a servidor HTTP
+# hospedado. Falar stdio hoje é conveniência de canalização, não decisão.
 mcp>=2,<3
