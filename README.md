@@ -10,20 +10,27 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 
 ## Estado — 31/08/2026
 
-**Dois servidores MCP rodando, uma ferramenta cada, ambas verificadas contra a USP.**
+**Dois servidores MCP rodando, três ferramentas.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
+| `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina — regras, listas, provas antigas |
 | `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
+
+`o_que_vence` e `disciplina` foram verificadas **contra a USP de verdade**.
+`material` ainda não: ela é verde contra fixture capturada, e falta rodá-la ao
+vivo — cada chamada consome credencial pessoal e fica no log da conta.
 
 O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter não usa
 credencial nenhuma e por isso segue candidato a servidor hospedado (§6 do `SPEC1.md`).
-Suíte: 177 testes offline em menos de 1 s, mais uma camada `live` atrás de
+Suíte: 201 testes offline em poucos segundos, mais uma camada `live` atrás de
 `USP_MCP_LIVE=1` que fala com a USP de verdade.
 
-**O que ainda não existe:** bandejão, notas, material de aula, aviso de professor —
-cinco das sete perguntas candidatas do §5. Horário, sala e vagas não são prometidos.
+**O que ainda não existe:** bandejão, notas, "já entreguei?", aviso de professor.
+Horário, sala e vagas não são prometidos, e `material` diz o nome do arquivo mas
+não entrega o link de download do que é interno — baixá-lo exigiria a credencial
+do usuário na URL.
 Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
 abertas do §4 fecham com dado registrado no §9.
 

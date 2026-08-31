@@ -99,11 +99,18 @@ def test_nao_ha_regra_de_prefixo():
 def test_superficie_da_fatia_e_exatamente_uma_funcao():
     """T7 — trava crescimento acidental da superfície.
 
-    A fatia vertical é `o_que_vence`. Se um dia a allowlist crescer, que seja por
-    decisão registrada no §9, não por alguém precisando de "só mais uma".
+    Cresceu de 1 para 4 em 31/08, por decisão registrada no §9: `material`
+    precisa traduzir sigla em `courseid`, e isso custa duas funções além da que
+    responde. O teste segue travando o conjunto INTEIRO — é o que impede a
+    próxima sessão de acrescentar "só mais uma" sem passar pelo §9.
     """
     assert politica.ALLOWLIST == frozenset(
-        {"core_calendar_get_action_events_by_timesort"}
+        {
+            "core_calendar_get_action_events_by_timesort",
+            "core_webservice_get_site_info",
+            "core_enrol_get_users_courses",
+            "core_course_get_contents",
+        }
     )
 
 

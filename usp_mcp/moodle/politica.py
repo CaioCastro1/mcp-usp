@@ -17,8 +17,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Fatia vertical: uma função só. Crescer isso é decisão de §9, não conveniência.
-ALLOWLIST: frozenset[str] = frozenset({"core_calendar_get_action_events_by_timesort"})
+# Duas ferramentas, quatro funções. Crescer isso é decisão de §9, não
+# conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
+# novas existem porque `material` precisa traduzir sigla em `courseid`:
+# site_info dá o userid a partir do token, users_courses dá a lista, e
+# get_contents é a resposta. Todas de leitura.
+ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "core_calendar_get_action_events_by_timesort",
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "core_course_get_contents",
+    }
+)
 
 # §2.2 do SPEC1, na íntegra — cada nome tem um motivo escrito lá.
 BLOQUEIO_PERMANENTE: frozenset[str] = frozenset(

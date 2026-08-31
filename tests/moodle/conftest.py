@@ -28,6 +28,8 @@ FIXTURE_EVENTOS = RAIZ / "fixtures" / "moodle" / "action_events.json"
 FIXTURE_ERRO = RAIZ / "fixtures" / "moodle" / "erro_invalidtoken.json"
 FIXTURE_ERRO_PARAM = RAIZ / "fixtures" / "moodle" / "erro_invalidparameter.json"
 FIXTURE_ERRO_LIMITE = RAIZ / "fixtures" / "moodle" / "erro_limite_fora_da_faixa.json"
+FIXTURE_CONTEUDO = RAIZ / "fixtures" / "moodle" / "course_contents_psi3323.json"
+FIXTURE_DISCIPLINAS = RAIZ / "fixtures" / "moodle" / "users_courses.json"
 
 
 # O carregador mora em usp_mcp/env.py, não aqui: o entrypoint stdio do Moodle
@@ -135,3 +137,63 @@ def erro_limite_fora_da_faixa() -> dict:
         "Recapture chamando core_calendar_get_action_events_by_timesort "
         "com limitnum=-5.",
     )
+
+
+def _obrigatoria(caminho, cru):
+    """Fixture higienizada ausente FALHA, nunca dá skip — mesmo motivo do §0
+    deste arquivo: skip aqui é verde que não testou nada."""
+    if not caminho.exists():
+        pytest.fail(
+            f"Fixture higienizada ausente: {caminho}\n"
+            f"Gere com: python3 scripts/higienizar.py "
+            f"fixtures/moodle/raw/{cru} {caminho.relative_to(RAIZ)}"
+        )
+    return json.loads(caminho.read_text(encoding="utf-8"))
+
+
+@pytest.fixture(scope="session")
+def conteudo_bruto() -> list:
+    """`core_course_get_contents` de PSI3323 (courseid 142033), 31/08/2026.
+
+    Amostra ÚNICA, e o dono decidiu assim conscientemente (§9, 31/08). Tudo que
+    esta suíte afirma sobre proporção — a projeção de 11,2%, a mistura de tipos —
+    vale para esta disciplina, não para as dez. Quem for generalizar precisa
+    capturar as outras primeiro.
+    """
+    return _obrigatoria(FIXTURE_CONTEUDO, "course_contents_142033.json")
+
+
+@pytest.fixture(scope="session")
+def disciplinas_brutas() -> list:
+    """`core_enrol_get_users_courses`: as 74 disciplinas, 104 kB de cru."""
+    return _obrigatoria(FIXTURE_DISCIPLINAS, "users_courses.json")
+
+
+class ClienteFalso:
+    """Dublê que responde por NOME de função e grava o que foi enviado.
+
+    Grava os parâmetros porque asserção sobre a saída não pega parâmetro errado:
+    o dublê devolve o que o teste mandou. Foi assim que o limite silencioso de 20
+    passou pela suíte (§9, 31/08) e assim que uma sabotagem de mapeamento passou
+    pelo T47 do Jupiter no mesmo dia.
+    """
+
+    def __init__(self, respostas: dict):
+        self._respostas = respostas
+        self.chamadas: list[tuple[str, dict]] = []
+
+    def chamar(self, funcao: str, **params):
+        self.chamadas.append((funcao, params))
+        if funcao not in self._respostas:
+            raise AssertionError(
+                f"O código chamou {funcao!r}, que este teste não previu. "
+                f"Previstas: {sorted(self._respostas)}"
+            )
+        resposta = self._respostas[funcao]
+        return resposta(params) if callable(resposta) else resposta
+
+    def params_de(self, funcao: str) -> dict:
+        for nome, params in self.chamadas:
+            if nome == funcao:
+                return params
+        raise AssertionError(f"{funcao!r} nunca foi chamada. Chamadas: {[c[0] for c in self.chamadas]}")
