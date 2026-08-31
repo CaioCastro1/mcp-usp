@@ -14,10 +14,12 @@ cardápio dos bandejões (RUCard), prazos e material do e-Disciplinas (Moodle),
 catálogo de disciplinas do JupiterWeb. Projeto não-oficial, sem vínculo com a
 universidade, sobre APIs não documentadas descobertas por observação.
 
-**Estado: Fase 1 (descoberta) concluída, Fase 2 (desenho) não começou.** Não há
-servidor MCP ainda — o que existe é fixture, medição e registro de decisão. O
-critério para uma ferramenta existir está no §5 do `SPEC1.md`, e ele não foi
-aplicado ainda.
+**Estado (31/08/2026): Fase 1 concluída nos três sistemas; Fase 2 implementada
+como uma fatia vertical em cada um.** Há três servidores MCP, registrados no
+`.mcp.json`: `usp-moodle` (`o_que_vence`), `usp-jupiter` (`disciplina`) e
+`usp-rucard` (`bandejao`). Cada fatia saiu do critério do §5 do `SPEC1.md`, com a
+decisão datada no §9. O que **não** existe: histórico de cardápio, horário/sala de
+turma, grade curricular, notas, material e qualquer escrita.
 
 ## 2. Onde as coisas moram
 
@@ -25,6 +27,7 @@ aplicado ainda.
 |---|---|
 | `SPEC1.md` | Autoridade: fatos verificados, invariantes, questões abertas, registro de decisões (§9) |
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
+| `usp_mcp/<sistema>/` | Código: `politica`, `cliente`, ferramenta e `server` por sistema |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
 | `scripts/` | Chamadores usados na descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) |
@@ -48,6 +51,9 @@ python3 scripts/reduzir.py
 
 # Cardápio de um RU (dado público, sem credencial pessoal)
 curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCARD_HASH"
+
+# Checar um servidor MCP sem tocar a rede da USP (vale para os três sistemas)
+.venv/bin/python -m usp_mcp.rucard.server --auto-verificar
 
 # Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
