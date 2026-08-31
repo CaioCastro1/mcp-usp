@@ -730,3 +730,35 @@ credencial vira `TokenInvalido` com instrução, que HTML de manutenção com HT
 do Moodle, que segue não verificada. O caminho de transporte HTTP real e o adaptador stdio
 do `main()` também não têm teste: nenhum roda offline. Capturar um `invalidtoken` real é
 barato e seguro e continua no backlog.
+
+### 31/08/2026 — a camada `live` rodou verde: a API não mudou desde 28/08
+
+`USP_MCP_LIVE=1 pytest -m live` no terminal do dono: **2 passed, 97 deselected em
+3,34 s**. É o canário do §5 do documento de desenho fechando o circuito — a fixture é
+de 28/08 e congela, e sem esta camada a USP poderia mudar a API por baixo com a suíte
+verde. Não mudou: as chaves de topo e os campos do primeiro evento da resposta real
+ainda batem com a fixture. Uma chamada, `limitnum=5`, dentro da Regra de Ouro do §3.1.
+
+Com isso a suíte inteira está verificada: **97 offline + 2 live = 99 de 99**.
+
+**E o caminho até aqui expôs um buraco na própria suíte.** O comando falhava com
+"MOODLE_TOKEN está vazio" numa máquina onde o `.env` estava preenchido, porque **nada
+no lado Python carregava o `.env`** — só `scripts/ws.sh` sourceia o arquivo (`set -a`,
+linha 15). O erro era legível e apontava a cura errada: mandava copiar o
+`.env.example` para quem já tinha o `.env`. É o bug do §9 de 28/08 outra vez, agora
+dentro da ferramenta de teste em vez de na resposta da API.
+
+Duas consequências, ambas corrigidas em `tests/moodle/conftest.py`:
+
+- **O `.env` agora é carregado pela suíte**, procurando na raiz e subindo até o
+  checkout com o `.git` de verdade — um worktree novo não tem `.env`, exatamente como
+  não tem o cru. Parser de stdlib: `python-dotenv` seria a primeira dependência de
+  runtime do projeto, e o formato é `CHAVE=valor` com comentário. `setdefault` e não
+  atribuição, para que quem já está no ambiente ganhe — é o que impede o carregador de
+  ligar a camada live por baixo de quem não pediu.
+- **`test_a_fixture_versionada_nao_contem_segredo_do_env` passava no vácuo.** Ela varre
+  a fixture procurando os segredos do ambiente, e o ambiente não tinha nenhum para
+  procurar: a asserção era verdadeira sobre lista vazia. Agora os três segredos estão
+  carregados quando ela roda, e ela segue verde — a fixture está limpa de fato, não por
+  omissão. Vale como aviso: um teste de segurança que não pode falhar não verifica nada
+  (§6 do `CONVENTIONS.md`).
