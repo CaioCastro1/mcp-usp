@@ -1,0 +1,5 @@
+{
+  "exception": "core\\exception\\moodle_exception",
+  "errorcode": "Limit must be between 1 and 50 (inclusive)",
+  "message": "error/Limit must be between 1 and 50 (inclusive)"
+}
