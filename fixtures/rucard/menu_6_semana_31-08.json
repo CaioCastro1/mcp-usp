@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "Arroz/feijão/arroz integral\nLombo com molho de mostarda\nOpção: Fricassê de repolho (V)\nMacarrão ao alho e óleo\nSalada de almeirão\nMexerica\nMinipão/refresco",
+      "calories" : "1035"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne assada com molho roti\nOpção: Moussaka de PVT (V)\nFarofa\nSalada de acelga\nDoce de leite\nMinipão / refresco",
+      "calories" : "1040"
+    },
+    "date" : "31/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de alcatra acebolado\nOpção: Quibe de PVT\nBerinjela à italiana\nSalada de alface\nBarra de cereais\nMinipão / refresco",
+      "calories" : "895"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de frango grelhado\nOpção: PVT com brócolis\nCreme de milho\nSalada de escarola\nMaçã\nMinipão / refresco",
+      "calories" : "1005"
+    },
+    "date" : "01/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango à passarinho\nOpção: Batata gratinada\nQuiabo ao alho e óleo\nSalada de escarola\nMexerica\nMinipão / refresco",
+      "calories" : "925"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nAlmôndegas com molho de tomate\nOpção: PVT com vagem\nBatata-doce sauté\nSalada de alface\nBanana\nMinipão / refresco",
+      "calories" : "975"
+    },
+    "date" : "02/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne assada com molho\nOpção: Creme de ervilha\nMandioquinha refogada\nSalada de acelga\nBanana\nMinipão / refresco",
+      "calories" : "985"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de tilápia com molho à escabeche\nOpção: Moussaka de PVT\nCenoura à juliana\nSalada de almeirão\nAbacaxi\nMinipão / refresco",
+      "calories" : "885"
+    },
+    "date" : "03/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nHambúrguer com molho barbecue\nOpção: Torta de PVT\nPurê de batata\nSalada de almeirão\nMaçã\nMinipão / refresco",
+      "calories" : "930"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango assado\nOpção: Cogumelos à aurora\nRepolho refogado\nSalada de tabule\nLaranja\nMinipão / refresco",
+      "calories" : "940"
+    },
+    "date" : "04/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "05/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "06/09/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação."
+  }
+}

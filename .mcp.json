@@ -13,6 +13,13 @@
         "-m",
         "usp_mcp.jupiter.server"
       ]
+    },
+    "usp-rucard": {
+      "command": ".venv/bin/python",
+      "args": [
+        "-m",
+        "usp_mcp.rucard.server"
+      ]
     }
   }
 }

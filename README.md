@@ -10,22 +10,24 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 
 ## Estado — 31/08/2026
 
-**Dois servidores MCP rodando, uma ferramenta cada, ambas verificadas contra a USP.**
+**Três servidores MCP rodando, uma ferramenta cada, todas verificadas contra a USP.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
+| `usp-rucard` | `bandejao` | O que tem no bandejão hoje, e onde vale a pena comer |
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
 | `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
 
-O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter não usa
-credencial nenhuma e por isso segue candidato a servidor hospedado (§6 do `SPEC1.md`).
-Suíte: 177 testes offline em menos de 1 s, mais uma camada `live` atrás de
-`USP_MCP_LIVE=1` que fala com a USP de verdade.
+O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter e o RUCard não
+usam credencial nenhuma e por isso seguem candidatos a servidor hospedado (§6 do
+`SPEC1.md`). Suíte: testes offline em segundos — incluindo um handshake stdio que sobe
+cada servidor de verdade — mais uma camada `live` atrás de `USP_MCP_LIVE=1` que fala com
+a USP.
 
-**O que ainda não existe:** bandejão, notas, material de aula, aviso de professor —
-cinco das sete perguntas candidatas do §5. Horário, sala e vagas não são prometidos.
-Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
-abertas do §4 fecham com dado registrado no §9.
+**O que ainda não existe:** notas, material de aula, aviso de professor — e nada de
+histórico de cardápio, saldo do cartão, horário, sala ou vagas. Nenhuma ferramenta nasce
+por conveniência: o critério está no §5, e as questões abertas do §4 fecham com dado
+registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
