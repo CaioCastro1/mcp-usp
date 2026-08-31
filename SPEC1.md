@@ -955,3 +955,54 @@ acento; e o Invariante 8, que não é testável em código.
 
 **O que esta decisão NÃO abre:** a Fase 2. Nenhuma função tem corpo. A suíte vermelha é a
 especificação que a implementação vai ter que satisfazer, e o §4.10 continua valendo.
+
+### 31/08/2026 — Fase 2 do Jupiter implementada contra a suíte
+
+A suíte vermelha registrada acima virou especificação e foi satisfeita. **173
+verdes, 4 pulados** (os dois canários `live` de cada trilha), 0 falhas. **Nenhum
+teste foi alterado para passar** — a regra do §6 do `CONVENTIONS.md` aplicada ao
+caso em que a tentação é máxima, porque quem escreveu a suíte foi a mesma sessão.
+
+Módulos: `usp_mcp/jupiter/{erros,politica,dwr,cliente,ferramentas,server}.py`.
+`.mcp.json` registra `usp-jupiter`.
+
+**A allowlist do Jupiter tem duas camadas, e a segunda não é redundante.** O
+`ControlePublicoDWR` recebe o nome da consulta como **primeiro parâmetro de
+string** — é RPC genérico. Filtrar só a consulta não bloqueia nada, porque
+`executarBatch` faz a consulta viajar dentro do lote: é o análogo exato do
+`tool_mobile_call_external_functions` do Moodle, registrado no §9 acima. Por isso
+o bloqueio é por **método** e ignora `permitir_escrita` — não há flag que libere.
+
+**O envelope DWR é lido por parser, não por conversão de regex.** A tentação era
+transformar chave-sem-aspas em JSON com uma substituição. A resposta carrega
+ementa e bibliografia escritas por docentes: um texto contendo `, algo:`
+corromperia o valor **em silêncio**. O parser distingue o que está dentro de
+string do que é estrutura — que é precisamente o que o regex não faz. E lê sem
+executar: o corpo vem da rede.
+
+**Assimetria com o Moodle que vale registrar, porque é o §6 aparecendo na suíte.**
+A fronteira MCP do Jupiter é testável **ponta a ponta offline** (T44): sem
+credencial, basta injetar o transporte e a fixture responde. A do Moodle não
+consegue — falta um token que não pode entrar em teste. É a mesma razão pela qual
+o §6 mantém o Jupiter como candidato a servidor hospedado e o Moodle como
+entrypoint local. Falar stdio hoje, no Jupiter, é conveniência de canalização,
+não decisão fechada.
+
+**O que a ferramenta declara não saber**, em vez de omitir (Invariante 7): sem
+`codcur`+`codhab` ela **não afirma** que não há pré-requisito — diz que não
+consultou, porque a resposta é condicional ao curso (§5.2 do recon). Quando
+recebe 3032 ou 3033, avisa que os dois códigos aparecem para a mesma habilitação
+em superfícies diferentes e que a relação **não foi verificada** (§5.1). E a
+descrição que o modelo lê diz explicitamente que a ferramenta **não** traz
+horário, sala nem vagas — sem isso o modelo promete o que ficou fora da fatia.
+
+**Continua aberto:** horário de aula (scraping de uma amostra só, com manutenção
+semestral não assumida); grade curricular e navegação unidade→curso, que são as
+fatias seguintes; o significado de `verdis`; o charset do percent-encoding do
+DWR; e o Invariante 8, que não é testável em código.
+
+**Não verificado contra a USP de verdade.** Os canários `live` do Jupiter nunca
+rodaram: esta sessão não alcança `uspdigital.usp.br` (§1.1). Rodar
+`USP_MCP_LIVE=1 .venv/bin/python -m pytest tests/jupiter -m live` no terminal do
+dono é o que falta para a Fase 2 estar verificada de ponta a ponta, e até lá o
+que existe é "verde contra fixture", não "verde contra a USP".
