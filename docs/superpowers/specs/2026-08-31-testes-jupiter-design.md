@@ -9,7 +9,7 @@
 
 Não existe servidor MCP. A Fase 2 não começou. Escrever testes antes da
 implementação é a escolha deliberada: **os testes são a especificação executável da
-Fase 2**, e falham hoje por `ImportError`.
+Fase 2**, e falham hoje por `NotImplementedError`.
 
 Isso resolve um risco concreto do projeto. O §5 do `SPEC1.md` manda derivar a
 ferramenta da pergunta do dono, e o §7 registra a tentação oposta — uma tabela de 8
@@ -75,6 +75,20 @@ o sandbox não alcança a USP; `live` só roda no terminal do dono.
 **Transporte injetado.** O cliente recebe a função de transporte como parâmetro. Nos
 testes ela lê fixture e **registra a requisição que teria sido feita** — é o que
 torna T13–T19 possíveis.
+
+**Esqueleto de pacote, não implementação.** `usp_mcp/jupiter/{dwr,cliente,ferramentas}.py`
+existem e cada símbolo levanta `NotImplementedError` apontando para o teste que o define.
+Isso não é Fase 2 — o esqueleto não decide ferramenta, nome nem formato de saída; é
+infraestrutura de teste, e existe por uma razão medida: com o módulo **ausente**, o pytest
+aborta a coleta (`Interrupted: N errors during collection`) e **os testes verdes nem
+rodam**. Verificado. Com o esqueleto, o vermelho vira contável e a guarda de fixture
+sobrevive.
+
+Efeito colateral que o esqueleto cria e que a suíte tem que neutralizar: **varredura de
+fonte passa espuriamente contra arquivo vazio.** T12, T19 e T25 leem o fonte do módulo;
+contra o esqueleto elas ficariam verdes verificando nada. Por isso toda leitura de fonte
+passa por `fonte_de(modulo)`, que falha enquanto o sentinela `ESQUELETO-FASE2` estiver
+lá.
 
 ## 4. Os testes
 
@@ -243,7 +257,8 @@ evidência (§8 do recon: 26 requisições sem 429 **não provam** que não exis
 
 T38 compara chaves porque valor muda por semestre sem que nada tenha quebrado.
 
-**Total: 40 testes.** Todos falham hoje por `ImportError`.
+**Total: 40 testes.** T1–T3 passam (guarda de fixture, não importam a implementação);
+os outros 37 falham por `NotImplementedError`.
 
 ## 5. Invariantes cobertos
 
@@ -298,9 +313,11 @@ propositalmente inválido, sem tocar na conta) e está no backlog dela.
 
 ## 8. Definição de pronto
 
-1. `pytest -m "not live"` roda em máquina limpa, sem rede, e falha em 40 testes por
-   `ImportError` — não por fixture ausente, não por skip.
+1. `pytest` roda em máquina limpa, sem rede, e reporta **3 verdes e 37 vermelhos por
+   `NotImplementedError`** — não erro de coleta, não fixture ausente, não skip. Um teste
+   que falha pelo motivo errado não verifica nada (§6 do `CONVENTIONS.md`).
 2. `pytest -m live` sem `USP_MCP_LIVE=1` dá skip com motivo escrito.
+2b. Nenhuma varredura de fonte está verde: `fonte_de()` recusa o esqueleto.
 3. Nenhum segredo e nenhum dado pessoal novo entrou no git.
 4. Ao virar código, o §3 e o §4 do `CONVENTIONS.md` e o §3 do `CLAUDE.md` perdem seus
    `<TODO>`: a estrutura passa a existir e `pytest -m "not live"` é o gate.
