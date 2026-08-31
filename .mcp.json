@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "usp-moodle": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "usp_mcp.moodle.server"]
+    }
+  }
+}
