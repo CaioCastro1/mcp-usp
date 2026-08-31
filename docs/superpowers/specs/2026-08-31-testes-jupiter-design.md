@@ -257,8 +257,9 @@ evidência (§8 do recon: 26 requisições sem 429 **não provam** que não exis
 
 T38 compara chaves porque valor muda por semestre sem que nada tenha quebrado.
 
-**Total: 40 testes.** T1–T3 passam (guarda de fixture, não importam a implementação);
-os outros 37 falham por `NotImplementedError`.
+**Total: 40 funções de teste, 68 casos** (parametrização). Executado: **56 falham, 10
+passam, 2 pulam**. As 56 falhas são todas `NotImplementedError`. Os verdes são a guarda
+de fixture (9 casos) e T40, que testa o próprio gate de rede.
 
 ## 5. Invariantes cobertos
 
@@ -313,9 +314,11 @@ propositalmente inválido, sem tocar na conta) e está no backlog dela.
 
 ## 8. Definição de pronto
 
-1. `pytest` roda em máquina limpa, sem rede, e reporta **3 verdes e 37 vermelhos por
-   `NotImplementedError`** — não erro de coleta, não fixture ausente, não skip. Um teste
-   que falha pelo motivo errado não verifica nada (§6 do `CONVENTIONS.md`).
+1. `pytest` roda em máquina limpa, sem rede, e reporta **56 falhas, 10 verdes e 2 skips**
+   — as falhas todas por `NotImplementedError`, nenhuma por erro de coleta, erro de setup
+   ou fixture ausente. Um teste que falha pelo motivo errado não verifica nada (§6 do
+   `CONVENTIONS.md`), e a checagem tem que ser motivo a motivo (`--tb=line`): contar
+   ocorrências no traceback não verifica coisa nenhuma.
 2. `pytest -m live` sem `USP_MCP_LIVE=1` dá skip com motivo escrito.
 2b. Nenhuma varredura de fonte está verde: `fonte_de()` recusa o esqueleto.
 3. Nenhum segredo e nenhum dado pessoal novo entrou no git.

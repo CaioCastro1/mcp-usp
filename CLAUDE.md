@@ -49,8 +49,8 @@ python3 scripts/reduzir.py
 # Cardápio de um RU (dado público, sem credencial pessoal)
 curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCARD_HASH"
 
-# Gate antes de commit: <TODO: ainda não existe — definir junto com o primeiro código
-# da Fase 2. Enquanto não houver, o gate é humano: o §9 do SPEC1.md registrou a decisão?>
+# Gate antes de commit (live pula sem USP_MCP_LIVE=1)
+.venv/bin/python -m pytest
 ```
 
 ## 4. Regras críticas (não negociáveis)

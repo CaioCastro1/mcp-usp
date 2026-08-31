@@ -628,3 +628,59 @@ instala por conta é promessa que quebra na primeira atualização — e quebra 
 Também fecha um item do §1.4: **o `authtoken` do iCal deriva do hash da senha**, confirmado
 em `calendar/lib.php` (`sha1($user->id . password . $CFG->calendar_exportsalt)`). Se isso
 rotaciona numa conta de SSO sem senha local continua sendo inferência, não fato.
+
+### 31/08/2026 — suíte do Jupiter escrita antes da implementação; o gate passa a existir
+
+Desenho em `docs/superpowers/specs/2026-08-31-testes-jupiter-design.md`, plano em
+`docs/superpowers/plans/2026-08-31-suite-testes-jupiter.md`. **40 funções de teste, 68
+casos: 56 falham, 10 passam, 2 pulam, em 0,39 s.** As 56 falhas são todas
+`NotImplementedError` — verificado com `--tb=line`, motivo a motivo, não por contagem
+de traceback. Os 10 verdes são a guarda de fixture e o teste do próprio gate de rede.
+
+**Escopo: fatia vertical de uma pergunta**, a candidata do §5 ("quantos créditos e qual
+o pré-requisito?"). Grade curricular, navegação unidade→curso e horário de turma ficam
+de fora. O argumento veio da suíte irmã do Moodle: cobrir três superfícies de uma vez
+deixaria os testes vermelhos por semanas, que é TDD no nome e waterfall no comportamento.
+
+**Uma asserção foi desenhada e descartada por medição.** A suíte ia fixar razão de
+redução contra o cru. Medida nas duas amostras: 1,73 e 1,98 — e, mais grave, **a razão do
+Jupiter é ~1,8×, não os 11,5× do recon**, que comparam DWR com HTML. Contra o próprio DWR
+quase não há o que reduzir: o payload *é* a resposta. Bytes por campo varia 68% porque 90%
+do peso é texto livre. O que é estável é o núcleo estruturado da saída: 179 B e 164 B,
+spread de 9%. A trava de regressão virou **categórica** — o conjunto de chaves da saída é
+exatamente o declarado.
+
+Regra que sai disso, e vale para toda asserção futura: **antes de fixar um teste sobre um
+número das notas, conferir contra o que ele foi medido.** A suíte do Moodle cometeu o
+mesmo erro na mesma noite, com 1000:1 (payload cru vs campos mínimos) contra 76:1 (a
+projeção que ela de fato implementa).
+
+**Três achados de ferramenta que custaram medição:**
+
+1. Com o módulo **ausente**, o pytest aborta a coleta (`Interrupted: N errors during
+   collection`) e **os testes verdes não rodam**. Daí o esqueleto de `usp_mcp/jupiter/`
+   que levanta `NotImplementedError`: ele não decide nada de Fase 2, e faz o vermelho
+   virar contável.
+2. **Varredura de fonte passa espuriamente contra esqueleto.** Três testes provam uma
+   ausência no fonte (nada de `eval`, de token, de choke point); contra arquivo vazio os
+   três ficariam verdes verificando nada. Toda leitura de fonte passa por um guarda que
+   recusa o sentinela `ESQUELETO-FASE2`.
+3. **Construir o objeto sob teste numa fixture do pytest transforma falha em erro de
+   setup.** 23 casos vinham como `ERROR` em vez de `FAILED`, o que anulava o ganho do
+   item 1. O cliente passa a nascer no corpo de cada teste.
+
+**Gate do projeto passa a existir:** `.venv/bin/python -m pytest`. Fecha o `<TODO>` do §3
+do `CLAUDE.md` e os dois do `CONVENTIONS.md`, que estavam abertos desde o bootstrap.
+
+**Acordos com a suíte do Moodle**, para as duas não colidirem no merge: `tests/{jupiter,
+moodle}/` simétricos; `server.py` por subpacote e nenhum na raiz; `@pytest.mark.live` +
+`USP_MCP_LIVE=1` com skip explicado; eixos `politica`/`contrato`/`live`.
+
+**Continua aberto:** a discrepância `codcur` 3032 vs 3033, que T33 declara e não resolve;
+o pareamento disciplina↔requisito, nunca amostrado junto na Fase 1 — T31 testa a
+composição de duas chamadas e diz isso no próprio código; o charset do percent-encoding
+do DWR (§8 do recon), por isso T15 asserta sobre o observável e não sobre bytes de
+acento; e o Invariante 8, que não é testável em código.
+
+**O que esta decisão NÃO abre:** a Fase 2. Nenhuma função tem corpo. A suíte vermelha é a
+especificação que a implementação vai ter que satisfazer, e o §4.10 continua valendo.

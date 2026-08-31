@@ -47,10 +47,18 @@ da pergunta.
 
 ## 3. Estrutura de código
 
-<TODO: definir com o primeiro código da Fase 2 — linguagem, runtime, se há core
-compartilhado entre o entrypoint local (Moodle) e o servidor público (RUCard/Jupiter),
-e como o erro da API sobe até a resposta da ferramenta. O §6 do `SPEC1.md` registra o
-que já está decidido e o que continua aberto.>
+**Python 3 + pytest.** O repo já rodava `python3`; `pytest` é a única dependência,
+declarada em `requirements-dev.txt` e instalada num venv local (`.venv/`, no gitignore).
+
+`usp_mcp/<sistema>/` por sistema (`jupiter/`, `moodle/`), cada um com `cliente.py`
+(transporte + allowlist na fronteira) e `ferramentas.py`. **O `server.py` mora dentro do
+subpacote, nunca na raiz:** o §6 do `SPEC1.md` separa entrypoint local com credencial
+(Moodle, stdio) de servidor público cacheável (Jupiter, RUCard), e a estrutura reflete
+isso em vez de deixar a separação só na prosa. Testes em `tests/<sistema>/`.
+
+Erro da API sobe como exceção com mensagem legível em português. O cru — stack trace,
+classe interna do servidor — é descartado antes de qualquer log: no Jupiter isso são
+1.978 tokens contra 17 da mensagem, e o cru é a resposta errada.
 
 Nome de ferramenta vem da pergunta do dono, não da função do Moodle: `o_que_vence`
 é bom nome, `get_action_events_by_timesort` não é (§5 do `SPEC1.md`).
@@ -58,12 +66,16 @@ Nome de ferramenta vem da pergunta do dono, não da função do Moodle: `o_que_v
 ## 4. Antes de cada commit
 
 ```bash
-<TODO: comando(s) de gate — não existem ainda; definir com o primeiro código>
+.venv/bin/python -m pytest
 ```
 
-Enquanto não houver gate automatizado, a verificação é a Definição de Pronto do
-`CLAUDE.md` §5: o dado está registrado, nenhum segredo entrou, achado colateral foi
-para o backlog.
+Os testes marcados `live` pulam sem `USP_MCP_LIVE=1`, e o skip diz o motivo. **Um teste
+que falha por erro de coleta, erro de setup ou fixture ausente não está vermelho, está
+quebrado** — conserte antes de commitar. Enquanto a Fase 2 não existir, o vermelho
+esperado é `NotImplementedError`, e nada além disso.
+
+O gate não substitui a Definição de Pronto do `CLAUDE.md` §5: o dado está registrado,
+nenhum segredo entrou, achado colateral foi para o backlog.
 
 Mensagem de commit: `feat|fix|chore|docs|test(escopo): descrição`.
 
