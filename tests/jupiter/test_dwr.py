@@ -5,7 +5,7 @@ status code produz exatamente o silêncio que o Invariante 6 proíbe — daí T6
 """
 import pytest
 
-from conftest import fonte_de
+from tests.jupiter.conftest import fonte_de
 from usp_mcp.jupiter import dwr
 
 pytestmark = pytest.mark.contrato

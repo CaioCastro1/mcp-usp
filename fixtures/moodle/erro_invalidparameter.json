@@ -1,0 +1,5 @@
+{
+  "exception": "core\\exception\\invalid_parameter_exception",
+  "errorcode": "invalidparameter",
+  "message": "Valor inválido de parâmetro detectado"
+}

@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from conftest import fonte_de
+from tests.jupiter.conftest import fonte_de
 from usp_mcp.jupiter import cliente, dwr, ferramentas
 
 # §4.2 de notas/jupiter-recon.md, verbatim.
