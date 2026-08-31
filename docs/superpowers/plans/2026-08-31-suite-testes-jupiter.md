@@ -160,7 +160,7 @@ A allowlist mora aqui, e não em arquivo próprio, porque a allowlist **é** a f
 
 **T30 é o Invariante 7.** O pré-requisito é condicional ao curso (§5.2 do recon). Uma ferramenta que responda sem curso está omitindo, e omitir calado é o que o invariante proíbe. O teste precisa provar três coisas: que não houve segunda chamada, que a saída diz o que falta, e que ela **não afirma** "sem pré-requisito".
 
-**T31 tem uma limitação que você deve declarar no próprio teste:** a Fase 1 nunca amostrou disciplina e pré-requisito da *mesma* disciplina. O que está sob teste é a composição de duas chamadas, não o pareamento — que continua não verificado (§8 do recon). Escreva isso no código; não deixe parecer cobertura que não existe.
+**T31 tem uma limitação que você deve declarar no próprio teste:** a Fase 1 nunca amostrou disciplina e pré-requisito da *mesma* disciplina. O que está sob teste é a composição de duas chamadas, não o pareamento — que a suíte não cobre por falta de fixture pareada, e que foi confirmado ao vivo em 31/08 (§9). Escreva isso no código; não deixe parecer cobertura que não existe.
 
 **T33** fecha um "não verificado" do §8 do recon sem fingir que o fechou: o comportamento travado é usar o código recebido sem traduzir **e avisar**.
 

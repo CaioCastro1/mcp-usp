@@ -79,10 +79,12 @@ def test_t30_sem_curso_a_ferramenta_diz_o_que_nao_sabe(gravador, psi3323):
 
 
 def test_t31_com_curso_duas_chamadas_e_requisito_estruturado(gravador, psi3323, requisito):
-    # LIMITAÇÃO DECLARADA: a Fase 1 nunca amostrou disciplina e pré-requisito
-    # da MESMA disciplina (§8 do recon). As duas respostas aqui são stubs, e o
-    # que está sob teste é a COMPOSIÇÃO de duas chamadas — não o pareamento,
-    # que continua não verificado.
+    # As duas respostas são stubs: a Fase 1 nunca capturou disciplina e
+    # pré-requisito da MESMA disciplina, então o que este teste cobre offline
+    # é a COMPOSIÇÃO de duas chamadas, não o pareamento.
+    # O pareamento foi verificado AO VIVO em 31/08 — MAT2454 no curso 3033-0
+    # devolve MAT2453 — e está no §9. Trazer isso para cá exigiria capturar
+    # as duas fixtures pareadas; enquanto não houver, este teste não o cobre.
     g = gravador([psi3323, requisito])
     d = ferramentas.disciplina("PSI3323", curso=("3033", "0"), cliente=cliente.ClienteJupiter(g))
 
