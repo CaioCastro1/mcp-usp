@@ -24,10 +24,23 @@ resolver em silêncio.
 
 ### 1.1 Restrição de ambiente que determina onde se trabalha
 
+**A restrição depende do ambiente, e a diferença importa** — corrigido em 31/08/2026,
+ver §9.
+
 `uspdigital.usp.br` e `edisciplinas.usp.br` **não são alcançáveis** do sandbox em nuvem do
 Cowork nem da VM local que ele expõe — ambos saem por um proxy de egress com allowlist que
 só libera um conjunto pequeno de domínios (registries de pacote, `api.anthropic.com`).
 Sintoma: `curl` devolve `000`, ou `403` no túnel CONNECT; DNS falha na VM local.
+
+**Mas do Claude Code rodando na máquina do dono, são alcançáveis.** Medido em 31/08/2026:
+DNS resolve (`edisciplinas.usp.br` → `200.144.235.136`), TCP/443 conecta, HTTPS numa página
+pública devolve `200`, e o web service devolve `invalidtoken` para token vazio. Nenhuma
+variável de proxy no ambiente.
+
+A consequência abaixo continua valendo, mas **por outro motivo**: não é a rede que separa
+uma sessão de agente do teste real, é a credencial. O token é pessoal, cada chamada fica no
+log da conta, e por isso a camada `live` fica atrás de `USP_MCP_LIVE=1` — decisão de quem
+é dono da conta, não limitação de infraestrutura.
 
 Consequência: **todo teste contra a USP roda no terminal do Caio.** O desenvolvimento
 assistido tem que acontecer com acesso à rede dele, ou contra fixtures.
@@ -801,3 +814,43 @@ de o bug aparecer, e o bug apareceu exatamente onde o aviso apontava.
 **O que continua não verificado:** `tools/call`. Ele fala com a USP, e a rede da USP não
 é alcançável do sandbox (§1.1). É a última coisa que falta, e só roda no terminal do
 dono.
+
+### 31/08/2026 — o MCP respondeu com dado real; §1.1 estava errado para este ambiente
+
+**A fatia vertical funciona ponta a ponta.** `o_que_vence` chamada por um cliente MCP de
+verdade, pelo `.mcp.json` versionado, devolveu 6 vencimentos reais em 14 dias — PTC3360,
+PSI3472, PME3344 e PTC3314 — em 767 caracteres de texto. É o critério 2 do §5 cumprido de
+fato: uma chamada do ponto de vista do modelo, resposta que cabe em pouco contexto. O
+`tools/call`, último caminho não verificado do registro anterior, fecha aqui.
+
+**§1.1 estava errado para este ambiente, e o erro custou trabalho.** O documento afirmava
+como fato que a rede da USP não é alcançável do sandbox, e isso foi repetido em várias
+decisões desta sessão sem nunca ter sido medido aqui. Medição: DNS resolve
+(`edisciplinas.usp.br` → `200.144.235.136`), TCP/443 conecta, HTTPS público devolve `200`,
+nenhuma variável de proxy no ambiente. A afirmação continua válida para o sandbox em nuvem
+do Cowork; **não** vale para o Claude Code na máquina do dono. §1.1 e o item 9 do
+`CLAUDE.md` reescritos.
+
+O que a correção muda no desenho: **não é a rede que separa uma sessão de agente do teste
+real, é a credencial.** O token é pessoal e cada chamada fica no log da conta. A camada
+`live` atrás de `USP_MCP_LIVE=1` continua certa — por consentimento do dono, não por
+limitação de infraestrutura. Registro fica como aviso: fato herdado de documento e nunca
+remedido é indistinguível de fato verificado, e este atrasou a verificação de ponta a ponta
+sem necessidade.
+
+**A fixture de erro existe** (`fixtures/moodle/erro_invalidtoken.json`, 142 B). Capturada com
+`wstoken=""` — token propositalmente vazio, que não usa credencial e não toca conta nenhuma.
+Fecha a limitação declarada no §6 do documento de desenho, para este modo de falha. A
+resposta real:
+
+- HTTP **200** com corpo de erro — confirma a decisão de checar o corpo e não o status.
+- `errorcode: invalidtoken`, `message: "Token inválido - token não encontrado"`.
+- Sem `debuginfo`, sem `backtrace`. Três chaves só.
+- **`exception: core\exception\moodle_exception`**, com namespace — não o `moodle_exception`
+  pelado que os testes montados à mão supunham. O cliente passa ileso porque casa em
+  `errorcode` e nunca em `exception`; T52 agora trava esse critério.
+
+Os outros modos de falha (`accessexception`, HTML de manutenção com 200, timeout) seguem
+sendo contrato de camada, com a forma real não verificada.
+
+Suíte: **98 offline + 2 live**, com T52 novo.
