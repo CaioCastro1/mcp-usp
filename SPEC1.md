@@ -1129,3 +1129,57 @@ O repositório já tinha essa instrução, em forma de Definição de Pronto, e 
 impediu nada — instrução escrita não compete com o fato de que ninguém reabre o §1
 ao fechar uma tarefa. Regra que depende de lembrança perde para regra que depende
 de lugar.
+
+### 31/08/2026 — a segunda ferramenta do Moodle é material, e a pergunta veio do dono
+
+As três candidatas que sobravam do §5 foram postas ao dono com o custo medido de
+cada uma. A resposta descarta duas e reescreve a terceira:
+
+- **Nota** — "eles usam pouco". Descartada apesar de ser a chamada mais barata do
+  projeto por unidade de informação (70 cursos em ~870 tokens). Barato não é
+  critério; o §5 pede a pergunta que o dono **faz de verdade**.
+- **Aviso do professor** — "não queria usar". Descartada.
+- **"Já entreguei"** — "devo usar um pouco mais". Fica como candidata, não como
+  próxima.
+- **Material** — a pergunta real, e não estava na forma em que o §5 a registrava.
+  Não é "onde está o PDF da aula de hoje": é **descobrir os arquivos do espaço da
+  disciplina**, porque muitos são regras da disciplina, listas de exercícios e
+  provas anteriores. O valor está no acervo, não no arquivo de hoje.
+
+**Medido antes de desenhar**, em cima da captura da Fase 1 e sem gastar chamada
+nova da conta (`course_contents_142033.json`, 58.049 B). Detalhe em
+`notas/fase1-moodle.md`:
+
+| | |
+|---|---|
+| Composição | 22 `resource` + 7 `url` = **29 entradas em `contents`** |
+| Mimetype | **19 PDF**, 1 docx, 1 jpeg, 1 octet-stream, 7 sem (os links externos) |
+| Cru | 58.049 B, ~14.512 tokens por disciplina |
+| **Projetado** | **6.486 B, ~1.621 tokens — 11,2% do cru** |
+
+A projeção é o que torna a ferramenta viável: 1,6k por disciplina cabe folgado,
+14,5k não. Varrer as 10 segue inviável (145k) — **sob demanda, uma por vez**, e a
+ferramenta exige escopo explícito como toda chamada deste projeto.
+
+**Decidido: duas ferramentas, nesta ordem, não uma.** A primeira lista; a segunda,
+depois, traz o conteúdo do arquivo para o modelo ler. O motivo de separar não é
+cautela genérica — é que a segunda tem dois problemas não resolvidos que a
+primeira não tem, e juntá-las seguraria a que já dá para entregar.
+
+**`fileurl` não carrega o token: 0 de 29 entradas.** A resposta como capturada não
+tem segredo dentro. Mas para **baixar**, o token precisa ir junto na URL, e aí o
+Invariante 3 morde: devolver URL pronta põe a credencial no contexto do modelo e
+em todo log por onde ela passar. Enquanto isso não tiver desenho, a ferramenta de
+listagem devolve o que identifica o arquivo, não uma URL autenticada.
+
+**Continua não verificado**, e registrado como tal em vez de suposto: (a) se o
+download com token anexado funciona — é o padrão do Moodle, este repo nunca mediu,
+e custa uma chamada da conta, que é decisão do dono; (b) se `get_contents` expande
+o conteúdo de um `mod_folder` — PSI3323 não tem nenhum, então a amostra não
+responde, e uma disciplina que agrupe as listas numa Pasta é exatamente o caso que
+importa.
+
+**Descartado:** usar `mod_resource_get_resources_by_courses` ou
+`core_search_get_results`. O primeiro é mais estreito e exigiria uma segunda
+chamada para os `url`; o segundo não foi testado. `get_contents` já responde em
+uma chamada, e a questão do §4 sobre ele fechou em 28/08.
