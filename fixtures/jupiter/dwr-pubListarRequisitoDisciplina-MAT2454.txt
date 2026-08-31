@@ -1,0 +1,9 @@
+throw 'allowScriptTagRemoting is false.';
+//#DWR-REPLY
+//#DWR-START#
+(function(){
+if(!window.dwr)return;
+var dwr=window.dwr._[0];
+dwr.engine.remote.handleCallback("0","0",[{coddisreq:"MAT2453",tipreq:"PR",numgrpreq:"1",nomdisreq:"C\u00E1lculo Diferencial e Integral I",stamtrrcp:"S"}]);
+})();
+//#DWR-END#

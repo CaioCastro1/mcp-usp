@@ -1,0 +1,1000 @@
+[ {
+  "name" : "Cidade Universitária",
+  "restaurants" : [ {
+    "alias" : "CENTRAL",
+    "address" : "Praça do Relógio Solar, travessa 8, no 300, Cidade Universitária, Butantã, São Paulo - SP",
+    "name" : "CENTRAL",
+    "phones" : "(11) 3091-3318",
+    "id" : "6",
+    "latitude" : "-23.5602110",
+    "longitude" : "-46.7218170",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/central.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:30",
+        "dinner" : "17:30 às 19:45"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rua da Praça do Relógio, 109, Bloco K, 1º andar, sala 107 (Tesouraria da PRIP) - Cidade Universitária/SP",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "de 2ª a 6ª feira, das 09h às 17h30"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "PUSP-CB",
+    "address" : "Av. Professor Almeida Prado, 1280, Cidade Universitária, Butantã, São Paulo - SP",
+    "name" : "PUSP-CB",
+    "phones" : "(11) 3091-0495",
+    "id" : "7",
+    "latitude" : "-23.5592830",
+    "longitude" : "-46.7400950",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/puspc.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:30",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rua da Praça do Relógio, 109, Bloco K, 1º andar, sala 107 (Tesouraria da PRIP) - Cidade Universitária/SP",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "de 2ª a 6ª feira, das 09h às 17h30"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "FÍSICA",
+    "address" : "Rua do Matão, travessa R, no 187, Cidade Universitária, Butantã, São Paulo - SP",
+    "name" : "FÍSICA",
+    "phones" : "(11) 3091-6711",
+    "id" : "8",
+    "latitude" : "-23.5607450",
+    "longitude" : "-46.7358080",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/fisica.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "",
+        "dinner" : "17:30 às 19:45"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rua da Praça do Relógio, 109, Bloco K, 1º andar, sala 107 (Tesouraria da PRIP) - Cidade Universitária/SP",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "de 2ª a 6ª feira, das 09h às 17h30"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "QUÍMICAS",
+    "address" : "Av. Lineu Prestes, 748 - Instituto de Químicas, Cidade Universitária, Butantã, São Paulo - SP",
+    "name" : "QUÍMICAS",
+    "phones" : "(11) 3927-8880",
+    "id" : "9",
+    "latitude" : "-23.5635250",
+    "longitude" : "-46.7255460",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/quimica.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "08:30 às 09:30",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:30 às 09:00",
+        "dinner" : "17:30 às 19:00"
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "",
+        "dinner" : "17:30 às 19:45"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rua da Praça do Relógio, 109, Bloco K, 1º andar, sala 107 (Tesouraria da PRIP) - Cidade Universitária/SP",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "de 2ª a 6ª feira, das 09h às 17h30"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Quadrilátero Saúde",
+  "restaurants" : [ {
+    "alias" : "ESCOLA DE ENFERMAGEM",
+    "address" : "Av. Dr. Enéas de Carvalho Aguiar, 419, Cerqueira César, São Paulo - SP",
+    "name" : "ESCOLA DE ENFERMAGEM",
+    "phones" : "(11) 3061-7518",
+    "id" : "12",
+    "latitude" : "-23.5566350",
+    "longitude" : "-46.6710830",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/enfermagem.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:30",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "FAC. DE SAÚDE PÚBLICA",
+    "address" : "Av. Dr. Arnaldo, 715, Cerqueira César, São Paulo - SP",
+    "name" : "FAC. DE SAÚDE PÚBLICA",
+    "phones" : "(11) 3061-7785",
+    "id" : "11",
+    "latitude" : "-23.5545030",
+    "longitude" : "-46.6735340",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/fsp.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:30",
+        "dinner" : "17:30 às 19:45"
+      }
+    },
+    "cashiers" : [ ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "FACULDADE DE MEDICINA",
+    "address" : "Av. Dr. Arnaldo, 455, Cerqueira César, São Paulo - SP",
+    "name" : "FACULDADE DE MEDICINA",
+    "phones" : "(11) 3061-7146",
+    "id" : "18",
+    "latitude" : "0E-7",
+    "longitude" : "0E-7",
+    "photourl" : "",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "11:00 às 14:30",
+        "breakfast" : "06:30 às 08:30",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 14:30",
+        "breakfast" : "06:30 às 08:30",
+        "dinner" : "18:00 às 20:15"
+      }
+    },
+    "cashiers" : [ ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Largo São Francisco",
+  "restaurants" : [ {
+    "alias" : "FACULDADE DE DIREITO",
+    "address" : "Rua Riachuelo, 185 - 2o andar intermediário, Sé, São Paulo - SP",
+    "name" : "FACULDADE DE DIREITO",
+    "phones" : "(11) 3111-4054",
+    "id" : "14",
+    "latitude" : "-23.5508560",
+    "longitude" : "-46.6370590",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/direito.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:30",
+        "dinner" : "17:00 às 19:30"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rua Riachuelo, 185 - 2º andar Intermediário, Sé, São Paulo, SP",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Terças e quintas- feiras, das 11h às 14h e das 16h30 às 18h30"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "USP Leste",
+  "restaurants" : [ {
+    "alias" : "EACH",
+    "address" : "Av. Arlindo Béttio, 1000, Ermelino Matarazzo, São Paulo - SP",
+    "name" : "EACH",
+    "phones" : "(11) 2648-0101",
+    "id" : "13",
+    "latitude" : "-23.4815940",
+    "longitude" : "-46.5012130",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/each.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:15 às 14:15",
+        "breakfast" : "07:00 às 08:00",
+        "dinner" : "17:30 às 19:45"
+      }
+    },
+    "cashiers" : [ ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus de Bauru",
+  "restaurants" : [ {
+    "alias" : "BAURU",
+    "address" : "Al. Dr. Octávio Pinheiro Brisolla, 9-75, Vila Nova Cidade Universitária, Bauru - SP",
+    "name" : "BAURU",
+    "phones" : "(14) 3235-8337",
+    "id" : "20",
+    "latitude" : "-22.3354660",
+    "longitude" : "-49.0595480",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/bauru.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 13:30",
+        "breakfast" : "",
+        "dinner" : "17:30 às 19:00"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Al. Dr. Octávio Pinheiro Brisolla, 9-75 - CEP: 17012-901 - Bauru/SP - Brasil",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "20,00",
+          "lunch" : "20,00",
+          "breakfast" : "",
+          "displayLabel" : "Visitante autorizado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta das 11h00 às 13h30"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus \"Luiz de Queiroz\"",
+  "restaurants" : [ {
+    "alias" : "PIRACICABA",
+    "address" : "Alameda dos Alecrins, s/nº, Independência, Piracicaba - SP",
+    "name" : "PIRACICABA",
+    "phones" : "(19) 3429-4356",
+    "id" : "1",
+    "latitude" : "-22.7044760",
+    "longitude" : "-47.6350850",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/piracicaba.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "11:30 às 13:00",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 13:30",
+        "breakfast" : "",
+        "dinner" : "17:30 às 19:00"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Alameda dos Alecrins, s/nº - Independência - Piracicaba - São Paulo (ao lado da Central de aulas)",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta das 11h as 13h30"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus \"Fernando Costa\"",
+  "restaurants" : [ {
+    "alias" : "PIRASSUNUNGA",
+    "address" : "Av. Duque de Caxias Norte, 225, Jardim Elite, Pirassununga - SP",
+    "name" : "PIRASSUNUNGA",
+    "phones" : "(19) 3565-4028",
+    "id" : "5",
+    "latitude" : "-21.9587270",
+    "longitude" : "-47.4678350",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/fisica.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "11:00 às 13:00",
+        "breakfast" : "06:45 às 08:15",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 13:30",
+        "breakfast" : "06:45 às 08:15",
+        "dinner" : "16:45 às 19:15 (nas sextas, fecha às 19:00)"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Av. Duque de Caxias Norte, 225 - Prédio Central - Pirassununga",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta das 11h às 13h30m"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus de São Carlos",
+  "restaurants" : [ {
+    "alias" : "CRHEA (SC)",
+    "address" : "Rodovia Domingos Inocentini, Km 13, CEAT, Itirapina - SP",
+    "name" : "CRHEA (SC)",
+    "phones" : "(16) 3373-3907",
+    "id" : "4",
+    "latitude" : "-22.1689510",
+    "longitude" : "-47.8994850",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/sao_carlos_chrea.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:30 às 13:00",
+        "breakfast" : "",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Rodovia Domingos Inocentini, Km 13 - Estrada do Broa - Itirapina/SP - CEP 13573-435",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta - 9h às 13h"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "ÁREA 1 (SC)",
+    "address" : "Av. Trabalhador São-carlense, 400, Parque Arnold Schimidt, São Carlos - SP",
+    "name" : "ÁREA 1 (SC)",
+    "phones" : "(16) 3373-9140",
+    "id" : "2",
+    "latitude" : "-22.0068230",
+    "longitude" : "-47.8971350",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/sao_carlos_1.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Av. Trabalhador são-carlense , nº 400 - Parque Arnold Schimidt - São Carlos/SP - CEP 13566-590",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta das 9h às 14h"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "ÁREA 2 (SC)",
+    "address" : "Av. João Dagnone, 1100, Santa Angelina, São Carlos - SP",
+    "name" : "ÁREA 2 (SC)",
+    "phones" : "(16) 3373-8318",
+    "id" : "3",
+    "latitude" : "-22.0009370",
+    "longitude" : "-47.9333690",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/sao_carlos_2.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Av. João Dagnone,  nº 1100  - Santa Angelina - São Carlos/SP - CEP 13563-120",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda à Sexta - 11h15min às 13h"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus de Ribeirão Preto",
+  "restaurants" : [ {
+    "alias" : "CENTRAL (RP)",
+    "address" : "Avenida Professor Hélio Lourenço, s/n, Vila Monte Alegre, Ribeirão Preto - SP",
+    "name" : "CENTRAL (RP)",
+    "phones" : "(16) 3315-4640",
+    "id" : "19",
+    "latitude" : "-21.1597940",
+    "longitude" : "-47.8476800",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/ribeirao_preto.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "11:00 às 13:00",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 13:30",
+        "breakfast" : "",
+        "dinner" : "17:15 às 19:15"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Avenida Professor Hélio Lourenço, s/n - Vila Monte Alegre - Ribeirão Preto/SP - CEP:14040-900",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda a Sexta - 7h as 8:30h e 11h as 13:30h"
+    }, {
+      "address" : "Seção de Tesouraria - PUSP-RP  Prefeitura do Campus - Administração",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "",
+      "latitude" : "",
+      "workinghours" : "Segunda a Sexta - 8h as 17h"
+    } ],
+    "hasCashier" : "false"
+  } ]
+}, {
+  "name" : "Campus de Lorena",
+  "restaurants" : [ {
+    "alias" : "EEL - ÁREA 1",
+    "address" : "Estrada Municipal do Campinho, 100, Campinho, Lorena - SP",
+    "name" : "EEL - ÁREA 1",
+    "phones" : "(12) 3159-5304",
+    "id" : "17",
+    "latitude" : "-22.6969629",
+    "longitude" : "-45.1194892",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/lorena.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:00 às 14:00",
+        "breakfast" : "06:45 às 08:30",
+        "dinner" : "17:00 às 19:30"
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Estrada Municipal do Campinho, s/n - Ponte Nova - Lorena - São Paulo (ao lado de Setor de Recursos Humanos)",
+      "prices" : {
+        "special" : {
+          "dinner" : "10,00",
+          "lunch" : "10,00",
+          "breakfast" : "",
+          "displayLabel" : "Especial"
+        },
+        "students" : {
+          "dinner" : "2,00",
+          "lunch" : "2,00",
+          "breakfast" : "",
+          "displayLabel" : "Aluno"
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "-45.1177380",
+      "latitude" : "-22.6974960",
+      "workinghours" : "Segundas, quartas e sextas: das 11h30 às 13h30 e das 16h30 às 19h"
+    } ],
+    "hasCashier" : "false"
+  }, {
+    "alias" : "EEL - ÁREA 2",
+    "address" : "Pólo-Urbo Industrial, 1000, Santa Lucrécia, Lorena - SP",
+    "name" : "EEL - ÁREA 2",
+    "phones" : "(12) 3159-9806",
+    "id" : "23",
+    "latitude" : "-22.7661769",
+    "longitude" : "-45.1017296",
+    "photourl" : "https://uspdigital.usp.br/comumwebdev/imagens/cardapio/lorena2.jpg",
+    "workinghours" : {
+      "sunday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "saturday" : {
+        "lunch" : "",
+        "breakfast" : "",
+        "dinner" : ""
+      },
+      "weekdays" : {
+        "lunch" : "11:30 às 13:00",
+        "breakfast" : "07:30 às 08:30",
+        "dinner" : ""
+      }
+    },
+    "cashiers" : [ {
+      "address" : "Pólo-Urbo Industrial, Gleba AI-6, s/n - Bairro Santa Lucrécia",
+      "prices" : {
+        "special" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        },
+        "students" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        },
+        "visiting" : {
+          "dinner" : "15,00",
+          "lunch" : "15,00",
+          "breakfast" : "",
+          "displayLabel" : "Credenciado"
+        },
+        "employees" : {
+          "dinner" : "",
+          "lunch" : "",
+          "breakfast" : "",
+          "displayLabel" : ""
+        }
+      },
+      "longitude" : "-45.1177380",
+      "latitude" : "-22.6974960",
+      "workinghours" : "Terças e quintas-feiras, das 14h30 às 17h30"
+    } ],
+    "hasCashier" : "false"
+  } ]
+} ]

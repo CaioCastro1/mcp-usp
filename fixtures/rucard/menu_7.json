@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne de panela\nOpção: Bolinho de PVT \nAcelga com cenoura ralada\nSalada de pepino\nBananada\nMinipão / refresco",
+      "calories" : "975"
+    },
+    "date" : "24/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral \nFricassé de frango com batata palha\nOpção: Grão-de-bico com azeitonas\nCaponata de abobrinha\nSalada de alface\nMelancia\nMinipão / refresco",
+      "calories" : "1010"
+    },
+    "date" : "25/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão preto / arroz integral\nLagarto com molho madeira\nOpção: PVT gratinado\nBatata corada\nSalada de agrião\nLaranja\nMinipão / refresco",
+      "calories" : "1175"
+    },
+    "date" : "26/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nSobrecoxa de frango assado\nOpção: PVT com ervilha\nVirado de cenoura\nSalada de acelga\nBolinho de laranja\nMinipão / refresco",
+      "calories" : "920"
+    },
+    "date" : "27/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de contrafilé acebolado \nOpção: Canelone de queijo, PVT e escarola\nRepolho refogado\nSalada de beterraba\nBanana\nMinipão / refresco",
+      "calories" : "1020"
+    },
+    "date" : "28/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "date" : "29/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "date" : "30/08/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação.\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**"
+  }
+}

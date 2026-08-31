@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de peito de frango empanado \nOpção: PVT com legumes\nCreme de milho\nSalada de almeirão\nMaçã\nMinipão / refresco",
+      "calories" : "1000"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife com molho de pimentões \nOpção: Hambúrguer de lentilha\nAbobrinha refogada\nSalada de alface\nBananada\nMinipão / refresco",
+      "calories" : "975"
+    },
+    "date" : "24/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de panela\nOpção: Charuto de repolho com PVT\nMandioca sauté\nSalada de acelga\nPudim de chocolate\nMinipão / refresco",
+      "calories" : "895"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nLinguiça toscana com molho de cebola\nOpção: Omelete \nEscarola à provençal \nSalada de cenoura\nAbacaxi\nMinipão / refresco",
+      "calories" : "955"
+    },
+    "date" : "25/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne moída à jardineira\nOpção: PVT à jardineira\nRepolho à caponata \nSalada de beterraba \nLaranja\nMinipão / refresco",
+      "calories" : "980"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de frango grelhado com molho mostarda\nOpção: PVT com azeitonas\nJardineira de legumes\nSalada de rúcula \nManjar com calda de ameixa\nMinipão / refresco",
+      "calories" : "885"
+    },
+    "date" : "26/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão preto / arroz integral \nCoxa e sobrecoxa de frango assadas\nOpção: PVT com cogumelos\nBatata doce sauté\nSalada de alface\nMousse de maracujá\nMinipão / refresco",
+      "calories" : "985"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão preto / arroz integral \nPeixe em tiras empanadas \nOpção: PVT com espinafre\nPolenta \nSalada de almeirão\nMelancia\nMinipão / refresco",
+      "calories" : "955"
+    },
+    "date" : "27/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nLagarto assado com molho argentino \nOpção: Ovos mexidos com ervas e tomate\nCouve refogada\nSalada de tomate\nBanana\nMinipão / refresco",
+      "calories" : "990"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de contrafilé com molho de ervas\nOpção: PVT à chinesa\nCenoura com alho-poró\nSalada de acelga\nMaria mole\nMinipão / refresco",
+      "calories" : "985"
+    },
+    "date" : "28/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nTorta madalena \nOpção: Almôndegas de PVT\nChuchu com azeitonas\nSalada de rúcula\nGelatina de uva\nMinipão / refresco",
+      "calories" : "920"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango em cubos acebolados\nOpção: Cassoulet vegetariano\nQuibebe\nSalada de catalonha\nLaranja\nMinipão / refresco",
+      "calories" : "975"
+    },
+    "date" : "29/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne assada\nOpção: Baião de dois vegetariano \nVirado de couve\nSalada de agrião\nCompota de maçã\nMinipão / refresco",
+      "calories" : "985"
+    },
+    "date" : "30/08/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação.\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**"
+  }
+}

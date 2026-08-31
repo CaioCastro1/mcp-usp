@@ -1,0 +1,9 @@
+throw 'allowScriptTagRemoting is false.';
+//#DWR-REPLY
+//#DWR-START#
+(function(){
+if(!window.dwr)return;
+var dwr=window.dwr._[0];
+dwr.engine.remote.handleCallback("0","0","uiLbomU4dH6D!GxJ1kxMVFISsNY9eXrQl2q");
+})();
+//#DWR-END#

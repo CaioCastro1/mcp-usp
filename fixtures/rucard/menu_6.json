@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nCarne assada com molho ferrugem\nOpção: Creme de ervilha\nAbobrinha refogada\nSalada de acelga\nMaçã\nMinipão / refresco",
+      "calories" : "935"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nIscas de tilápia empanadas\nOpção: Grão-de-bico à indiana (V)\nJardineira de Legumes\nSalada de escarola\nDoce de leite\nMinipão / refresco",
+      "calories" : "1065"
+    },
+    "date" : "24/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de caçarola\nOpção: Abobrinha com molho branco (V)\nMandioca sauté\nSalada de alface\nBanana\nMinipão / refresco",
+      "calories" : "1015"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão preto / arroz integral\nLombo com molho de limão\nOpção: Escondidinho de shimeji (V)\nEscarola refogada\nSalada de cenoura\nMexerica\nMinipão / refresco",
+      "calories" : "785"
+    },
+    "date" : "25/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de frango acebolado\nOpção: Bobó de PVT (V)\nChuchu refogado\nSalada de almeirão\nCocada\nMinipão / refresco",
+      "calories" : "935"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nHambúrguer com molho americano\nOpção: Lentilha com vinagrete (V)\nMacarrão ao alho e óleo\nSalada de acelga\nMaçã\nMinipão / refresco",
+      "calories" : "1115"
+    },
+    "date" : "26/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nLinguiça acebolada\nOpção: Cassoulet vegetariano\nVirado de couve\nSalada de escarola\nLaranja\nMinipão / refresco",
+      "calories" : "1035"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango assado\nOpção: PVT xadrez\nAbóbora refogada\nSalada de alface\nMelão\nMinipão / refresco",
+      "calories" : "885"
+    },
+    "date" : "27/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango empanado\nOpção: Falafel\nCenoura refogada\nSalada de repolho\nMexerica\nMinipão / refresco",
+      "calories" : "985"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de caçarola com molho de cogumelos\nOpção: Quibe de PVT\nBatata corada\nSalada de almeirão\nSagu\nMinipão / refresco",
+      "calories" : "1045"
+    },
+    "date" : "28/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "29/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "30/08/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação."
+  }
+}

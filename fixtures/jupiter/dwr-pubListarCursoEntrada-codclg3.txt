@@ -1,0 +1,9 @@
+throw 'allowScriptTagRemoting is false.';
+//#DWR-REPLY
+//#DWR-START#
+(function(){
+if(!window.dwr)return;
+var dwr=window.dwr._[0];
+dwr.engine.remote.handleCallback("0","0",[{codcur:"3033",codhab:"0",nomhab:"Ciclo B\u00E1sico - Engenharia El\u00E9trica",nomcur:"Engenharia",perhab:"integral"},{codcur:"3201",codhab:"0",nomhab:"Ciclo B\u00E1sico - Materiais\/Metal\u00FArgica\/Nuclear",nomcur:"Engenharia",perhab:"integral"},{codcur:"3251",codhab:"0",nomhab:"Ciclo B\u00E1sico - Minas\/Petr\u00F3leo",nomcur:"Engenharia",perhab:"integral"},{codcur:"3152",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Ambiental",nomcur:"Engenharia",perhab:"integral"},{codcur:"3023",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Civil",nomcur:"Engenharia",perhab:"integral"},{codcur:"3123",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia de Computa\u00E7\u00E3o",nomcur:"Engenharia",perhab:"integral"},{codcur:"3084",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia de Produ\u00E7\u00E3o",nomcur:"Engenharia",perhab:"integral"},{codcur:"3045",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Mec\u00E2nica",nomcur:"Engenharia",perhab:"integral"},{codcur:"3113",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Mecatr\u00F4nica",nomcur:"Engenharia",perhab:"integral"},{codcur:"3073",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Naval e Oce\u00E2nica",nomcur:"Engenharia",perhab:"integral"},{codcur:"3093",codhab:"3000",nomhab:"Habilita\u00E7\u00E3o: Engenharia Qu\u00EDmica",nomcur:"Engenharia",perhab:"integral"}]);
+})();
+//#DWR-END#

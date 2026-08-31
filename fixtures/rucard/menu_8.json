@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral \nCarne assada com molho picante\nOpção: Torta madalena de PVT\nCenoura com vagem\nSalada de acelga\nMaçã \nMinipão / refresco",
+      "calories" : "875"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral \nContrafilé em tiras com molho roti  \nOpção: Grão-de-bico com molho vinagrete\nMacarrão ao sugo\nSalada de alface e rúcula\nBananada\nMinipão / refresco",
+      "calories" : "840"
+    },
+    "date" : "24/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão preto / arroz integral\nBife de caçarola \nOpção: Feijão branco com azeitonas\nCreme de espinafre\nSalada de repolho branco e roxo\nGelatina de limão \nMinipão / refresco",
+      "calories" : "890"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão preto / arroz integral\nFilé de peito de frango com molho de mostarda\nOpção: PVT com abobrinha\nEscarola refogada\nSalada de tomate \nLaranja\nMinipão / refresco",
+      "calories" : "895"
+    },
+    "date" : "25/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de coxa de frango grelhado\nOpção: Omelete de forno\nMandioca sauté\nSalada de escarola\nLaranja\nMinipão / refresco",
+      "calories" : "945"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nLagarto com molho agridoce\nOpção: PVT com batata e cenoura\nAcelga refogada\nSalada de beterraba\nBiscoito de chocolate\nMinipão / refresco",
+      "calories" : "960"
+    },
+    "date" : "26/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nHambúrguer grelhado\nOpção: PVT com moyashi e shoyu\nAbobrinha com molho vinagrete\nSalada de alface\nBananinha\nMinipão / refresco",
+      "calories" : "865"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFricassé de frango\nOpção: Ervilha seca com legumes\nBatata à provençal\nSalada de almeirão\nBanana\nMinipão / refresco",
+      "calories" : "910"
+    },
+    "date" : "27/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Arroz / feijão / arroz integral\nFilé de peito de frango empanado\nOpção: Feijoada vegetariana \nAcelga refogada\nSalada de pepino com tomate\nMexerica\nMinipão / refresco",
+      "calories" : "940"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de alcatra com molho picante\nOpção: Panqueca de PVT ao sugo\nChuchu sauté\nSalada de escarola\nDelicia de abacaxi\nMinipão / refresco",
+      "calories" : "915"
+    },
+    "date" : "28/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "date" : "29/08/2026"
+  }, {
+    "dinner" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "FECHADO",
+      "calories" : "0"
+    },
+    "date" : "30/08/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação."
+  }
+}
