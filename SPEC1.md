@@ -900,6 +900,45 @@ HTTP 200 (exige a USP em manutenção) e timeout (exige a USP fora do ar). Os te
 dois seguem assegurando contrato de camada, e é o máximo que dá para afirmar.
 
 Suíte: **103 offline + 2 live**.
+
+### 31/08/2026 — gate de pré-commit, e ele reprovou a si mesmo primeiro
+
+`scripts/gate.sh` fecha o `<TODO>` do §4 do `CONVENTIONS.md` e do §3 do `CLAUDE.md`.
+Três checagens: segredo do `.env` em arquivo rastreado, o cru seguindo gitignorado, e a
+suíte offline. A camada `live` fica de fora de propósito — um gate que depende da USP
+estar de pé reprova commit por motivo errado, e gasta credencial a cada commit.
+
+**A primeira versão passava sem ter verificado nada.** Ela procurava o `.env` em
+`cwd/.env`, e num worktree esse arquivo não existe: o dicionário de segredos saía vazio,
+o laço não tinha o que procurar, e a checagem reportava OK. Descoberto plantando o
+`MOODLE_TOKEN` de propósito num arquivo rastreado — o gate aprovou.
+
+O detalhe que vale registrar: **é exatamente o mesmo erro que o `conftest` tinha**,
+cometido no mesmo dia por quem acabara de consertá-lo. A lição não é "lembre do
+worktree", é que **buscar `.env` tem um jeito certo e ele agora está num lugar só**
+(`usp_mcp.env.achar_env`). Toda cópia nova do algoritmo é uma chance de repetir isto.
+
+Duas consequências no desenho do gate:
+
+- **Checagem que não pode rodar REPROVA**, e diz por quê. Sem `.env` em lugar nenhum, o
+  gate não reporta OK — ele falha dizendo "esta checagem não verificou nada". É o
+  Invariante 6 aplicado à ferramenta de verificação.
+- **Isenção por par `(variável, arquivo)`, nunca por variável.** `RUCARD_HASH` está
+  deliberadamente no `.env.example` e no §1.2 deste documento, porque é o hash embutido
+  no app oficial do RUCard e sem ele o §8 não é reproduzível. Isentar a variável inteira
+  transformaria o gate em teatro para ela; por par, a mesma hash em qualquer outro
+  arquivo reprova — verificado.
+
+**O gate foi verificado sabotando cada checagem uma a uma**, e as três reprovam:
+`MOODLE_TOKEN` plantado no README, `RUCARD_HASH` em arquivo não previsto, `.gitignore`
+sem a linha do cru, e a `ALLOWLIST` esvaziada. Um gate que não pode falhar não verifica
+nada (§6 do `CONVENTIONS.md`), e a única forma de saber é tentando fazê-lo falhar.
+
+Registro adicional, porque a primeira tentativa de sabotagem falhou em ser sabotagem:
+desligar a checagem de `BLOQUEIO_PERMANENTE` **não** quebrou nenhum teste, e está certo.
+Com allowlist, o default já é negar — a segunda camada do §2.2 documenta o motivo e
+protege contra erro futuro NA allowlist, mas não é o que nega hoje. É a arquitetura do
+Invariante 2 funcionando como anunciado.
 ### 31/08/2026 — suíte do Jupiter escrita antes da implementação; o gate passa a existir
 
 Desenho em `docs/superpowers/specs/2026-08-31-testes-jupiter-design.md`, plano em
