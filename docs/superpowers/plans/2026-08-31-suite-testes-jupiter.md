@@ -14,7 +14,7 @@ Quatro coisas foram medidas empiricamente antes deste plano. Todas mudam o que v
 
 **1.1 — pytest não está instalado no Python do sistema.** `python3 -m pytest` devolve `No module named pytest`. Crie um venv, acrescente-o ao `.gitignore`, e declare a dependência em `requirements-dev.txt`.
 
-**1.2 — Módulo ausente aborta a coleta inteira.** Com `usp_mcp` inexistente, o pytest devolve `Interrupted: N errors during collection` e **os testes verdes não rodam** — a saída nem os menciona. Testado nas duas formas. Portanto o plano cria um **esqueleto** de `usp_mcp/jupiter/{dwr,cliente,ferramentas}.py` cujos símbolos levantam `NotImplementedError`. Com ele, o resultado vira `37 failed, 3 passed`.
+**1.2 — Módulo ausente aborta a coleta inteira.** Com `usp_mcp` inexistente, o pytest devolve `Interrupted: N errors during collection` e **os testes verdes não rodam** — a saída nem os menciona. Testado nas duas formas. Portanto o plano cria um **esqueleto** de `usp_mcp/jupiter/{dwr,cliente,ferramentas}.py` cujos símbolos levantam `NotImplementedError`. Com ele o vermelho vira contável — na execução real, `56 failed, 10 passed, 2 skipped` (40 funções, 68 casos).
 
 O esqueleto **não é a Fase 2**: ele não decide ferramenta, nome nem formato de saída, e nenhuma função tem corpo. Se você se pegar escrevendo lógica dentro dele, parou de fazer andaime e começou a Fase 2 — o que o §4.10 do `CLAUDE.md` proíbe.
 
@@ -94,6 +94,8 @@ Leia o §4.3 e o §4.5 de `notas/jupiter-recon.md` antes: eles descrevem o envel
 **T12** precisa de duas coisas: um teste comportamental (o efeito colateral não aconteceu) e a varredura de fonte do §1.3 — que só significa algo depois que o esqueleto sair.
 
 **Aceite:** falham por `NotImplementedError`. Se aparecer `SyntaxError`, `fixture not found` ou erro de coleta, o teste está quebrado, não vermelho.
+
+**Armadilha, custou uma volta:** não construa o objeto sob teste dentro de uma fixture do pytest. O `NotImplementedError` no setup vira `ERROR` em vez de `FAILED` — 23 casos assim — e o vermelho deixa de ser contável, que era todo o motivo do esqueleto. A fixture entrega o insumo; o objeto nasce no corpo do teste.
 
 ---
 
@@ -197,7 +199,7 @@ Leia o §4.6 do spec inteiro antes de escrever. Ele registra uma asserção que 
 
 **T40 é o teste do próprio gate.** A diferença entre "não rodou" e "não rodou, e aqui está por quê" é o Invariante 6 aplicado à suíte; o motivo tem que citar a variável e o host.
 
-**Aceite:** falham por `NotImplementedError` — a coleta importa o cliente, então a falha vem antes do skip.
+**Aceite:** `2 skipped, 1 passed`. **Não** falham, ao contrário do resto da suíte: o esqueleto importa sem erro e só o *acesso a atributo* levanta, então um teste pulado nunca chega lá. T40 passa porque só inspeciona a mensagem do skip.
 
 ---
 
@@ -218,7 +220,7 @@ Os três `<TODO>` de gate do repo existem porque não havia código. Agora há s
 
 ## 4. Definição de pronto
 
-1. A suíte roda em máquina limpa, sem rede: **3 verdes, 37 vermelhos por `NotImplementedError`** — não erro de coleta, não fixture ausente, não skip.
+1. A suíte roda em máquina limpa, sem rede: **56 falhas, 10 verdes, 2 skips**. Confira o motivo de cada falha com `--tb=line`: todas `NotImplementedError`, nenhuma por erro de coleta, erro de setup ou fixture ausente. Contar ocorrências de `NotImplementedError` na saída inteira **não** verifica isso — as linhas `FAILED` vêm truncadas pela largura do terminal e o traceback infla a contagem.
 2. Sem a variável de ambiente, os testes `live` pulam com motivo escrito.
 3. Nenhuma varredura de fonte está verde: o helper do §1.3 recusa o esqueleto.
 4. Nenhum segredo e nenhum dado pessoal entrou no git; o venv está ignorado.
