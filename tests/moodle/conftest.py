@@ -25,6 +25,7 @@ from usp_mcp.env import carregar_env
 
 RAIZ = Path(__file__).resolve().parents[2]
 FIXTURE_EVENTOS = RAIZ / "fixtures" / "moodle" / "action_events.json"
+FIXTURE_ERRO = RAIZ / "fixtures" / "moodle" / "erro_invalidtoken.json"
 
 
 # O carregador mora em usp_mcp/env.py, não aqui: o entrypoint stdio do Moodle
@@ -71,6 +72,27 @@ def eventos_brutos() -> dict:
 @pytest.fixture(scope="session")
 def caminho_fixture() -> Path:
     return FIXTURE_EVENTOS
+
+
+@pytest.fixture(scope="session")
+def erro_invalidtoken() -> dict:
+    """A resposta REAL do Moodle para token inválido, capturada em 31/08/2026.
+
+    Capturada com `wstoken=""` — token propositalmente vazio, que não usa
+    credencial de ninguém e não toca conta nenhuma. É o que faltava para os
+    testes de erro pararem de assegurar só o contrato da camada.
+
+    Obrigatória, não opcional, pelo mesmo motivo da fixture de eventos: um
+    skip aqui produziria verde sem ter testado nada.
+    """
+    if not FIXTURE_ERRO.exists():
+        pytest.fail(
+            f"Fixture de erro ausente: {FIXTURE_ERRO}\n"
+            "Recapture com wstoken vazio contra "
+            "https://edisciplinas.usp.br/webservice/rest/server.php\n"
+            "Isto FALHA em vez de dar skip de propósito (Invariante 6)."
+        )
+    return json.loads(FIXTURE_ERRO.read_text(encoding="utf-8"))
 
 
 def pytest_runtest_setup(item):
