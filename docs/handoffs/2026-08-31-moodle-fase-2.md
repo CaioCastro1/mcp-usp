@@ -50,9 +50,9 @@ dias, contra teto de 4.000.
 - **Gate de pré-commit.** O `<TODO>` do §4 do `CONVENTIONS.md` e do §3 do
   `CLAUDE.md` continua aberto — agora existe código para o gate rodar
   (`.venv/bin/python -m pytest`), então dá para fechá-lo.
-- **`.venv` não existe no repositório nem em worktree novo.** Esta sessão criou
-  o dela com `python3 -m venv .venv && .venv/bin/pip install pytest`. Vale
-  decidir se isso vira `requirements-dev.txt` ou fica na mão.
+- ~~`.venv` não existe no repositório nem em worktree novo~~ — **resolvido:**
+  `requirements-dev.txt` criado. O venv continua sendo por diretório, e isso é
+  o certo; o que faltava era o comando de recriar estar escrito.
 - As demais perguntas do §5 continuam abertas. Isto é **uma** ferramenta.
 
 ## Arquivos tocados
@@ -63,10 +63,17 @@ dias, contra teto de 4.000.
 
 ## Como retomar
 ```bash
-# branch: claude/moodle-fase-2-156479
-python3 -m venv .venv && .venv/bin/pip install pytest   # se o venv não existir
-.venv/bin/python -m pytest              # esperado: 97 passed, 2 skipped
+# se o venv não existir NESTE diretório (cada worktree precisa do seu):
+python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
+
+.venv/bin/python -m pytest                    # 97 passed, 2 skipped
+USP_MCP_LIVE=1 .venv/bin/python -m pytest -m live   # 2 passed (fala com a USP)
 ```
+
+O `.venv` é gitignorado e **não** é copiado por `git worktree add` — o erro
+`zsh: no such file or directory: .venv/bin/python` significa que você está num
+diretório sem venv, não que a suíte quebrou. O `.env` não tem esse problema: o
+`conftest` sobe até o checkout principal para achá-lo.
 Depois: rodar a camada `live` no terminal do Caio, e só então tratar a fatia
 como validada contra a USP de verdade.
 
