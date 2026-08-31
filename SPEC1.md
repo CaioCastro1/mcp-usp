@@ -1362,7 +1362,10 @@ a **guardar** o diagnóstico, e quem reprova é o teste.
 
 **Custo.** Um processo por teste custava 67 s e teria feito o gate pesar mais que a suíte
 inteira; um processo por servidor, com escopo de sessão, custa ~6 s para 26 testes. O gate
-passou de 250 para **279 verdes**, e continua sem tocar a rede da USP: `initialize` e
+passou de 250 para **283 verdes** (279 desta trilha, mais os T45-T48 do teste em processo
+do Jupiter, que entrou na `main` em paralelo e **não** é substituído por este: aquele
+alcança o corpo enviado e a mensagem de SDK ausente, este alcança o fio), e continua sem
+tocar a rede da USP: `initialize` e
 `tools/list` são respondidos sem passar por `chamar_ferramenta`, que é onde mora qualquer
 credencial. Por isso esta camada roda no gate e não atrás de `USP_MCP_LIVE=1`.
 
