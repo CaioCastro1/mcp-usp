@@ -64,6 +64,9 @@ curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCAR
 # senão o .mcp.json falha com ENOENT em `.venv/bin/python`.
 python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
 
+# Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
+.venv/bin/python -m pytest tests/handshake
+
 # Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
