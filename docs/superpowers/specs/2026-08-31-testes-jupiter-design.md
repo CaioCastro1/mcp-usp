@@ -1,5 +1,12 @@
 # Suíte de testes do Jupiter — desenho
 
+> **Estado, 31/08/2026: SATISFEITO.** Este documento descreve a suíte enquanto ela
+> era especificação de algo que não existia. A Fase 2 foi implementada contra ela e
+> os 40 testes ficaram verdes, mais 4 da fronteira MCP (T41–T44), que não estavam
+> previstos aqui. Leia as seções abaixo como o *desenho*, não como o estado: onde
+> se lê "falha por `NotImplementedError`", hoje é verde. O registro do que mudou
+> está no §9 do `SPEC1.md`, entrada "Fase 2 do Jupiter implementada contra a suíte".
+
 > Data: 31/08/2026. Autoridade continua sendo o `SPEC1.md`; este documento é o
 > desenho de uma suíte, não um fato novo sobre a USP.
 > Escrito em par com a suíte do Moodle (`moodle-mcp-tests-e77611`), que está em
