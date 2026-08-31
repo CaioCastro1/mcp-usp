@@ -164,10 +164,12 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     do MCP instalado, e um import de topo quebraria a coleta inteira da
     suíte por causa de uma dependência que as funções puras nem chegam a usar.
 
-    Sem teste automático de propósito — exercitar isto exigiria subir um
-    processo stdio e um cliente MCP falso, o que testaria o SDK e não este
-    projeto. O que dá para verificar sem rede está em `--auto-verificar`, e a
-    verificação que importa é plugar num cliente de verdade e perguntar.
+    **Tem teste** desde 31/08 (T78-T81, `tests/moodle/test_server_stdio.py`).
+    Esta docstring dizia o contrário — que exercitar isto exigiria subir um
+    processo stdio — e estava errada: substituindo só `run()`, a suíte monta o
+    servidor contra o SDK real e chama `call_tool` até a fixture, sem credencial
+    nenhuma. O que faltava não era token, era `chamar_ferramenta` aceitar cliente
+    injetável. Segue sem teste apenas o `run()` em si, que é o SDK.
     """
     try:
         from mcp.server import MCPServer
@@ -232,8 +234,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     print("SDK do MCP           : presente")
 
     # O schema que o modelo vê tem de casar com a assinatura que o adaptador
-    # registra; divergir aqui é o erro que só apareceria em uso real.
-    declarados = set(listar_ferramentas()[0]["inputSchema"]["properties"])
+    # registra. Isto checava a PRIMEIRA ferramenta e imprimia "OK" como se
+    # falasse pelas duas — meia checagem com cara de checagem inteira, que é o
+    # Invariante 7 quebrado dentro da própria ferramenta de verificação.
+    # Corrigido em 31/08; a cobertura de verdade está em T79.
     import inspect
 
     from mcp.server import MCPServer as _M
@@ -241,17 +245,33 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     servidor = _M(name="verificacao", version="0.0.0")
 
     @servidor.tool(name="o_que_vence", description="verificação")
-    def _sonda(dias: int = 14, limite: int | None = None) -> str:
+    def _sonda_vence(dias: int = 14, limite: int | None = None) -> str:
         return ""
 
-    reais = set(inspect.signature(_sonda).parameters)
-    print("schema x assinatura  :", "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}")
-    if declarados != reais:
+    @servidor.tool(name="material", description="verificação")
+    def _sonda_material(disciplina: str, busca: str | None = None) -> str:
+        return ""
+
+    sondas = {"o_que_vence": _sonda_vence, "material": _sonda_material}
+    divergiu = False
+    for ferramenta in listar_ferramentas():
+        nome = ferramenta["name"]
+        declarados = set(ferramenta["inputSchema"]["properties"])
+        sonda = sondas.get(nome)
+        if sonda is None:
+            print(f"schema x assinatura  : {nome}: SEM SONDA — acrescente uma aqui")
+            divergiu = True
+            continue
+        reais = set(inspect.signature(sonda).parameters)
+        estado = "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}"
+        print(f"schema x assinatura  : {nome}: {estado}")
+        divergiu = divergiu or declarados != reais
+    if divergiu:
         return 1
 
     print()
-    print("Nada acima tocou a rede da USP. O que falta é plugar num cliente")
-    print("MCP e perguntar — só isso exercita chamar_ferramenta de verdade.")
+    print("Nada acima tocou a rede da USP. A suíte já cobre a fronteira MCP")
+    print("offline (T78-T81); o que falta é a rede — plugar e perguntar.")
     return 0
 
 
