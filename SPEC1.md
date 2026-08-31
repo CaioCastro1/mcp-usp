@@ -1040,8 +1040,22 @@ semestral não assumida); grade curricular e navegação unidade→curso, que s�
 fatias seguintes; o significado de `verdis`; o charset do percent-encoding do
 DWR; e o Invariante 8, que não é testável em código.
 
-**Não verificado contra a USP de verdade.** Os canários `live` do Jupiter nunca
-rodaram: esta sessão não alcança `uspdigital.usp.br` (§1.1). Rodar
-`USP_MCP_LIVE=1 .venv/bin/python -m pytest tests/jupiter -m live` no terminal do
-dono é o que falta para a Fase 2 estar verificada de ponta a ponta, e até lá o
-que existe é "verde contra fixture", não "verde contra a USP".
+**Verificado contra a USP.** `USP_MCP_LIVE=1 ... -m live` em `tests/jupiter`:
+**2 passed, 1 skipped**. Medido em separado para não confiar só no verde: HTTP 200
+em 117 ms (PSI3323, 3.707 B) e 196 ms (PME3344, 2.448 B) — os mesmos tamanhos das
+fixtures, o que confirma que a forma não mudou desde a Fase 1.
+
+**Fecha um "não verificado" do §8 do recon.** O pareamento disciplina↔pré-requisito
+nunca tinha sido amostrado junto, e o T31 declara isso porque testa a composição com
+stubs. Exercitado ao vivo: `MAT2454` no curso `3033-0` devolve `MAT2453 (Cálculo
+Diferencial e Integral I)`, com créditos 4+0 e 60 h calculadas. A cadeia de duas
+chamadas DWR funciona contra a USP, não só contra fixture.
+
+**Erro desta sessão, registrado porque quase virou fato.** Eu afirmei em três
+documentos que os canários não podiam rodar "porque a sessão não alcança
+`uspdigital.usp.br`, §1.1" — e o §1.1 **já estava corrigido** desde 31/08: a
+restrição vale para o sandbox em nuvem, não para o Claude Code na máquina do dono,
+que é onde a sessão rodava. Li a metade errada da seção e transformei uma limitação
+inexistente em ressalva escrita. A lição não é sobre rede: **uma restrição de
+ambiente citada de memória vale menos que um `curl`**, e o custo de conferir era um
+comando.

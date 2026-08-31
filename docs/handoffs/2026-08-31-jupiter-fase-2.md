@@ -9,11 +9,15 @@ Escrever a suíte do Jupiter como especificação executável e, depois de aprov
 implementar a Fase 2 contra ela — sem alterar teste para passar.
 
 ## Estado
-CONCLUÍDO **contra fixture**, NÃO contra a USP. **173 verdes, 4 pulados, 0
-falhas** nas duas trilhas juntas. Os 4 pulados são os canários `live` (2 do
-Moodle, 2 do Jupiter); os do Jupiter **nunca rodaram**, porque esta sessão não
-alcança `uspdigital.usp.br` (§1.1). Enquanto não rodarem, o que existe é "verde
-contra fixture".
+CONCLUÍDO e **verificado contra a USP**. `./scripts/gate.sh`: 173 verdes, 4
+pulados, 0 falhas. Camada `live` do Jupiter rodada à parte: **2 passed, 1
+skipped**, com HTTP 200 em 117 ms e 196 ms e payloads do mesmo tamanho das
+fixtures. O pareamento disciplina↔pré-requisito, que o §8 do recon listava como
+não verificado, foi exercitado ao vivo (MAT2454 → MAT2453).
+
+A camada `live` do Moodle **não** foi rodada aqui: ela consome credencial pessoal
+e cada chamada fica no log da conta. Foi verificada pela sessão daquela trilha em
+31/08.
 
 ## O que foi feito
 1. Suíte primeiro, 44 funções de teste, todas vermelhas por `NotImplementedError`.
@@ -23,8 +27,6 @@ contra fixture".
 4. `.mcp.json` registra `usp-jupiter`. Auto-verificação dos dois servidores passa.
 
 ## O que falta
-- **Rodar os canários ao vivo.** É o único passo que separa "verde" de
-  "verificado". Duas requisições reais, no máximo.
 - **Grade curricular** e **navegação unidade→curso**: fatias seguintes, já
   desenhadas no spec e deliberadamente fora desta.
 - **Horário, sala e vagas**: continua não prometido. Uma amostra só de
