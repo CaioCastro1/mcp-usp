@@ -119,10 +119,13 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     do MCP instalado, e um import de topo quebraria a coleta inteira da
     suíte por causa de uma dependência que as funções puras nem chegam a usar.
 
-    Sem teste automático de propósito — exercitar isto exigiria subir um
-    processo stdio e um cliente MCP falso, o que testaria o SDK e não este
-    projeto. O que dá para verificar sem rede está em `--auto-verificar`, e a
-    verificação que importa é plugar num cliente de verdade e perguntar.
+    **Isto era "sem teste automático de propósito" até 31/08/2026**, com a
+    justificativa de que exercitá-lo exigiria "um cliente MCP falso, o que
+    testaria o SDK e não este projeto". As duas metades estavam erradas: o
+    cliente é JSON-RPC por um pipe (~90 linhas em `tests/handshake/`), e o que
+    se testa não é o SDK — é se este adaptador casa com o SDK instalado, que é
+    exatamente o que quebrou aqui uma vez, com a suíte 99/99 verde. Hoje
+    `tests/handshake/` sobe este processo e aperta a mão com ele.
     """
     try:
         from mcp.server import MCPServer
@@ -133,16 +136,22 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
             "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
+    from usp_mcp.adaptador import anotar
+
     descritor = listar_ferramentas()[0]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
-    @servidor.tool(name=descritor["name"], description=descritor["description"])
-    def _o_que_vence(dias: int = 14, limite: int | None = None) -> str:
+    def _o_que_vence(dias=14, limite=None) -> str:
         # Assinatura explícita em vez de `**kwargs`: o SDK deriva o schema que
         # o modelo vê a partir dela, e um `**kwargs` produziria uma ferramenta
         # sem parâmetro nenhum. Mantida em sincronia com o `inputSchema` de
         # `listar_ferramentas` — `_auto_verificar` compara os dois.
         return chamar_ferramenta(descritor["name"], {"dias": dias, "limite": limite})
+
+    # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
+    # isto, "Padrão 14" e a explicação de `limite` não chegam ao modelo.
+    anotar(_o_que_vence, descritor["inputSchema"], {"dias": int, "limite": int | None})
+    servidor.tool(name=descritor["name"], description=descritor["description"])(_o_que_vence)
 
     servidor.run(transport="stdio")
 
@@ -151,9 +160,11 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     """`python -m usp_mcp.moodle.server --auto-verificar`: o que dá para
     checar sem tocar a rede da USP nem gastar uma chamada da conta.
 
-    Existe porque `main()` não tem teste: sem isto, a única forma de saber que
-    o adaptador casa com o SDK instalado seria plugar num cliente e ver
-    falhar. Não substitui essa verificação — reduz o que ela precisa descobrir.
+    Nasceu porque `main()` não tinha teste. Desde 31/08/2026 tem
+    (`tests/handshake/`), e isto continua útil por outro motivo: roda em um
+    comando, imprime o diagnóstico de configuração (`.env`, token, SDK) que um
+    teste não imprime, e responde "por que o servidor não sobe aqui" mais rápido
+    do que uma suíte.
     """
     from .. import env as _env
 

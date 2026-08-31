@@ -1295,3 +1295,82 @@ que imprimiria o valor nos dois lados da comparação) e reprova quando a checag
 rodar. Verificado por sabotagem: com a hash plantada em `catalogo.py`, o teste falha.
 Lição registrada porque é reutilizável: **um teste que procura um segredo é um lugar onde
 o segredo pode vazar.**
+
+### 31/08/2026 — handshake stdio compartilhado, e o schema que o modelo lia era mais pobre que o escrito
+
+**O furo que motivou.** O backlog registrava três vezes o mesmo achado: o adaptador
+`main()` de cada servidor não tem teste, e verde na suíte não é verde nele. Na trilha do
+Moodle isso escondeu um `main()` escrito contra a API antiga do SDK com 99/99 testes
+passando. Três repetições deixaram de ser dívida e viraram sintoma: a cura não era mais
+uma linha de backlog, era um teste.
+
+**Decisão: um teste de handshake, N servidores, por descoberta.** `tests/handshake/` sobe
+cada `usp_mcp/*/server.py` como processo, fala JSON-RPC pelos pipes e compara o que sai no
+fio com o que `listar_ferramentas()` declara. Os servidores saem de um glob, não de uma
+lista escrita à mão: um quarto sistema nasce coberto, em vez de nascer com o mesmo furo
+pela quarta vez. H9 falha se a descoberta vier vazia — é o R1/T1 aplicado a esta suíte.
+
+Isto desmente por escrito a justificativa que estava na docstring dos três `main()`:
+*"exercitar isto exigiria um cliente MCP falso, o que testaria o SDK e não este projeto"*.
+As duas metades estavam erradas. O cliente é JSON-RPC por um pipe, ~90 linhas, e não é
+falso — o processo sob teste é o real. E o que se testa não é o SDK: é se **o nosso
+adaptador casa com o SDK que está instalado**, que é literalmente o que quebrou uma vez.
+
+**O achado que só apareceu quando o teste existiu.** O SDK **não usa** o `inputSchema` que
+`listar_ferramentas()` declara: ele deriva o schema que o modelo vê da **assinatura** da
+função registrada em `main()`. Medido nos três servidores, antes do conserto:
+
+| O que estava declarado | O que o modelo recebia |
+|---|---|
+| `dia`: "'hoje', 'amanhã' ou uma data como 26/08/2026…" | `{"title": "Dia", "type": "string"}` |
+| `refeicao`: enum `["almoco","jantar","cafe","todas"]` | `{"title": "Refeicao", "type": "string"}` |
+| `restaurantes`: enum `["6","7","8","9"]` | `{"title": "Restaurantes", "type": "array"}` |
+
+Ou seja: **toda descrição de parâmetro dos três servidores e todo `enum` do RUCard eram
+texto escrito com cuidado e entregue a ninguém.** O caso do `enum` tem consequência
+concreta: sem ele, o modelo não sabe que só existem quatro RUs, inventa um id e recebe
+negativa da allowlist depois de uma requisição inútil — o erro certo pela via mais cara.
+E nada disso aparecia no `--auto-verificar`, que comparava o schema declarado com a
+*assinatura*, e não com o que sai no fio.
+
+**Decisão: o schema declarado vira a fonte, e a ponte é explícita.** `usp_mcp/adaptador.py`
+lê a descrição do `inputSchema` declarado e a prende à anotação
+(`Annotated[tipo, Field(description=…)]`), resolvendo a anotação como objeto — os
+servidores usam `from __future__ import annotations`, que transformaria tudo em string. O
+tipo (inclusive `Literal` para enum) fica na assinatura do adaptador, à vista. Descartado:
+gerar o tipo a partir do JSON Schema. Seria um conversor para três casos conhecidos, e o
+que mantém os dois lados iguais passa a ser verificação (H6–H8), não geração.
+
+`listar_ferramentas()` **continua** sendo declaração pura, chamável sem o SDK — é
+invariante deste projeto, e é o que deixa as três suítes testarem vocabulário sem
+dependência de protocolo. O que mudou é que agora existe quem verifique que a declaração
+chega ao outro lado.
+
+**Verificado por sabotagem**, um defeito de cada tipo, com o restante do repo intacto:
+
+| Sabotagem | Resultado |
+|---|---|
+| `main()` do Moodle contra a API antiga do SDK (o bug histórico) | 8 falhas — o handshake inteiro daquele servidor |
+| Adaptador do Jupiter registra `disciplina_v2` | 5 falhas, 3 passam (o servidor sobe; o contrato não bate) |
+| Ponte `anotar` removida do RUCard | 2 falhas — exatamente H7 e H8 |
+
+A graduação importa: os testes discriminam o tipo de defeito em vez de ficarem vermelhos
+juntos. E na primeira rodada da sabotagem o caso mais importante apareceu como `ERROR` e
+não como `FAILED`, porque a fixture que sobe o processo levantava — o §4 do
+`CONVENTIONS.md` já registrava que erro de setup não é vermelho honesto. A fixture passou
+a **guardar** o diagnóstico, e quem reprova é o teste.
+
+**Custo.** Um processo por teste custava 67 s e teria feito o gate pesar mais que a suíte
+inteira; um processo por servidor, com escopo de sessão, custa ~6 s para 26 testes. O gate
+passou de 250 para **283 verdes** (279 desta trilha, mais os T45-T48 do teste em processo
+do Jupiter, que entrou na `main` em paralelo e **não** é substituído por este: aquele
+alcança o corpo enviado e a mensagem de SDK ausente, este alcança o fio), e continua sem
+tocar a rede da USP: `initialize` e
+`tools/list` são respondidos sem passar por `chamar_ferramenta`, que é onde mora qualquer
+credencial. Por isso esta camada roda no gate e não atrás de `USP_MCP_LIVE=1`.
+
+**Erro de processo desta sessão, registrado porque custou trabalho.** Sabotei os
+servidores para verificar os testes **sem ter estagiado o conserto**, e o `git checkout`
+que desfaz a sabotagem levou o conserto junto — a suíte voltou a ficar vermelha por um
+motivo que eu já havia consertado. A regra que sai daí: **sabotagem se faz sobre árvore
+limpa** (`git add` antes), senão a restauração desfaz o que se quer manter.

@@ -50,8 +50,9 @@ da pergunta.
 **Python 3 + pytest.** O repo já rodava `python3`; `pytest` é a única dependência,
 declarada em `requirements-dev.txt` e instalada num venv local (`.venv/`, no gitignore).
 
-`usp_mcp/<sistema>/` por sistema (`jupiter/`, `moodle/`), cada um com `cliente.py`
-(transporte + allowlist na fronteira) e `ferramentas.py`. **O `server.py` mora dentro do
+`usp_mcp/<sistema>/` por sistema (`jupiter/`, `moodle/`, `rucard/`), cada um com
+`cliente.py` (transporte + allowlist na fronteira) e `ferramentas.py`. O que é comum aos
+três mora em `usp_mcp/` (hoje `env.py` e `adaptador.py`). **O `server.py` mora dentro do
 subpacote, nunca na raiz:** o §6 do `SPEC1.md` separa entrypoint local com credencial
 (Moodle, stdio) de servidor público cacheável (Jupiter, RUCard), e a estrutura reflete
 isso em vez de deixar a separação só na prosa. Testes em `tests/<sistema>/`.
@@ -77,8 +78,14 @@ Três checagens, na ordem em que a mais barata que pode reprovar vem antes:
    `RUCARD_HASH` no `.env.example` e no `SPEC1.md` é isento **por par**, não por
    variável: a mesma hash em qualquer outro arquivo reprova.
 2. **`fixtures/moodle/raw/` segue gitignorada** (§3.3).
-3. **A suíte offline.** A camada `live` NÃO entra: precisa de rede e do token pessoal,
-   e um gate que depende da USP estar de pé reprova commit por motivo errado.
+3. **A suíte offline**, incluindo a camada `handshake` — que sobe cada servidor como
+   processo e aperta a mão com ele. Ela é offline de verdade: `initialize` e `tools/list`
+   não passam por `chamar_ferramenta`, que é onde mora qualquer credencial. Custa ~6 s
+   (um processo por servidor, escopo de sessão) e é o que impede o furo que ficou três
+   vezes neste backlog — `main()` quebrado com a suíte verde.
+
+   A camada `live` NÃO entra: precisa de rede e do token pessoal, e um gate que depende da
+   USP estar de pé reprova commit por motivo errado.
 
 O gate foi verificado sabotando cada checagem uma a uma — as três reprovam quando
 devem (§9, 31/08/2026). A primeira versão dele passava sem ter verificado nada, porque
@@ -86,9 +93,16 @@ procurava o `.env` só no diretório atual e um worktree não tem o dele; hoje u
 `usp_mcp.env.achar_env` e **reprova** se não achar `.env` nenhum, em vez de reportar OK.
 
 **Um teste que falha por erro de coleta, erro de setup ou fixture ausente não está
-vermelho, está quebrado** — conserte antes de commitar. Os dois casos que já morderam:
-módulo ausente aborta a coleta inteira e some com os verdes; e construir o objeto sob
-teste numa fixture do pytest transforma `FAILED` em `ERROR`.
+vermelho, está quebrado** — conserte antes de commitar. Os três casos que já morderam:
+módulo ausente aborta a coleta inteira e some com os verdes; construir o objeto sob teste
+numa fixture do pytest transforma `FAILED` em `ERROR`; e a fixture que sobe o servidor no
+handshake fazia o mesmo com o caso mais importante da suíte (o servidor não sobe) — hoje
+ela **guarda** o diagnóstico e quem reprova é o teste.
+
+**Sabotagem se faz sobre árvore limpa.** Verificar um teste quebrando de propósito o que
+ele protege é a prática deste repo (o gate, o handshake). Faça `git add` antes: o
+`git checkout` que desfaz a sabotagem desfaz junto qualquer conserto não estagiado — e o
+vermelho que sobra parece do teste, não da restauração (§9, 31/08/2026).
 
 O gate não substitui a Definição de Pronto do `CLAUDE.md` §5 — ele cobre "nenhum
 segredo entrou", e o dado registrado e o achado colateral continuam sendo humanos.
