@@ -4,8 +4,8 @@ A fixture higienizada é obrigatória, não opcional: se ela sumir, os testes t�
 FALHAR, nunca dar skip. Um skip aqui produziria verde sem ter testado nada — o
 falso "não tem nada" que o Invariante 6 proíbe, aplicado à própria suíte.
 
-O segundo insumo é o `.env`, e ele precisa ser carregado AQUI porque nada no
-lado Python fazia isso: só `scripts/ws.sh` sourceia o arquivo (`set -a`). O
+O segundo insumo é o `.env`, carregado por `usp_mcp.env` porque nada no lado
+Python fazia isso: só `scripts/ws.sh` sourceia o arquivo (`set -a`). O
 efeito era um erro legível apontando para a cura errada — `test_live` dizia
 "MOODLE_TOKEN está vazio, copie .env.example para .env" para quem já tinha o
 .env preenchido, porque o valor nunca chegava a `os.environ`. E fazia
@@ -21,64 +21,17 @@ from pathlib import Path
 
 import pytest
 
+from usp_mcp.env import carregar_env
+
 RAIZ = Path(__file__).resolve().parents[2]
 FIXTURE_EVENTOS = RAIZ / "fixtures" / "moodle" / "action_events.json"
 
 
-def _achar_env() -> Path | None:
-    """O `.env` é gitignorado, então um worktree novo não tem o dele — mesma
-    situação do cru. Procura na raiz de onde a suíte roda e, se não achar,
-    sobe até o checkout que tem o `.git` de verdade (num worktree o `.git` é
-    arquivo, não diretório). Devolve None quando não existe em lugar nenhum,
-    porque "não tem .env" e "tem .env sem a chave" pedem mensagens
-    diferentes."""
-    candidatos = [RAIZ / ".env"]
-    for pai in RAIZ.parents:
-        if (pai / ".git").is_dir():
-            candidatos.append(pai / ".env")
-            break
-    for c in candidatos:
-        if c.is_file():
-            return c
-    return None
-
-
-ARQUIVO_ENV = _achar_env()
-
-
-def _carregar_env() -> None:
-    """Põe o `.env` em `os.environ` — o equivalente Python do `set -a && . ./.env`
-    da linha 15 do `scripts/ws.sh`.
-
-    Parser de stdlib de propósito: `python-dotenv` seria a primeira dependência
-    de runtime do projeto, e o formato aqui é `CHAVE=valor` com comentário —
-    não vale uma dependência.
-
-    `setdefault`, e não atribuição: quem já está no ambiente GANHA. É o que
-    mantém `USP_MCP_LIVE=1 pytest` valendo mesmo se o `.env` disser o
-    contrário, e o que impede este carregador de ligar a camada live por
-    baixo de quem não pediu.
-
-    Nenhum valor é impresso, nem em erro (Invariante 3): linha malformada é
-    ignorada em silêncio em vez de ecoada.
-    """
-    if ARQUIVO_ENV is None:
-        return
-    for linha in ARQUIVO_ENV.read_text(encoding="utf-8").splitlines():
-        linha = linha.strip()
-        if not linha or linha.startswith("#") or "=" not in linha:
-            continue
-        chave, valor = linha.split("=", 1)
-        # `export CHAVE=valor` é válido num arquivo feito para ser sourceado.
-        chave = chave.removeprefix("export ").strip()
-        valor = valor.strip()
-        if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "\"'":
-            valor = valor[1:-1]
-        if chave:
-            os.environ.setdefault(chave, valor)
-
-
-_carregar_env()
+# O carregador mora em usp_mcp/env.py, não aqui: o entrypoint stdio do Moodle
+# precisa do mesmo comportamento (§9, 31/08/2026). `setdefault` lá dentro
+# garante que quem já está no ambiente ganha — `USP_MCP_LIVE=1 pytest` continua
+# valendo, e este import não liga a camada live por baixo de ninguém.
+ARQUIVO_ENV = carregar_env(RAIZ)
 
 
 def _achar_cru() -> Path:
