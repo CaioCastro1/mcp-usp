@@ -854,3 +854,49 @@ Os outros modos de falha (`accessexception`, HTML de manutenção com 200, timeo
 sendo contrato de camada, com a forma real não verificada.
 
 Suíte: **98 offline + 2 live**, com T52 novo.
+
+### 31/08/2026 — limite silencioso de 20 no calendário: bug real, corrigido
+
+**O `limitnum` do `core_calendar_get_action_events_by_timesort` tem default 20, e a API
+não avisa que parou.** Medido na mesma janela de 365 dias: **20 eventos sem o parâmetro,
+30 com `limitnum=50`**. A `o_que_vence` não mandava `limitnum` — então perdia dez entregas
+reais e ainda reportava `truncado=False`.
+
+É o Invariante 7 sendo violado pelo código escrito para respeitá-lo, e vale registrar por
+que passou: **a suíte não podia pegar.** O duplo de cliente devolve o que o teste manda, e
+o corte acontecia do lado do Moodle. Todas as asserções de truncamento olhavam a saída;
+nenhuma olhava o parâmetro enviado — que era onde o defeito morava. T53 agora asserta sobre
+o parâmetro, T54 sobre a declaração do teto, T55 sobre o aviso não ser decorativo.
+
+**Correção:** manda `limitnum=50` (o teto do serviço) e, quando a resposta vem com o teto
+cheio, declara na saída que pode haver mais. A API não informa se há mais depois do último
+item, então declarar a dúvida é a única saída honesta — presumir que acabou é o bug de novo.
+Verificado contra a API real: a janela de 365 dias passou a devolver 30, `truncado=False`.
+
+**O teto é 50**, e isso saiu de um erro capturado: `limitnum=-5` responde
+`"Limit must be between 1 and 50 (inclusive)"`.
+
+### 31/08/2026 — `errorcode` nem sempre é um código
+
+Fato da API que contraria o nome do campo, e que só apareceu ao capturar erro de verdade.
+Duas fixtures novas, ambas na função da allowlist, read-only (Regra de Ouro §3.1):
+
+| Fixture | `errorcode` | `message` |
+|---|---|---|
+| `erro_invalidparameter.json` | `invalidparameter` | `Valor inválido de parâmetro detectado` |
+| `erro_limite_fora_da_faixa.json` | `Limit must be between 1 and 50 (inclusive)` | `error/Limit must be...` |
+
+No segundo, **`errorcode` é uma frase em inglês, não um identificador**, e o `message` vem
+prefixado de `error/` — sinal de que o Moodle não achou a string de idioma correspondente.
+Quem tratar `errorcode` como enum quebra aqui.
+
+O cliente sobrevive porque compara por igualdade exata com `invalidtoken` e repassa o resto
+cru (Invariante 6). T56 trava que `invalidparameter` **não** vire `TokenInvalido` — as duas
+respostas têm a mesma forma de três chaves, e um casamento por "contém `invalid`" mandaria
+renovar um token que está perfeito. T57 trava o critério contra o `errorcode` que é frase.
+
+**Não capturáveis sob demanda, e continuam sem forma verificada:** HTML de manutenção com
+HTTP 200 (exige a USP em manutenção) e timeout (exige a USP fora do ar). Os testes desses
+dois seguem assegurando contrato de camada, e é o máximo que dá para afirmar.
+
+Suíte: **103 offline + 2 live**.
