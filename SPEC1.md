@@ -1245,3 +1245,49 @@ disciplina, não para as dez. `mod_folder` não aparece nela, então não se sab
 `get_contents` expande pasta. E a higienização embaralha `fullname`, o que torna
 o casamento por **nome** de disciplina não exercitável contra a fixture — T62
 testa a regra contra lista sintética e diz isso.
+
+### 31/08/2026 — `material` ao vivo: funciona, e o timeout de 15 s era bug
+
+Primeira execução contra a USP de verdade. **A ferramenta funciona** — e a
+primeira tentativa falhou, pelo motivo que nenhum teste offline alcança.
+
+**Bug real, achado na primeira chamada.** `core_enrol_get_users_courses` levou
+**14,7 s** para devolver as 74 matrículas (104 kB), contra um
+`_TIMEOUT_PADRAO_SEGUNDOS` de **15 s**. Dois por cento de margem: estourou. A
+suíte estava 201/201 verde, porque o transporte HTTP real é um dos caminhos que
+ela declaradamente não alcança (backlog, 31/08). Elevado para 60 s, com T82
+travando o piso em 45 — e o teste guarda o **motivo medido**, não o número, para
+que baixar isso exija remedir. O erro que apareceu ao usuário foi legível e disse
+a cura, que é o Invariante 6 fazendo o que promete.
+
+**Medido nas três disciplinas, com o conserto:**
+
+| | itens | resposta | tempo |
+|---|---|---|---|
+| PSI3323 | 29 | ~725 tokens | 0,4 s |
+| PTC3314 | 52 | ~849 tokens | 0,4 s |
+| PTC3360 | 38 | ~1.154 tokens | 0,3 s |
+
+A projeção se sustenta fora da amostra: nenhuma das três passou de ~1,2k tokens,
+e `get_contents` de uma disciplina responde em menos de meio segundo. O custo da
+ferramenta é dominado inteiramente pela lista de matrículas — que é justamente o
+que o cache de semestre resolve.
+
+**Refuta uma leitura da "fração viva".** O §9 de 28/08 mediu 4 de 10 disciplinas
+com entrega e 6 aparecendo no calendário, e isso foi lido como medida de uso.
+**PTC3360 tem zero entregas e 38 arquivos publicados.** Entrega e material são
+eixos diferentes de vida: uma disciplina pode não usar o Moodle para avaliar e
+usá-lo inteiro para distribuir. Isso ataca o item que `notas/fase1-moodle.md`
+deixou explícito ("falta medir material postado para as 10") — três medidas, não
+dez, mas as três dizem a mesma coisa.
+
+**`mod_folder` não apareceu em nenhuma das três.** Modnames observados ao vivo:
+`resource`, `url`, `forum`, `quiz`, `assign`, `choicegroup`. A questão de se
+`get_contents` expande pasta **continua aberta** — não observar em três amostras
+não é observar ausência, e é exatamente o erro que este §9 já registrou hoje
+(ausência de arquivo não é ausência de fato).
+
+**Deriva de dado, observada de graça.** PSI3323 tinha 32 módulos com 1 `assign`
+na captura de 28/08 e tem 31 sem `assign` hoje. O espaço da disciplina muda
+durante o semestre — a fixture é retrato, não espelho, e teste que dependa da
+contagem exata envelhece.

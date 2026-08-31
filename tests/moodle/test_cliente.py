@@ -205,3 +205,18 @@ def test_errorcode_nem_sempre_e_um_codigo(erro_limite_fora_da_faixa):
         c.chamar("core_calendar_get_action_events_by_timesort")
     assert not isinstance(e.value, TokenInvalido)
     assert "between 1 and 50" in str(e.value)
+
+
+@pytest.mark.politica
+def test_t82_o_timeout_cobre_a_chamada_mais_pesada_medida():
+    """A `get_users_courses` levou 14,7 s ao vivo em 31/08 e estourou o teto de
+    15 s que estava aqui — com a suíte inteira verde, porque nenhum teste
+    alcança o transporte real.
+
+    O piso é 3x a medição, não o valor exato: rede de universidade em dia ruim
+    não é o mesmo dia. Se alguém baixar isto para "falhar rápido", a ferramenta
+    `material` volta a quebrar na primeira pergunta.
+    """
+    assert mod_cliente._TIMEOUT_PADRAO_SEGUNDOS >= 45, (
+        "timeout abaixo do medido: get_users_courses levou 14,7 s ao vivo"
+    )
