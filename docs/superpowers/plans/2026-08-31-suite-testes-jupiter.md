@@ -1,5 +1,11 @@
 # Suíte de testes do Jupiter — plano de implementação
 
+> **Estado, 31/08/2026: EXECUTADO.** As sete tarefas foram cumpridas e, na sequência,
+> a Fase 2 foi implementada contra a suíte resultante. O plano fica como registro do
+> caminho — inclusive dos quatro achados do §1, que continuam valendo para quem
+> escrever a próxima fatia. Handoff da sessão em
+> `docs/handoffs/2026-08-31-jupiter-fase-2.md`.
+
 **Goal:** Escrever as 40 funções de teste que especificam a ferramenta `disciplina` do MCP do Jupiter, conforme `docs/superpowers/specs/2026-08-31-testes-jupiter-design.md`.
 
 **Leia o spec primeiro.** Ele é a fonte; este plano é a ordem de execução, o que já foi medido e o que faz um teste mentir. O spec define os 40 testes (T1–T40) e o que cada um trava.
