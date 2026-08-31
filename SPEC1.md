@@ -586,6 +586,58 @@ exatamente a parte frágil. Rate limit não foi observado em 26 requisições, o
 prova** que não exista. E há uma discrepância não explicada: `codcur` aparece como 3033 no
 DWR e 3032 no HTML de requisitos da mesma habilitação.
 
+### 31/08/2026 — a Fase 2 do Moodle ganha especificação executável
+
+A pergunta era "como verificar o MCP do Moodle" quando o MCP não existe. Resposta
+escolhida: escrever a suíte antes, como spec executável de uma **fatia vertical**
+— `o_que_vence`, uma ferramenta ponta a ponta — em vez das seis perguntas medidas
+na Fase 1. Motivo: seis ferramentas vermelhas ao mesmo tempo é TDD no nome e
+waterfall no comportamento.
+
+Runtime: **Python + pytest** (o §6 deixava em aberto). O repo já é bash+python3 e
+não tem `package.json`. Fonte de `o_que_vence`: **web service projetado**, não o
+feed iCal — o iCal exigiria um segundo segredo e devolve ICS sem `courseid`
+utilizável, apesar de custar 1/30.
+
+99 testes em três camadas por marcador: `politica` (58, sem rede nem fixture),
+`contrato` (41, contra fixture higienizada), `live` (2, só com `USP_MCP_LIVE=1`).
+Roda em 0,46 s. Hoje: 91 vermelhos por construção, 6 verdes, 2 pulados.
+
+**`scripts/higienizar.py` existe** — o §3.3 era prosa e virou código. Ele preserva
+a forma, como o §3.3 pede, **e o comprimento em bytes**, que o §3.3 não pede e o
+teste de custo exige: encolher um `summary` de 9 kB apagaria justamente o custo
+que a projeção existe para resolver. `fixtures/moodle/action_events.json` entrou
+no git; o cru continua fora.
+
+**Descoberta que corrige um erro de desenho:** medindo subamostras dos mesmos 35
+eventos, a razão de redução varia 63,5× → 81,1× (28%), porque o `course` de 9,5 kB
+repetido faz a razão medir composição de amostra, não qualidade da projeção. O que
+é estável é **201–205 B por evento projetado** (±2%). Um teste de custo ancorado na
+razão seria frouxo ou quebradiço. Ficou em três asserções: teto absoluto com folga
+declarada, bytes/evento na faixa medida, e a categórica "nenhum `course` sobrevive"
+— esta última é a que trava a regressão de verdade.
+
+Registro de imprecisão: o **1000:1** de `notas/fase1-moodle.md` compara o cru com
+os 132 B/evento dos campos mínimos. A projeção implementável é **76:1**, o mesmo
+1,3% da entrada anterior. Dois números verdadeiros sobre coisas diferentes; o teste
+vive no 76:1.
+
+**Achado colateral, e é uma lacuna da Fase 1:** não existe fixture de erro do
+Moodle. Varredura por `debuginfo`, `backtrace`, `stacktrace`, `exception` e
+`errorcode` deu zero em todas as capturas — só respostas bem-sucedidas. Os testes
+de erro legível asseguram o contrato da camada, nunca a forma do erro do Moodle,
+que segue **não verificada**. Capturar um `invalidtoken` (token propositalmente
+inválido, não toca na conta) está no backlog.
+
+Descartado: suíte contra a API real como canário principal (não descreve o
+servidor a construir), suíte end-to-end só pela fronteira MCP (torna a asserção de
+custo frouxa e a de allowlist quase impossível de escrever por tabela), e fixture
+sintética escrita à mão (a forma sairia da minha leitura das notas, não do
+payload).
+
+Desenho completo em `docs/superpowers/specs/2026-08-31-testes-moodle-design.md`.
+Acordos de nome com a suíte do Jupiter no §7 de lá.
+
 ### 31/08/2026 — o §2.2 era contornável; vira segunda camada de uma allowlist
 
 Catálogo das 447 funções em `notas/moodle-catalogo.md`, produzido **sem nenhuma chamada ao
