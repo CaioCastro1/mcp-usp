@@ -1183,3 +1183,65 @@ importa.
 `core_search_get_results`. O primeiro é mais estreito e exigiria uma segunda
 chamada para os `url`; o segundo não foi testado. `get_contents` já responde em
 uma chamada, e a questão do §4 sobre ele fechou em 28/08.
+
+### 31/08/2026 — `material` implementada; a allowlist vai de 1 para 4, com motivo
+
+Segunda ferramenta do Moodle, contra a suíte escrita antes (20 vermelhos por
+`NotImplementedError`, depois satisfeitos). **Nenhum teste foi afrouxado para
+passar** — os dois que ficaram vermelhos de propósito, T7 (tamanho da allowlist)
+e T42 (número de ferramentas), são travas que existem justamente para forçar esta
+entrada, e foram atualizados **depois** dela, não em vez dela.
+
+**A allowlist cresce de 1 para 4, e o motivo é uma tradução.** O modelo recebe
+"PSI3323"; o Moodle só entende `courseid`. Resolver isso custa duas funções além
+da que responde:
+
+| Função | Para quê | Cru | Projetado |
+|---|---|---|---|
+| `core_webservice_get_site_info` | `userid` a partir do token | 31.386 B | — |
+| `core_enrol_get_users_courses` | a lista, para resolver a sigla | 104.712 B | 7.816 B (74) / 1.026 B (semestre) |
+| `core_course_get_contents` | a resposta | 58.049 B | ~6.486 B |
+
+As três são leitura e nenhuma está no bloqueio permanente do §2.2. **A resposta
+final da ferramenta sai em ~727 tokens** — menor que a projeção JSON porque o
+texto formatado é mais compacto que a serialização.
+
+**Cache obrigatório, não otimização.** Buscar 104 kB de matrículas a cada
+pergunta sobre material é reconfirmar a cada pergunta um dado que muda uma vez
+por semestre — o Invariante 5 pede TTL colado à taxa de mudança do dado, e daí
+`TTL_DISCIPLINAS`. O relógio é injetável para o teste verificar a REGRA e não o
+valor da constante.
+
+**A regra de segurança desta fronteira veio de medição, não de princípio.** Os 22
+módulos `resource` apontam para `edisciplinas.usp.br/webservice/pluginfile.php`;
+os 7 `url` apontam para fora (YouTube, Google Docs, sites de fabricante). Baixar
+do primeiro grupo exige anexar o token na URL. Então: **nome, tipo, tamanho e
+data do arquivo interno saem; o endereço dele, não** — emiti-lo põe a credencial
+a um passo do contexto do modelo e de todo log por onde a resposta passar
+(Invariante 3). Link externo sai inteiro, porque recusar tudo seria esconder o
+que se sabe. T68 e T69 são os dois lados dessa regra.
+
+**Duas sabotagens sobreviveram à primeira versão da suíte**, e as duas dizem a
+mesma coisa que este §9 já registrou duas vezes:
+
+1. `courseid=142033` fixo no lugar da resolução **passou** — porque 142033 *é* o
+   courseid de PSI3323, e o teste pedia uma disciplina só. Corrigido pedindo
+   duas: valor fixo não acerta as duas. É o mesmo erro do T47 do Jupiter, no
+   mesmo dia, depois de eu ter escrito a lição.
+2. As outras oito sabotagens (URL interna emitida, ambiguidade resolvida
+   sozinha, cache eterno, `userid` chutado, `author` na saída, busca que não
+   filtra, aviso suprimido, ferramenta não registrada) ficaram vermelhas na
+   primeira tentativa.
+
+**Fecha dois itens do backlog de manhã.** `chamar_ferramenta` do Moodle passou a
+aceitar cliente injetável — era isso, e não a falta de token, que impedia o teste
+ponta a ponta desta fronteira. Com a injeção, T78-T81 rodam o `main()` do Moodle
+contra o SDK real **sem credencial nenhuma**, incluindo `call_tool("material")`
+atravessando até a fixture. O §9 de mais cedo registrava a causa errada.
+
+**Limites declarados.** A amostra é PSI3323 e só ela, por decisão do dono: a
+projeção de 11,2%, a contagem de 16 seções e a mistura de tipos valem para essa
+disciplina, não para as dez. `mod_folder` não aparece nela, então não se sabe se
+`get_contents` expande pasta. E a higienização embaralha `fullname`, o que torna
+o casamento por **nome** de disciplina não exercitável contra a fixture — T62
+testa a regra contra lista sintética e diz isso.
