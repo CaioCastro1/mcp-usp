@@ -166,7 +166,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 def main() -> None:  # pragma: no cover — casca stdio
     """Adaptador stdio real. O import do SDK fica aqui dentro, não no topo: a
     suíte importa este módulo sem o SDK instalado, e um import de topo quebraria
-    a coleta por causa de uma dependência que as funções puras nem usam."""
+    a coleta por causa de uma dependência que as funções puras nem usam.
+
+    Coberto por `tests/handshake/` desde 31/08/2026: aquele teste sobe este
+    processo, aperta a mão e compara o que sai no fio com o que
+    `listar_ferramentas()` declara."""
     try:
         from mcp.server import MCPServer
     except ImportError as exc:
@@ -176,18 +180,27 @@ def main() -> None:  # pragma: no cover — casca stdio
             "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
+    from usp_mcp.adaptador import anotar
+
     descritor = listar_ferramentas()[0]
     servidor = MCPServer(name="usp-mcp-jupiter", version="0.1.0")
 
-    @servidor.tool(name=descritor["name"], description=descritor["description"])
-    def _disciplina(sigla: str, codcur: str | None = None, codhab: str = "0",
-                    ingles: bool = False) -> str:
+    def _disciplina(sigla, codcur=None, codhab="0", ingles=False) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
         return chamar_ferramenta(
             descritor["name"],
             {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
         )
+
+    # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026): sem
+    # isto, o aviso de que sem `codcur` não há pré-requisito não chega ao modelo.
+    anotar(
+        _disciplina,
+        descritor["inputSchema"],
+        {"sigla": str, "codcur": str | None, "codhab": str, "ingles": bool},
+    )
+    servidor.tool(name=descritor["name"], description=descritor["description"])(_disciplina)
 
     servidor.run(transport="stdio")
 

@@ -171,7 +171,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 def main() -> None:  # pragma: no cover — casca stdio
     """Adaptador stdio real. O import do SDK fica aqui dentro, não no topo: a
     suíte importa este módulo sem o SDK instalado, e um import de topo quebraria
-    a coleta por causa de uma dependência que as funções puras nem usam."""
+    a coleta por causa de uma dependência que as funções puras nem usam.
+
+    Coberto por `tests/handshake/` desde 31/08/2026: aquele teste sobe este
+    processo, aperta a mão e compara o que sai no fio com o que
+    `listar_ferramentas()` declara."""
     try:
         from mcp.server import MCPServer
     except ImportError as exc:
@@ -188,18 +192,36 @@ def main() -> None:  # pragma: no cover — casca stdio
     # pergunta por uma variável que o arquivo tinha.
     carregar_env()
 
+    from typing import Literal
+
+    from usp_mcp.adaptador import anotar
+
     descritor = listar_ferramentas()[0]
     servidor = MCPServer(name="usp-mcp-rucard", version="0.1.0")
 
-    @servidor.tool(name=descritor["name"], description=descritor["description"])
-    def _bandejao(dia: str = "hoje", refeicao: str = "todas",
-                  restaurantes: list[str] | None = None) -> str:
+    def _bandejao(dia="hoje", refeicao="todas", restaurantes=None) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
         return chamar_ferramenta(
             descritor["name"],
             {"dia": dia, "refeicao": refeicao, "restaurantes": restaurantes},
         )
+
+    # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
+    # isto, o `enum` que ensina que só existem quatro RUs não chega ao modelo, e
+    # ele inventa id para receber negativa da allowlist depois — erro certo pela
+    # via mais cara. Os Literal ficam à vista aqui; H8 é quem os mantém iguais
+    # aos do schema declarado.
+    anotar(
+        _bandejao,
+        descritor["inputSchema"],
+        {
+            "dia": str,
+            "refeicao": Literal["almoco", "jantar", "cafe", "todas"],
+            "restaurantes": list[Literal["6", "7", "8", "9"]] | None,
+        },
+    )
+    servidor.tool(name=descritor["name"], description=descritor["description"])(_bandejao)
 
     servidor.run(transport="stdio")
 
