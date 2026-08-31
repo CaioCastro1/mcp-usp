@@ -10,16 +10,25 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 
 ## Estado
 
-**Fase 1 (descoberta) concluída.** Ainda não há servidor MCP: o que existe é fixture,
-medição e registro de decisão. O desenho das ferramentas é a Fase 2, e o critério para
-uma existir está no §5 do `SPEC1.md`.
+**Fase 1 (descoberta) concluída nos três sistemas. Fase 2 implementada como uma fatia
+vertical em cada um** — uma pergunta real, ponta a ponta, com suíte e custo medido:
+
+| Servidor | Ferramenta | Responde |
+|---|---|---|
+| `usp-rucard` | `bandejao` | o que tem no bandejão hoje, e onde vale a pena comer |
+| `usp-moodle` | `o_que_vence` | o que eu tenho que entregar, e até quando |
+| `usp-jupiter` | `disciplina` | créditos, ementa e pré-requisito de uma disciplina |
+
+O que **não** existe: histórico de cardápio, horário/sala de turma, grade curricular,
+notas, material — e nenhuma escrita (Invariante 1).
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
 
+- `usp_mcp/<sistema>/` — código: política, cliente, ferramenta e servidor por sistema
 - `notas/` — análise por sistema, com custo medido em bytes e tokens
 - `fixtures/` — respostas cruas capturadas (as do Moodle ficam fora do git: têm dado pessoal)
-- `scripts/` — chamadores usados na descoberta
+- `scripts/` — chamadores da descoberta, e `gate.sh` antes de cada commit
 
 ## Configuração
 

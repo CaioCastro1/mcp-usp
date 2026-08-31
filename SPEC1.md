@@ -67,12 +67,32 @@ assistido tem que acontecer com acesso à rede dele, ou contra fixtures.
   booleanos. Vazio é `""`. `/menu` **não** segue a mesma regra — lá `message.error` é
   booleano de verdade. `hasCashier` vem `"false"` nos 18 RUs, inclusive nos 14 que têm
   `cashiers` preenchido: campo sempre errado, e string truthy em JS. Usar o tamanho de
-  `cashiers`.
+  `cashiers`. É a resposta mais **estática** do projeto: 27.661 B **byte-idênticos** em
+  27/08 e 31/08/2026 — e a mais cara (~6.900 tokens), o que a torna tabela de apoio e
+  nunca resposta.
 - Não há parâmetro de data. Só semana corrente. Histórico exige persistir por conta.
+  **A semana vira na segunda, ou antes dela**: em 31/08/2026 (segunda), às 19:22, a
+  resposta já era 31/08→06/09, enquanto a captura de 27/08 trazia 24/08→30/08. O
+  instante exato da virada continua sem medida, e é por isso que o cache do cliente não
+  confia só em TTL — ver §9, 31/08/2026 (Fase 2 do RUCard).
 - Ids de interesse do Caio: **6 CENTRAL, 9 QUÍMICAS, 8 FÍSICA, 7 PUSP-CB**. Os outros 14
   RUs existem mas estão fora de escopo por decisão dele. O 7 não serve jantar (não há
   horário publicado, e os 7 jantares vêm fechados) — distinguir "fechado hoje" de "nunca
   serve essa refeição" exige cruzar `/menu` com `workinghours`.
+- **O 9 (QUÍMICAS) é o único dos quatro que abre no fim de semana**: `workinghours`
+  publica sábado (almoço 11:15–14:15 e jantar 17:30–19:00) e domingo (só almoço), e o
+  cardápio das duas semanas capturadas concorda item a item. Nos 6, 7 e 8 sábado e
+  domingo vêm vazios nas três refeições. Medido em 31/08/2026; a nota da Fase 1 dizia
+  "jantar em 6, 8 e 9" sem mencionar fim de semana, o que deixava o 9 parecer igual aos
+  outros.
+- **`breakfast` aparece em três RUs, não dois**: 6 e 7 em dia de semana (07:00–08:30) e
+  **9 só no fim de semana** (sábado 07:30–09:00, domingo 08:30–09:30). O 8 não publica
+  café em dia nenhum. O `/menu` continua não tendo café: a pergunta "o que tem no café"
+  tem serviço e não tem fonte (Invariante 6 — dizer isso, não devolver vazio).
+- As duas rotas concordam entre si quando cruzadas, nas duas capturas — nenhum caso de
+  cardápio com comida em dia sem horário publicado, nem o inverso. Isso **não** é
+  garantia: é o que sustenta usar `workinghours` como fonte da distinção, e o código
+  declara o desacordo em vez de escolher um lado calado se ele aparecer.
 - A resolução deve ser **por id**; o `name`/`alias` que a API devolve varia de grafia e
   serve só para exibição.
 
@@ -1059,3 +1079,95 @@ que é onde a sessão rodava. Li a metade errada da seção e transformei uma li
 inexistente em ressalva escrita. A lição não é sobre rede: **uma restrição de
 ambiente citada de memória vale menos que um `curl`**, e o custo de conferir era um
 comando.
+
+### 31/08/2026 — Fase 2 do RUCard implementada contra a suíte; os três sistemas têm servidor
+
+**Decisão: uma ferramenta, `bandejao`, sobre os quatro RUs da Cidade Universitária.**
+Ela responde a pergunta do §5 inteira — "o que tem no bandejão hoje, e onde vale a pena
+almoçar?" — em uma chamada de ferramenta, com os quatro RUs lado a lado. A comparação
+**não** virou uma segunda ferramenta: "o que tem" e "onde vale a pena" são a mesma
+pergunta feita por alguém com fome, e separá-las obrigaria o modelo a duas chamadas para
+uma decisão.
+
+**O que sustenta, medido em 31/08/2026** (dado público, sem credencial pessoal — segunda
+captura, quatro dias depois da Fase 1):
+
+| Fato | Medida |
+|---|---|
+| `/menu/{6,7,8,9}` | HTTP 200; 2.928 / 2.303 / 3.084 / 3.624 B |
+| Semana devolvida na segunda 31/08 às 19:22 | **31/08→06/09** (a de 27/08 era 24/08→30/08) |
+| `/restaurants` | 27.661 B, **byte-idêntico** ao de 27/08 |
+| `GET` na mesma rota | HTTP 500, `text/html`, 3.240 B de HTML do Tomcat |
+| Grafia de fechado | 6 `Fechado`; 7, 8 e 9 `FECHADO` — estável nas duas semanas |
+| HTML ou ` - ` no `menu` | zero em 2 semanas × 7 dias × 2 refeições × 4 RUs |
+| Cru para responder um dia nos 4 RUs | 39.615 B (~9.900 tokens) |
+| Saída da ferramenta, pior caso (4 RUs × 2 refeições) | **3.367 B** estruturados, **1.929 B** de texto em 23 linhas |
+| Razão de redução | **11,8x** (17,9x pedindo só almoço; 40,8x pedindo um RU) |
+
+Esta é a razão de redução que a trilha do Jupiter não conseguiu ter: lá o payload DWR
+*era* a resposta e a razão real ficou em ~1,8x. Aqui 6/7 do `/menu` é semana que ninguém
+pediu, e o catálogo inteiro é tabela de apoio.
+
+**Decisão: o cache tem duas regras, não uma.** TTL protege a USP (3 h para cardápio, 7
+dias para catálogo — colado na taxa de mudança do dado, Invariante 5); validação por data
+protege a resposta. A rota não aceita parâmetro de data, e a virada da semana não tem hora
+conhecida: com TTL sozinho, uma pergunta na segunda-feira receberia o cardápio da semana
+passada **com cara de resposta certa**. Quando o dia pedido é posterior à semana que está
+em cache, o cliente revalida — **uma vez por janela de TTL**, para que uma pergunta sobre
+uma data que a API nunca vai cobrir não vire uma requisição por pergunta. O par de
+fixtures do mesmo RU em semanas diferentes (`menu_6.json` e `menu_6_semana_31-08.json`)
+existe para que esse teste seja de comportamento, não de dublê.
+
+**Decisão: `FECHADO` tem três leituras, e a ferramenta as separa.** O `/menu` diz a mesma
+palavra para três coisas diferentes, e o cruzamento com `workinghours` as distingue:
+
+- `nao_serve` — não há horário publicado para essa refeição nesse dia da semana. O detalhe
+  diz se é *em dia nenhum* (o 7 no jantar) ou *só nesse dia* (o 6 no sábado). A diferença
+  decide entre voltar amanhã e procurar outro RU.
+- `fechado` — há horário publicado para aquele dia da semana **e** o cardápio está
+  fechado: feriado, greve, manutenção. É a única situação em que "fechado hoje" é a
+  informação certa. Nenhuma das duas semanas capturadas tem um caso (nenhum feriado caiu
+  nelas), então o teste desta situação usa entrada fabricada, com o mínimo alterado, e diz
+  isso no próprio teste.
+- `sem_cardapio_publicado` — só café da manhã: o horário existe, o cardápio não é
+  publicado. Responder `[]` aqui seria ler como "não tem café" (Invariante 6).
+
+**Decisão: a opção do dia não é chamada de vegetariana sem a marca.** 100% das refeições
+abertas nas duas semanas têm uma linha `Opção: …`; a marca `(V)` aparece em algumas (5 de
+10 no RU 6 na semana da Fase 1, 2 de 10 na seguinte, **zero** nos RUs 7, 8 e 9). A saída
+traz `opcao` e `opcao_vegetariana_marcada` separados: rotular toda opção como vegetariana
+seria afirmar o que a fonte não diz, e é o tipo de erro que só aparece no prato.
+
+**Descartado:** os outros 14 RUs (fora do recorte do §1.2 — a allowlist os nega com motivo
+que distingue "existe e está fora de escopo" de "id não verificado"); histórico de semanas
+anteriores (não existe na API — prometer exigiria persistir por conta própria, outro
+escopo); saldo, extrato e recarga do cartão (área autenticada nunca mapeada — o §2.2 não
+deixa adivinhar rota de escrita, e `permitir_escrita` não libera nada aqui porque não há
+nada mapeado para liberar); latitude, telefone e foto do RU na saída (ninguém pergunta a
+coordenada do bandejão, e todo campo é token gasto em toda resposta).
+
+**Verificado.** `./scripts/gate.sh`: **253 passed, 6 skipped**, 0 falhas — 80 testes novos
+(R1–R44, com desdobramentos). Camada `live` do RUCard: **2 passed, 1 skipped**. Handshake
+stdio real contra o servidor: `initialize` → `tools/list` → `tools/call` devolveu o
+cardápio de hoje dos quatro RUs em 975 caracteres. `--auto-verificar` passa nos três
+servidores. O `.mcp.json` registra `usp-rucard`.
+
+**Um furo de Invariante 7 achado na revisão da própria implementação.** Quando
+NENHUM RU publica o dia pedido, o aviso da semana aparecia; quando só UM não publicava
+— porque ficou na semana anterior —, ele saía da lista **calado**. Três RUs respondidos
+e o quarto sumido é a forma mais difícil de notar de um limite silencioso: nada na
+resposta indica que faltou alguém. Consertado com teste primeiro (R27b), que exigiu uma
+segunda fixture pareada (`menu_9_semana_31-08.json`), e o aviso passou a nomear o
+restaurante e a semana que ele publicou, agrupado por semana para não repetir quatro
+vezes a mesma frase.
+
+**O gate reprovou este commit primeiro, e estava certo.** A primeira versão do teste R8
+trazia o valor real da hash como agulha de busca. A isenção registrada no §9 é por **par**
+(variável, arquivo) e vale só para `.env.example` e `SPEC1.md` — o gate apontou
+`RUCARD_HASH em tests/rucard/test_politica.py` e barrou. O conserto deixou o teste
+melhor: em vez de procurar uma constante escrita à mão, ele procura no fonte a hash que
+está **realmente** configurada, falha com `pytest.fail` (e não com `assert x not in y`,
+que imprimiria o valor nos dois lados da comparação) e reprova quando a checagem não pôde
+rodar. Verificado por sabotagem: com a hash plantada em `catalogo.py`, o teste falha.
+Lição registrada porque é reutilizável: **um teste que procura um segredo é um lugar onde
+o segredo pode vazar.**
