@@ -762,3 +762,42 @@ Duas consequências, ambas corrigidas em `tests/moodle/conftest.py`:
   carregados quando ela roda, e ela segue verde — a fixture está limpa de fato, não por
   omissão. Vale como aviso: um teste de segurança que não pode falhar não verifica nada
   (§6 do `CONVENTIONS.md`).
+
+### 31/08/2026 — o token chega ao servidor pelo `.env`; e o `main()` não casava com o SDK
+
+**Decisão: `usp_mcp/env.py` carrega o `.env`, e os dois lados usam** — a suíte
+(`conftest`) e o entrypoint stdio (`server.chamar_ferramenta`). O `.env` do §8,
+gitignorado, continua sendo a única casa do token, e o `.mcp.json` vai para o git sem
+segredo nenhum.
+
+**Descartado:** o token vir do bloco `env` da configuração do cliente MCP. Ele
+duplicaria o segredo num arquivo de configuração fácil de commitar por acidente, e
+exigiria `export MOODLE_TOKEN` no shell — que é exatamente a etapa que ninguém faz e
+que produziu o erro enganoso do registro anterior. O `setdefault` do carregador
+preserva o melhor dos dois: **quem já está no ambiente ganha**, então um cliente MCP
+que passe a variável continua sobrescrevendo o arquivo.
+
+**O achado que fecha o argumento do registro anterior.** O `main()` — o único caminho
+sem teste offline — **não funcionava**. Foi escrito contra a API antiga do SDK
+(`Server` com decoradores `@servidor.list_tools()` / `@servidor.call_tool()`), e no
+`mcp` 2.1.1 instalado esses decoradores não existem: a API é `MCPServer` com
+`@servidor.tool(...)` e `run(transport="stdio")`. A suíte estava 99/99 verde com esse
+caminho quebrado, porque nenhum teste o alcançava.
+
+Isto é a demonstração do que o §6 do documento de desenho já declarava: **verde na
+suíte não é verde nos caminhos que a suíte não alcança.** O aviso estava escrito antes
+de o bug aparecer, e o bug apareceu exatamente onde o aviso apontava.
+
+**Verificado depois do conserto**, e sem tocar a rede da USP:
+
+- `initialize` por stdio responde `{"name": "usp-mcp-moodle", "version": "0.1.0"}`,
+  protocolo `2024-11-05`.
+- `tools/list` devolve uma ferramenta, `o_que_vence`, com `dias` (int, default 14) e
+  `limite` (int | null) no schema.
+- `python -m usp_mcp.moodle.server --auto-verificar` confere ferramenta, `.env`,
+  presença do token (forma, nunca valor), SDK, e que o `inputSchema` declarado casa com
+  a assinatura que o adaptador registra — a divergência que só apareceria em uso real.
+
+**O que continua não verificado:** `tools/call`. Ele fala com a USP, e a rede da USP não
+é alcançável do sandbox (§1.1). É a última coisa que falta, e só roda no terminal do
+dono.
