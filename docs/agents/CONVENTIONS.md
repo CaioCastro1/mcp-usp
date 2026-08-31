@@ -58,12 +58,27 @@ Nome de ferramenta vem da pergunta do dono, não da função do Moodle: `o_que_v
 ## 4. Antes de cada commit
 
 ```bash
-<TODO: comando(s) de gate — não existem ainda; definir com o primeiro código>
+./scripts/gate.sh
 ```
 
-Enquanto não houver gate automatizado, a verificação é a Definição de Pronto do
-`CLAUDE.md` §5: o dado está registrado, nenhum segredo entrou, achado colateral foi
-para o backlog.
+Três checagens, na ordem em que a mais barata que pode reprovar vem antes:
+
+1. **Nenhum segredo do `.env` em arquivo rastreado** (Invariante 3). Primeiro porque é
+   a única falha do gate que é irreversível — commit empurrado com segredo não se
+   desfaz apagando o commit. Imprime o NOME da variável e o arquivo, nunca o valor.
+   `RUCARD_HASH` no `.env.example` e no `SPEC1.md` é isento **por par**, não por
+   variável: a mesma hash em qualquer outro arquivo reprova.
+2. **`fixtures/moodle/raw/` segue gitignorada** (§3.3).
+3. **A suíte offline.** A camada `live` NÃO entra: precisa de rede e do token pessoal,
+   e um gate que depende da USP estar de pé reprova commit por motivo errado.
+
+O gate foi verificado sabotando cada checagem uma a uma — as três reprovam quando
+devem (§9, 31/08/2026). A primeira versão dele passava sem ter verificado nada, porque
+procurava o `.env` só no diretório atual e um worktree não tem o dele; hoje usa
+`usp_mcp.env.achar_env` e **reprova** se não achar `.env` nenhum, em vez de reportar OK.
+
+O gate não substitui a Definição de Pronto do `CLAUDE.md` §5 — ele cobre "nenhum
+segredo entrou", e o dado registrado e o achado colateral continuam sendo humanos.
 
 Mensagem de commit: `feat|fix|chore|docs|test(escopo): descrição`.
 
