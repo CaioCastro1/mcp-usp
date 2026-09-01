@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "disableClaudeAiConnectors": true,
+  "skillOverrides": {
+    "lais-html-report": "off",
+    "lais-copywriter": "off",
+    "lastro-briefing-closers": "off",
+    "fix-trino-query": "off",
+    "anthropic-skills:lais-copywriter": "off",
+    "anthropic-skills:lastro-briefing-closers": "off",
+    "anthropic-skills:fix-trino-query": "off"
+  },
+  "enabledPlugins": {
+    "lais-brand-studio": false
+  }
+}
