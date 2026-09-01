@@ -62,9 +62,46 @@ Horário de semana dos 4: almoço 11:15–14:15 em todos; jantar 17:30–19:45 e
 Ou seja, dá para distinguir "fechado hoje" de "nunca serve essa refeição" cruzando
 `/menu` com `workinghours`, mas só cruzando. Isolado, o `/menu` do 7 parece um RU quebrado.
 
+## Segunda captura — 31/08/2026, segunda-feira, 19:22 (-03)
+
+Quatro dias depois da primeira, do terminal do dono. Motivo: a Fase 2 precisava do TTL do
+cache, e ele dependia de uma pergunta que a captura única não podia responder.
+
+| resposta | bytes | semana devolvida |
+|---|---:|---|
+| `/menu/6` | 2.928 | 31/08 → 06/09 |
+| `/menu/7` | 2.303 | 31/08 → 06/09 |
+| `/menu/8` | 3.084 | 31/08 → 06/09 |
+| `/menu/9` | 3.624 | 31/08 → 06/09 |
+| `/restaurants` | 27.661 | — (byte-idêntico ao de 27/08) |
+
+O que a segunda captura resolveu, e o que continua aberto:
+
+1. **A semana vira na segunda, ou antes dela.** Às 19:22 de segunda a resposta já era a
+   semana nova. Isso **não** dá o instante da virada — pode ser domingo à noite, pode ser
+   segunda de manhã. É suficiente para o desenho do cache, e insuficiente para um TTL que
+   dependa da hora: por isso o cliente valida a data que o payload traz em vez de confiar
+   só no relógio (§9, Fase 2 do RUCard).
+2. **`/restaurants` é estável a ponto de ser byte-idêntico** em quatro dias. Confirma o
+   TTL longo para o catálogo e a leitura de que ele é tabela de apoio, não resposta.
+3. **A grafia de "fechado" é estável por RU**, não aleatória: 6 capitalizado, 7/8/9 em
+   caixa alta, nas duas semanas. A comparação segue case-insensitive — estabilidade
+   observada em duas amostras não é contrato.
+4. **HTML e ` - ` continuam não aparecendo**: agora em 2 semanas × 7 dias × 2 refeições ×
+   4 RUs. O parser tolera os dois (o §1.2 registra que existem), e não há fixture — a que
+   houver terá que vir de uma captura que os traga, não da imaginação de quem escreve.
+5. **Correção à própria nota** (item 3 de "Correções ao §1.2", acima): eu havia escrito que `workinghours` publica
+   `breakfast` "para os RUs 6 e 7". São três — o 9 publica café **no fim de semana**. E o
+   9 é o único dos quatro que abre sábado e domingo, o que esta nota não registrava. §1.2
+   corrigido.
+
 ## Aberto, não testado
 
 - Se `/menu` aceita algum parâmetro de data (o §1.2 diz que não; não retestei — não vale
   chamada nova até haver motivo).
-- Se a semana vira na segunda ou no domingo, e a que horas. Só saberia com captura em dias
-  diferentes; é o que decide o TTL do cache (Invariante 5).
+- **A que horas** a semana vira. Fechado o suficiente para o cache (item 1 acima), aberto
+  para quem quiser prever a virada. Custaria uma captura por hora numa madrugada de
+  domingo, e nenhuma pergunta do dono depende disso hoje.
+- Se algum RU já teve cardápio publicado num dia sem horário publicado (ou o inverso). As
+  duas fontes concordaram nas duas capturas; o código declara o desacordo se ele aparecer,
+  em vez de escolher um lado calado.

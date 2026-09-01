@@ -32,7 +32,7 @@ quatro é este arquivo.
 | Caminho | O que é |
 |---|---|
 | `SPEC1.md` | Autoridade: fatos verificados, invariantes, questões abertas, registro de decisões (§9) |
-| `usp_mcp/` | Código dos servidores MCP, um pacote por sistema |
+| `usp_mcp/` | Código dos servidores MCP, um pacote por sistema: `politica`, `cliente`, ferramenta, `server` |
 | `tests/` | Suíte em três camadas: `politica` e `contrato` offline, `live` atrás de env var |
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
@@ -62,6 +62,9 @@ curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCAR
 # O venv é POR DIRETÓRIO e não vem no git: todo worktree novo precisa do seu,
 # senão o .mcp.json falha com ENOENT em `.venv/bin/python`.
 python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+
+# Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
+.venv/bin/python -m pytest tests/handshake
 
 # Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh

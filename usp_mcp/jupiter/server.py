@@ -168,10 +168,14 @@ def main() -> None:
     suíte importa este módulo sem o SDK instalado, e um import de topo quebraria
     a coleta por causa de uma dependência que as funções puras nem usam.
 
-    **Tem teste** (T45-T48, `tests/jupiter/test_server_stdio.py`): a suíte roda
-    isto de verdade contra o SDK instalado, substituindo só `run()`, que
-    bloquearia no stdin. Foi assim que a trilha do Moodle descobriu tarde que o
-    `main()` dela falava a API antiga do SDK com a suíte inteira verde.
+    **Tem teste, por dois caminhos que não se substituem.** T45-T48
+    (`tests/jupiter/test_server_stdio.py`) rodam isto em processo, substituindo
+    só `run()`, e alcançam o que o processo esconde: o corpo enviado e a
+    mensagem de SDK ausente. `tests/handshake/` sobe o processo de verdade e
+    compara o que sai NO FIO com o que `listar_ferramentas()` declara — foi lá
+    que apareceu o schema mais pobre que o declarado. Foi este buraco que, na
+    trilha do Moodle, escondeu um `main()` falando a API antiga do SDK com a
+    suíte inteira verde.
     """
     try:
         from mcp.server import MCPServer
@@ -182,18 +186,27 @@ def main() -> None:
             "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
+    from usp_mcp.adaptador import anotar
+
     descritor = listar_ferramentas()[0]
     servidor = MCPServer(name="usp-mcp-jupiter", version="0.1.0")
 
-    @servidor.tool(name=descritor["name"], description=descritor["description"])
-    def _disciplina(sigla: str, codcur: str | None = None, codhab: str = "0",
-                    ingles: bool = False) -> str:
+    def _disciplina(sigla, codcur=None, codhab="0", ingles=False) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
         return chamar_ferramenta(
             descritor["name"],
             {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
         )
+
+    # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026): sem
+    # isto, o aviso de que sem `codcur` não há pré-requisito não chega ao modelo.
+    anotar(
+        _disciplina,
+        descritor["inputSchema"],
+        {"sigla": str, "codcur": str | None, "codhab": str, "ingles": bool},
+    )
+    servidor.tool(name=descritor["name"], description=descritor["description"])(_disciplina)
 
     servidor.run(transport="stdio")
 

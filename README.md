@@ -10,29 +10,26 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 
 ## Estado — 31/08/2026
 
-**Dois servidores MCP rodando, três ferramentas.**
+**Três servidores MCP rodando, quatro ferramentas, todas verificadas contra a USP.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
+| `usp-rucard` | `bandejao` | O que tem no bandejão hoje, e onde vale a pena comer |
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
 | `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina — regras, listas, provas antigas |
 | `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
 
-`o_que_vence` e `disciplina` foram verificadas **contra a USP de verdade**.
-`material` ainda não: ela é verde contra fixture capturada, e falta rodá-la ao
-vivo — cada chamada consome credencial pessoal e fica no log da conta.
+O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter e o RUCard não
+usam credencial nenhuma e por isso seguem candidatos a servidor hospedado (§6 do
+`SPEC1.md`). Suíte: testes offline em segundos — incluindo um handshake stdio que sobe
+cada servidor de verdade — mais uma camada `live` atrás de `USP_MCP_LIVE=1` que fala com
+a USP.
 
-O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter não usa
-credencial nenhuma e por isso segue candidato a servidor hospedado (§6 do `SPEC1.md`).
-Suíte: 203 testes offline em poucos segundos, mais uma camada `live` atrás de
-`USP_MCP_LIVE=1` que fala com a USP de verdade.
-
-**O que ainda não existe:** bandejão, notas, "já entreguei?", aviso de professor.
-Horário, sala e vagas não são prometidos, e `material` diz o nome do arquivo mas
-não entrega o link de download do que é interno — baixá-lo exigiria a credencial
-do usuário na URL.
-Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
-abertas do §4 fecham com dado registrado no §9.
+**O que ainda não existe:** notas, "já entreguei?", aviso de professor — e nada de
+histórico de cardápio, saldo do cartão, horário, sala ou vagas. `material` diz o nome do
+arquivo mas **não** entrega o link de download do que é interno: baixá-lo exigiria a
+credencial do usuário na URL. Nenhuma ferramenta nasce por conveniência: o critério está
+no §5, e as questões abertas do §4 fecham com dado registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
