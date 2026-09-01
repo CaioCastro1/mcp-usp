@@ -15,10 +15,14 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — a fatia vertical é uma ferramenta. Crescer é decisão registrada."""
+    """T42 — duas ferramentas. Crescer foi decisão registrada no §9 (31/08).
+
+    A asserção trava o conjunto inteiro, não um mínimo: uma terceira ferramenta
+    aparecendo aqui sem passar pelo §9 deixa este teste vermelho, e ele está
+    certo em ficar.
+    """
     fs = server.listar_ferramentas()
-    assert len(fs) == 1
-    assert fs[0]["name"] == "o_que_vence"
+    assert [f["name"] for f in fs] == ["o_que_vence", "material"]
 
 
 def test_o_nome_vem_da_pergunta_nao_da_funcao_do_moodle():

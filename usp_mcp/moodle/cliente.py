@@ -35,7 +35,12 @@ _URL_SUFIXO_WEBSERVICE = "/webservice/rest/server.php"
 # nenhum teste exercita esse caminho (só tests/moodle/test_live.py, pulado) —
 # um valor fixo e conservador é suficiente até haver dado medido que peça algo
 # diferente (decisão de §9, não conveniência de código).
-_TIMEOUT_PADRAO_SEGUNDOS = 15
+# Medido ao vivo em 31/08/2026: `core_enrol_get_users_courses` levou **14,7 s**
+# para devolver as 74 matrículas (104 kB). Com o teto anterior de 15 s, a chamada
+# mais pesada da ferramenta `material` rodava a 2% de margem — e estourou na
+# primeira execução real, com a suíte inteira verde. Não baixe este valor sem
+# remedir: a suíte não alcança este caminho (§9, 31/08).
+_TIMEOUT_PADRAO_SEGUNDOS = 60
 
 
 class _TokenOculto:

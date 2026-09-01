@@ -20,6 +20,7 @@ import os
 from ..env import carregar_env
 from .cliente import ClienteMoodle
 from .erros import ErroMoodle
+from .material import material
 from .o_que_vence import o_que_vence
 
 # URL default: mesma do §8 do SPEC1 e de scripts/ws.sh. MOODLE_URL sobrescreve
@@ -27,9 +28,10 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Nome da única ferramenta exposta (§5: fatia vertical, crescer é decisão de
-# §9). O nome vem da pergunta do dono, não da função do Moodle por trás dela.
+# Duas ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08).
+# Os nomes vêm das perguntas do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
+_NOME_MATERIAL = "material"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -71,11 +73,49 @@ def listar_ferramentas() -> list[dict]:
                 },
                 "additionalProperties": False,
             },
-        }
+        },
+        {
+            "name": _NOME_MATERIAL,
+            "description": (
+                "Lista os arquivos publicados no espaço de uma disciplina no "
+                "e-Disciplinas (Moodle da USP): PDFs de regras e programação da "
+                "matéria, listas de exercícios, roteiros, apostilas, provas de "
+                "semestres anteriores, além dos links externos que o professor "
+                "postou. Use para 'que arquivos tem em PSI3323', 'cadê as regras "
+                "da disciplina', 'tem prova antiga em PTC3314', 'onde está a "
+                "lista de exercícios'. NÃO devolve o link de download do arquivo "
+                "interno, porque baixá-lo exigiria a credencial do usuário — "
+                "diz o nome e onde está, e a pessoa abre pelo e-Disciplinas."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PSI3323 ou PTC3314. Espaço e caixa não "
+                            "importam. Casa também com pedaço do nome."
+                        ),
+                    },
+                    "busca": {
+                        "type": "string",
+                        "description": (
+                            "Filtra por pedaço do nome do arquivo — 'prova', "
+                            "'lista', 'regras'. Opcional: sem ele vem tudo, e "
+                            "a saída diz quantos itens ficaram de fora quando "
+                            "o filtro é usado."
+                        ),
+                    },
+                },
+                "required": ["disciplina"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
-def chamar_ferramenta(nome: str, argumentos: dict) -> str:
+def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     """Despacha para a ferramenta pedida pelo nome, ou levanta erro legível.
 
     Nome desconhecido é a fronteira do Invariante 6 (T44): não devolve lista
@@ -83,34 +123,39 @@ def chamar_ferramenta(nome: str, argumentos: dict) -> str:
     porque "ferramenta não existe" e "ferramenta existe mas não achou nada"
     têm curas diferentes para quem lê o erro.
     """
-    if nome != _NOME_FERRAMENTA:
+    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL):
         raise ErroMoodle(
-            f"Ferramenta desconhecida: {nome!r}. A única ferramenta exposta "
-            f"por este servidor é {_NOME_FERRAMENTA!r}."
+            f"Ferramenta desconhecida: {nome!r}. As ferramentas expostas por "
+            f"este servidor são {_NOME_FERRAMENTA!r} e {_NOME_MATERIAL!r}."
         )
 
-    # O `.env` é a única casa do token (§8, gitignorado) — decisão de
-    # 31/08/2026. `carregar_env` usa `setdefault`, então o bloco `env` de um
-    # cliente MCP, se existir, ganha do arquivo. Chamado aqui e não no import
-    # do módulo para que importar `server` continue sendo livre de efeito
-    # colateral (é o que os testes de contrato fazem).
-    carregar_env()
+    if cliente is None:
+        # O `.env` é a única casa do token (§8, gitignorado) — decisão de
+        # 31/08/2026. `carregar_env` usa `setdefault`, então o bloco `env` de um
+        # cliente MCP, se existir, ganha do arquivo. Chamado aqui e não no import
+        # do módulo para que importar `server` continue sendo livre de efeito
+        # colateral (é o que os testes de contrato fazem).
+        carregar_env()
 
-    # Credencial só é lida aqui, na hora de montar o cliente — nunca logada
-    # nem exposta (Invariante 3). Este caminho não é exercitado por teste
-    # offline (T44 só cobre o nome desconhecido); ele fala com a rede da USP,
-    # que o sandbox não alcança (§1.1).
-    cliente = ClienteMoodle(
-        token=os.environ.get("MOODLE_TOKEN", ""),
-        url=os.environ.get("MOODLE_URL", _URL_PADRAO),
-    )
+        # Credencial só é lida aqui, na hora de montar o cliente — nunca logada
+        # nem exposta (Invariante 3).
+        cliente = ClienteMoodle(
+            token=os.environ.get("MOODLE_TOKEN", ""),
+            url=os.environ.get("MOODLE_URL", _URL_PADRAO),
+        )
 
-    resposta = o_que_vence(
+    if nome == _NOME_MATERIAL:
+        return material(
+            cliente,
+            argumentos["disciplina"],
+            busca=argumentos.get("busca"),
+        ).texto
+
+    return o_que_vence(
         cliente,
         dias=argumentos.get("dias", 14),
         limite=argumentos.get("limite"),
-    )
-    return resposta.texto
+    ).texto
 
 
 def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
@@ -119,13 +164,15 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     do MCP instalado, e um import de topo quebraria a coleta inteira da
     suíte por causa de uma dependência que as funções puras nem chegam a usar.
 
-    **Isto era "sem teste automático de propósito" até 31/08/2026**, com a
-    justificativa de que exercitá-lo exigiria "um cliente MCP falso, o que
-    testaria o SDK e não este projeto". As duas metades estavam erradas: o
-    cliente é JSON-RPC por um pipe (~90 linhas em `tests/handshake/`), e o que
-    se testa não é o SDK — é se este adaptador casa com o SDK instalado, que é
-    exatamente o que quebrou aqui uma vez, com a suíte 99/99 verde. Hoje
-    `tests/handshake/` sobe este processo e aperta a mão com ele.
+    **Tem teste, por dois caminhos que não se substituem.** T78-T81
+    (`tests/moodle/test_server_stdio.py`) rodam isto em processo, substituindo só
+    `run()`, e alcançam o que o processo esconde: o dicionário montado para
+    `chamar_ferramenta` e a mensagem de SDK ausente. `tests/handshake/` sobe o
+    processo de verdade e compara o que sai NO FIO com o declarado — foi lá que
+    apareceu o schema mais pobre que o `inputSchema`. Antes de 31/08/2026 esta
+    docstring dizia "sem teste automático de propósito", com a justificativa de
+    que exercitá-lo testaria o SDK; as duas metades estavam erradas, e foi este
+    buraco que escondeu um `main()` falando a API antiga com a suíte 99/99 verde.
     """
     try:
         from mcp.server import MCPServer
@@ -138,7 +185,8 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
 
     from usp_mcp.adaptador import anotar
 
-    descritor = listar_ferramentas()[0]
+    porta_vence, porta_material = listar_ferramentas()
+    descritor = porta_vence
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
     def _o_que_vence(dias=14, limite=None) -> str:
@@ -152,6 +200,20 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     # isto, "Padrão 14" e a explicação de `limite` não chegam ao modelo.
     anotar(_o_que_vence, descritor["inputSchema"], {"dias": int, "limite": int | None})
     servidor.tool(name=descritor["name"], description=descritor["description"])(_o_que_vence)
+
+    def _material(disciplina, busca=None) -> str:
+        # `disciplina` SEM default de propósito: no SDK é a ausência de default
+        # que torna o parâmetro obrigatório no fio, e o `inputSchema` a declara
+        # em `required`. Com `=None` os dois divergiam e o modelo via uma
+        # ferramenta que aceita ser chamada sem disciplina — H6 pegou.
+        return chamar_ferramenta(
+            porta_material["name"], {"disciplina": disciplina, "busca": busca}
+        )
+
+    # Mesmo motivo: sem `anotar`, "Espaço e caixa não importam" e a explicação de
+    # `busca` não chegam ao modelo — ele veria só {"title": "Disciplina"}.
+    anotar(_material, porta_material["inputSchema"], {"disciplina": str, "busca": str | None})
+    servidor.tool(name=porta_material["name"], description=porta_material["description"])(_material)
 
     servidor.run(transport="stdio")
 
@@ -189,8 +251,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     print("SDK do MCP           : presente")
 
     # O schema que o modelo vê tem de casar com a assinatura que o adaptador
-    # registra; divergir aqui é o erro que só apareceria em uso real.
-    declarados = set(listar_ferramentas()[0]["inputSchema"]["properties"])
+    # registra. Isto checava a PRIMEIRA ferramenta e imprimia "OK" como se
+    # falasse pelas duas — meia checagem com cara de checagem inteira, que é o
+    # Invariante 7 quebrado dentro da própria ferramenta de verificação.
+    # Corrigido em 31/08; a cobertura de verdade está em T79.
     import inspect
 
     from mcp.server import MCPServer as _M
@@ -198,17 +262,33 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     servidor = _M(name="verificacao", version="0.0.0")
 
     @servidor.tool(name="o_que_vence", description="verificação")
-    def _sonda(dias: int = 14, limite: int | None = None) -> str:
+    def _sonda_vence(dias: int = 14, limite: int | None = None) -> str:
         return ""
 
-    reais = set(inspect.signature(_sonda).parameters)
-    print("schema x assinatura  :", "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}")
-    if declarados != reais:
+    @servidor.tool(name="material", description="verificação")
+    def _sonda_material(disciplina: str, busca: str | None = None) -> str:
+        return ""
+
+    sondas = {"o_que_vence": _sonda_vence, "material": _sonda_material}
+    divergiu = False
+    for ferramenta in listar_ferramentas():
+        nome = ferramenta["name"]
+        declarados = set(ferramenta["inputSchema"]["properties"])
+        sonda = sondas.get(nome)
+        if sonda is None:
+            print(f"schema x assinatura  : {nome}: SEM SONDA — acrescente uma aqui")
+            divergiu = True
+            continue
+        reais = set(inspect.signature(sonda).parameters)
+        estado = "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}"
+        print(f"schema x assinatura  : {nome}: {estado}")
+        divergiu = divergiu or declarados != reais
+    if divergiu:
         return 1
 
     print()
-    print("Nada acima tocou a rede da USP. O que falta é plugar num cliente")
-    print("MCP e perguntar — só isso exercita chamar_ferramenta de verdade.")
+    print("Nada acima tocou a rede da USP. A suíte já cobre a fronteira MCP")
+    print("offline (T78-T81); o que falta é a rede — plugar e perguntar.")
     return 0
 
 
