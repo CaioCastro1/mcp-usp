@@ -14,8 +14,12 @@ outras.
 
 **A regra de segurança desta fronteira, e ela veio de medição.** Os 22 módulos
 `resource` apontam para `edisciplinas.usp.br/webservice/pluginfile.php`, e baixar
-de lá exige anexar o token na URL. Emitir essa URL põe a credencial a um passo do
-contexto do modelo e de todo log por onde a resposta passar (Invariante 3). Os 7
+de lá exige o token no request. Emitir uma URL com o token dentro põe a credencial
+a um passo do contexto do modelo e de todo log por onde a resposta passar
+(Invariante 3); emitir a URL sem o token entrega um endereço que não abre. Nos dois
+casos a saída fica pior, então o endereço não sai. **Medido em 01/09: o token não
+precisa ir na URL — o corpo do POST autentica igual** (§9), então quem baixa é o
+servidor, sem que uma URL com segredo dentro chegue a existir. Os 7
 módulos `url` apontam para fora (YouTube, Google Docs, sites de fabricante) e não
 têm esse problema: esses saem inteiros, porque recusar tudo seria esconder o que
 se sabe. O que identifica um arquivo interno — nome, tipo, tamanho, data — sai;
