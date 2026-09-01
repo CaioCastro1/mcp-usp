@@ -1560,3 +1560,115 @@ entrypoint: em processo alcança o dicionário montado e a mensagem de SDK ausen
 no fio alcança o que o SDK decide sozinho. Nenhum dos dois é redundante.
 
 Depois do merge: **309 passed, 6 skipped**.
+
+### 01/09/2026 — o download de arquivo do Moodle, medido: o token não precisa ir na URL
+
+**Fechada a questão (a) do §9 de 31/08**, que estava registrada como "continua não
+verificado ... custa uma chamada da conta, que é decisão do dono". O dono pediu.
+Custou **zero** chamada de web service: as `fileurl` da fixture higienizada
+`course_contents_psi3323.json` são reais — a higienização do §3.3 mexe em nome,
+`userid` e nota, não em endereço de arquivo. Só o GET/POST no `pluginfile.php`
+saiu para a rede. Medição completa em `notas/fase1-moodle.md`.
+
+**O download funciona, e de quatro formas testadas só duas autenticam:**
+
+| | |
+|---|---|
+| sem token | HTTP **200** + JSON `errorcode: missingparam` |
+| `?token=` na query | 200, `application/pdf`, 87.705 B, `%PDF-` |
+| `Authorization: Bearer` | HTTP **200** + JSON `missingparam` — header ignorado |
+| **`token` no corpo do POST** | **200, `application/pdf`, 87.705 B** |
+
+**Primeiro achado, e ele corrige uma afirmação deste documento.** O §9 de 31/08 e
+a docstring de `material.py` diziam que baixar "exige anexar o token na URL", e
+derivavam disso a regra da fronteira. A premissa é falsa: **o corpo do POST
+serve**. A regra de não emitir URL de arquivo interno **continua certa** — uma URL
+sem token não abre para o usuário, e uma com token põe a credencial no contexto
+do modelo (Invariante 3) — mas o motivo muda de "é impossível baixar sem expor" para
+"o servidor baixa sem nunca formar uma URL com segredo dentro". Isso **destrava** a
+segunda ferramenta em vez de bloqueá-la: ela pode entregar o *conteúdo* sem que o
+*endereço autenticado* exista em lugar nenhum. Afirmação não medida virando premissa
+de desenho — o mesmo padrão do iCal e da rede da USP, terceira vez registrada.
+
+**Segundo achado, e é armadilha de implementação.** Falha de credencial **não vem
+como 4xx**: vem HTTP 200 com `application/json` e `errorcode`. Quem checar status
+entrega JSON de erro achando que é PDF. A checagem que vale é content-type +
+byte-magic (Invariante 6). O `filesize` de `contents` bateu exato com os bytes
+recebidos, então dá para prever custo antes de baixar.
+
+**Terceiro: o custo do texto, medido nos 19 PDFs internos de PSI3323 — não em três.**
+15,9 MB e 181 páginas baixados; texto somado **203.675 B (~50.900 tokens), 1,28%
+dos bytes**; média **~2.679 tokens por PDF**; extremos 1,7k e 25,3k bytes.
+**Zero escaneados: 19 de 19 têm camada de texto**, nenhum exigiria OCR. Foram os 19
+e não uma amostra porque "três não provam ausência" já custou duas correções a este
+repo — e desta vez a ausência (de PDF sem texto) era exatamente o que se queria provar.
+
+**Consequência de desenho:** um PDF cabe folgado no contexto (~2,7k), a disciplina
+inteira não (~50,9k). A segunda ferramenta é **um arquivo por vez**, como a primeira
+é uma disciplina por vez, e declara truncamento quando o texto passar do teto
+(Invariante 7) — a variação de 15× entre o menor e o maior é o motivo.
+
+**Continua aberto, e não foi medido aqui:** (i) `mod_folder` — PSI3323 não tem
+nenhum, e esta medição não acrescentou disciplina; (ii) `pypdf` como **primeira
+dependência de runtime** do projeto — foi instalado só para medir e desinstalado
+depois, e adotá-lo é decisão de §9 própria, não efeito colateral; (iii) o que fazer
+com `.docx`, `.jpeg` e `octet-stream`, que existem no acervo e não são PDF.
+
+### 01/09/2026 — a segunda ferramenta de material entrega o caminho, não o conteúdo
+
+**Decidido: o MCP baixa o arquivo e devolve o caminho local; quem lê é o agente
+que chamou.** A pergunta veio do dono — "isso não pode ser resolvido por outras
+partes do Claude? o MCP entrega o PDF e o agente decide o que fazer" — e ela
+desfez o desenho que esta sessão ia propor (extrair texto com `pypdf` e devolver
+o texto). Registrada aqui porque muda a fronteira da ferramenta, não só a
+implementação.
+
+**Entregar os bytes pelo canal MCP está descartado, e é medida.** O SDK suporta
+(`EmbeddedResource` + `BlobResourceContents.blob`, base64). O custo, projetado
+sobre os `filesize` reais dos 19 PDFs de PSI3323:
+
+| | arquivo | base64 no contexto |
+|---|---|---|
+| menor | 88 kB | ~31.600 tok |
+| médio | 838 kB | **~302.000 tok** |
+| maior | 6,3 MB | **~2.286.000 tok** |
+
+Contra **~2.679 tok** do texto extraído de um PDF e **~1.621 tok** da listagem
+inteira da disciplina. Base64 infla 33% e tokeniza mal: um PDF médio custaria
+mais que cem disciplinas listadas. `ResourceLink` não salva o desenho — o
+conteúdo continua atravessando o mesmo canal quando for lido.
+
+**Entregar o caminho custa ~50 tokens** — uma linha com nome, páginas, tamanho e
+destino em disco. Três ganhos, e o primeiro não é de custo:
+
+1. **O agente vê as figuras.** Decisivo neste acervo: são PDFs de eletrônica —
+   circuitos, formas de onda, esquemas. Os slides medidos hoje têm **280–440 B de
+   texto por página**; são quase só imagem. `pypdf` devolveria uma casca e nós
+   chamaríamos isso de "texto extraído" — Invariante 6 violado com aparência de
+   sucesso, que é a pior forma.
+2. **Nenhuma dependência de runtime nova.** `pypdf` sai inteiro, e com ele a
+   questão aberta que esta mesma sessão tinha acabado de abrir no backlog.
+3. **Paginação sob demanda.** Num PDF de 29 páginas o agente pede as que
+   interessam, em vez de o servidor despejar 9,6 kB de texto achatado.
+
+**O que a decisão custa, escrito antes de valer:**
+
+- **O servidor passa a escrever em disco.** Não fere o Invariante 1, que é sobre
+  escrita na USP — mas é efeito colateral novo e pede diretório confinado, teto de
+  tamanho e limpeza declarada. Isso é desenho da implementação, e ela ainda não
+  existe.
+- **Acopla ao cliente.** Só funciona se quem chamou souber ler arquivo local. O
+  Invariante 4 já prende o servidor autenticado ao stdio local, então o cliente é
+  sempre local — mas "local" não garante "lê PDF". A saída da ferramenta tem de
+  dizer o que devolveu e por quê, para o cliente que não souber (Invariante 6).
+- **O Invariante 7 muda de dono nessa fronteira.** Se o agente ler 5 de 29
+  páginas, quem declara o truncamento é o cliente. Nós declaramos o total de
+  páginas; o recorte é dele.
+
+**A disciplina é a mesma das outras duas ferramentas:** o MCP entrega o dado
+escasso e caro de obter, quem interpreta é o modelo. `bandejao` não decide onde
+almoçar, `material` não resume a lista — e ler o PDF é interpretação, não acesso.
+
+**Descartado junto:** extrair texto no servidor (perde figura, cria dependência,
+achata 29 páginas em um blob), e devolver texto **e** caminho (a dependência volta
+inteira para produzir a metade pior).
