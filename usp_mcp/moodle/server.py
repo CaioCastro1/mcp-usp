@@ -164,12 +164,15 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     do MCP instalado, e um import de topo quebraria a coleta inteira da
     suíte por causa de uma dependência que as funções puras nem chegam a usar.
 
-    **Tem teste** desde 31/08 (T78-T81, `tests/moodle/test_server_stdio.py`).
-    Esta docstring dizia o contrário — que exercitar isto exigiria subir um
-    processo stdio — e estava errada: substituindo só `run()`, a suíte monta o
-    servidor contra o SDK real e chama `call_tool` até a fixture, sem credencial
-    nenhuma. O que faltava não era token, era `chamar_ferramenta` aceitar cliente
-    injetável. Segue sem teste apenas o `run()` em si, que é o SDK.
+    **Tem teste, por dois caminhos que não se substituem.** T78-T81
+    (`tests/moodle/test_server_stdio.py`) rodam isto em processo, substituindo só
+    `run()`, e alcançam o que o processo esconde: o dicionário montado para
+    `chamar_ferramenta` e a mensagem de SDK ausente. `tests/handshake/` sobe o
+    processo de verdade e compara o que sai NO FIO com o declarado — foi lá que
+    apareceu o schema mais pobre que o `inputSchema`. Antes de 31/08/2026 esta
+    docstring dizia "sem teste automático de propósito", com a justificativa de
+    que exercitá-lo testaria o SDK; as duas metades estavam erradas, e foi este
+    buraco que escondeu um `main()` falando a API antiga com a suíte 99/99 verde.
     """
     try:
         from mcp.server import MCPServer
@@ -180,25 +183,37 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
             "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
+    from usp_mcp.adaptador import anotar
+
     porta_vence, porta_material = listar_ferramentas()
     descritor = porta_vence
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
-    @servidor.tool(name=porta_material["name"], description=porta_material["description"])
-    def _material(disciplina: str, busca: str | None = None) -> str:
-        # Assinatura explícita pelo mesmo motivo da de baixo: o SDK deriva o
-        # schema que o modelo vê a partir dela.
-        return chamar_ferramenta(
-            porta_material["name"], {"disciplina": disciplina, "busca": busca}
-        )
-
-    @servidor.tool(name=descritor["name"], description=descritor["description"])
-    def _o_que_vence(dias: int = 14, limite: int | None = None) -> str:
+    def _o_que_vence(dias=14, limite=None) -> str:
         # Assinatura explícita em vez de `**kwargs`: o SDK deriva o schema que
         # o modelo vê a partir dela, e um `**kwargs` produziria uma ferramenta
         # sem parâmetro nenhum. Mantida em sincronia com o `inputSchema` de
         # `listar_ferramentas` — `_auto_verificar` compara os dois.
         return chamar_ferramenta(descritor["name"], {"dias": dias, "limite": limite})
+
+    # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
+    # isto, "Padrão 14" e a explicação de `limite` não chegam ao modelo.
+    anotar(_o_que_vence, descritor["inputSchema"], {"dias": int, "limite": int | None})
+    servidor.tool(name=descritor["name"], description=descritor["description"])(_o_que_vence)
+
+    def _material(disciplina, busca=None) -> str:
+        # `disciplina` SEM default de propósito: no SDK é a ausência de default
+        # que torna o parâmetro obrigatório no fio, e o `inputSchema` a declara
+        # em `required`. Com `=None` os dois divergiam e o modelo via uma
+        # ferramenta que aceita ser chamada sem disciplina — H6 pegou.
+        return chamar_ferramenta(
+            porta_material["name"], {"disciplina": disciplina, "busca": busca}
+        )
+
+    # Mesmo motivo: sem `anotar`, "Espaço e caixa não importam" e a explicação de
+    # `busca` não chegam ao modelo — ele veria só {"title": "Disciplina"}.
+    anotar(_material, porta_material["inputSchema"], {"disciplina": str, "busca": str | None})
+    servidor.tool(name=porta_material["name"], description=porta_material["description"])(_material)
 
     servidor.run(transport="stdio")
 
@@ -207,9 +222,11 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     """`python -m usp_mcp.moodle.server --auto-verificar`: o que dá para
     checar sem tocar a rede da USP nem gastar uma chamada da conta.
 
-    Existe porque `main()` não tem teste: sem isto, a única forma de saber que
-    o adaptador casa com o SDK instalado seria plugar num cliente e ver
-    falhar. Não substitui essa verificação — reduz o que ela precisa descobrir.
+    Nasceu porque `main()` não tinha teste. Desde 31/08/2026 tem
+    (`tests/handshake/`), e isto continua útil por outro motivo: roda em um
+    comando, imprime o diagnóstico de configuração (`.env`, token, SDK) que um
+    teste não imprime, e responde "por que o servidor não sobe aqui" mais rápido
+    do que uma suíte.
     """
     from .. import env as _env
 
