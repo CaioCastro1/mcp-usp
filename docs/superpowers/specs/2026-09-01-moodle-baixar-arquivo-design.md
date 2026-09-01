@@ -87,8 +87,11 @@ O verbo no nome é deliberado: `material` lista e não tem efeito colateral;
 2. **`core_course_get_contents(courseid)`** — já está na allowlist; a política não
    muda. Reusa `material.projetar_material` em vez de duplicar a travessia
    seção→módulo→conteúdo, acrescentando ao `Item` os campos que o download precisa e
-   que hoje são jogados fora: `fileurl` (cru), `fileid`, `modname` e o nome da seção
-   e do módulo, para o desempate.
+   que hoje são jogados fora: `fileurl_bruta` (a `fileurl` como veio), `fileid`,
+   `mimetype`, e o nome da seção e do módulo, para o desempate. O campo se chama
+   `fileurl_bruta` e não `fileurl_interna` porque a `fileurl` de um `url` externo
+   passa pelo mesmo campo — é a **ausência de `fileid`** que distingue link de
+   arquivo do webservice, não o nome do campo.
 
    **Cuidado que essa mudança exige, e ele tem um teste com nome:** acrescentar
    `fileurl` ao `Item` **não pode** fazer a saída de `material` emitir a URL interna.
@@ -131,7 +134,7 @@ vez.
 Dataclasses congeladas, no molde de `material.RespostaMaterial`:
 
 ```
-Baixado:   nome, tipo, mimetype, tamanho, caminho (Path), fileid, secao, modulo
+Baixado:   nome, tipo, mimetype, tamanho, caminho (Path), fileid, secao, modulo, reusado
 Link:      nome, url            # item externo, não baixado
 Recusado:  nome, motivo         # teto, ou erro por arquivo no modo plural
 RespostaArquivo:
