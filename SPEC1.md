@@ -1374,3 +1374,189 @@ servidores para verificar os testes **sem ter estagiado o conserto**, e o `git c
 que desfaz a sabotagem levou o conserto junto — a suíte voltou a ficar vermelha por um
 motivo que eu já havia consertado. A regra que sai daí: **sabotagem se faz sobre árvore
 limpa** (`git add` antes), senão a restauração desfaz o que se quer manter.
+
+### 31/08/2026 — `material` implementada; a allowlist vai de 1 para 4, com motivo
+
+Segunda ferramenta do Moodle, contra a suíte escrita antes (20 vermelhos por
+`NotImplementedError`, depois satisfeitos). **Nenhum teste foi afrouxado para
+passar** — os dois que ficaram vermelhos de propósito, T7 (tamanho da allowlist)
+e T42 (número de ferramentas), são travas que existem justamente para forçar esta
+entrada, e foram atualizados **depois** dela, não em vez dela.
+
+**A allowlist cresce de 1 para 4, e o motivo é uma tradução.** O modelo recebe
+"PSI3323"; o Moodle só entende `courseid`. Resolver isso custa duas funções além
+da que responde:
+
+| Função | Para quê | Cru | Projetado |
+|---|---|---|---|
+| `core_webservice_get_site_info` | `userid` a partir do token | 31.386 B | — |
+| `core_enrol_get_users_courses` | a lista, para resolver a sigla | 104.712 B | 7.816 B (74) / 1.026 B (semestre) |
+| `core_course_get_contents` | a resposta | 58.049 B | ~6.486 B |
+
+As três são leitura e nenhuma está no bloqueio permanente do §2.2. **A resposta
+final da ferramenta sai em ~727 tokens** — menor que a projeção JSON porque o
+texto formatado é mais compacto que a serialização.
+
+**Cache obrigatório, não otimização.** Buscar 104 kB de matrículas a cada
+pergunta sobre material é reconfirmar a cada pergunta um dado que muda uma vez
+por semestre — o Invariante 5 pede TTL colado à taxa de mudança do dado, e daí
+`TTL_DISCIPLINAS`. O relógio é injetável para o teste verificar a REGRA e não o
+valor da constante.
+
+**A regra de segurança desta fronteira veio de medição, não de princípio.** Os 22
+módulos `resource` apontam para `edisciplinas.usp.br/webservice/pluginfile.php`;
+os 7 `url` apontam para fora (YouTube, Google Docs, sites de fabricante). Baixar
+do primeiro grupo exige anexar o token na URL. Então: **nome, tipo, tamanho e
+data do arquivo interno saem; o endereço dele, não** — emiti-lo põe a credencial
+a um passo do contexto do modelo e de todo log por onde a resposta passar
+(Invariante 3). Link externo sai inteiro, porque recusar tudo seria esconder o
+que se sabe. T68 e T69 são os dois lados dessa regra.
+
+**Duas sabotagens sobreviveram à primeira versão da suíte**, e as duas dizem a
+mesma coisa que este §9 já registrou duas vezes:
+
+1. `courseid=142033` fixo no lugar da resolução **passou** — porque 142033 *é* o
+   courseid de PSI3323, e o teste pedia uma disciplina só. Corrigido pedindo
+   duas: valor fixo não acerta as duas. É o mesmo erro do T47 do Jupiter, no
+   mesmo dia, depois de eu ter escrito a lição.
+2. As outras oito sabotagens (URL interna emitida, ambiguidade resolvida
+   sozinha, cache eterno, `userid` chutado, `author` na saída, busca que não
+   filtra, aviso suprimido, ferramenta não registrada) ficaram vermelhas na
+   primeira tentativa.
+
+**Fecha dois itens do backlog de manhã.** `chamar_ferramenta` do Moodle passou a
+aceitar cliente injetável — era isso, e não a falta de token, que impedia o teste
+ponta a ponta desta fronteira. Com a injeção, T78-T81 rodam o `main()` do Moodle
+contra o SDK real **sem credencial nenhuma**, incluindo `call_tool("material")`
+atravessando até a fixture. O §9 de mais cedo registrava a causa errada.
+
+**Limites declarados.** A amostra é PSI3323 e só ela, por decisão do dono: a
+projeção de 11,2%, a contagem de 16 seções e a mistura de tipos valem para essa
+disciplina, não para as dez. `mod_folder` não aparece nela, então não se sabe se
+`get_contents` expande pasta. E a higienização embaralha `fullname`, o que torna
+o casamento por **nome** de disciplina não exercitável contra a fixture — T62
+testa a regra contra lista sintética e diz isso.
+
+### 31/08/2026 — `material` ao vivo: funciona, e o timeout de 15 s era bug
+
+Primeira execução contra a USP de verdade. **A ferramenta funciona** — e a
+primeira tentativa falhou, pelo motivo que nenhum teste offline alcança.
+
+**Bug real, achado na primeira chamada.** `core_enrol_get_users_courses` levou
+**14,7 s** para devolver as 74 matrículas (104 kB), contra um
+`_TIMEOUT_PADRAO_SEGUNDOS` de **15 s**. Dois por cento de margem: estourou. A
+suíte estava 201/201 verde, porque o transporte HTTP real é um dos caminhos que
+ela declaradamente não alcança (backlog, 31/08). Elevado para 60 s, com T82
+travando o piso em 45 — e o teste guarda o **motivo medido**, não o número, para
+que baixar isso exija remedir. O erro que apareceu ao usuário foi legível e disse
+a cura, que é o Invariante 6 fazendo o que promete.
+
+**Medido nas três disciplinas, com o conserto:**
+
+| | itens | resposta | tempo |
+|---|---|---|---|
+| PSI3323 | 29 | ~725 tokens | 0,4 s |
+| PTC3314 | 52 | ~849 tokens | 0,4 s |
+| PTC3360 | 38 | ~1.154 tokens | 0,3 s |
+
+A projeção se sustenta fora da amostra: nenhuma das três passou de ~1,2k tokens,
+e `get_contents` de uma disciplina responde em menos de meio segundo. O custo da
+ferramenta é dominado inteiramente pela lista de matrículas — que é justamente o
+que o cache de semestre resolve.
+
+**Refuta uma leitura da "fração viva".** O §9 de 28/08 mediu 4 de 10 disciplinas
+com entrega e 6 aparecendo no calendário, e isso foi lido como medida de uso.
+**PTC3360 tem zero entregas e 38 arquivos publicados.** Entrega e material são
+eixos diferentes de vida: uma disciplina pode não usar o Moodle para avaliar e
+usá-lo inteiro para distribuir. Isso ataca o item que `notas/fase1-moodle.md`
+deixou explícito ("falta medir material postado para as 10") — três medidas, não
+dez, mas as três dizem a mesma coisa.
+
+**`mod_folder` não apareceu em nenhuma das três.** Modnames observados ao vivo:
+`resource`, `url`, `forum`, `quiz`, `assign`, `choicegroup`. A questão de se
+`get_contents` expande pasta **continua aberta** — não observar em três amostras
+não é observar ausência, e é exatamente o erro que este §9 já registrou hoje
+(ausência de arquivo não é ausência de fato).
+
+**Deriva de dado, observada de graça.** PSI3323 tinha 32 módulos com 1 `assign`
+na captura de 28/08 e tem 31 sem `assign` hoje. O espaço da disciplina muda
+durante o semestre — a fixture é retrato, não espelho, e teste que dependa da
+contagem exata envelhece.
+
+### 31/08/2026 — acento: a normalização apagava a letra em vez de dobrá-la
+
+Achado ao vivo, na primeira pergunta que o dono fez em linguagem natural em vez
+de sigla. `_normalizar` fazia `re.sub(r"[^A-Z0-9]", "")` direto: `"Eletrônica"`
+virava `ELETRNICA` e `"eletronica"` virava `ELETRONICA`. Os dois deixavam de
+casar entre si — e quem pergunta em português digita sem acento.
+
+Corrigido com `unicodedata.normalize("NFD", ...)` **antes** do filtro: o NFD
+separa "ô" em "o" + marca combinante, e aí o filtro descarta só a marca. T83 fica
+vermelho se alguém remover o NFD por parecer supérfluo — verificado por sabotagem.
+
+**A suíte não pegava, e o motivo é estrutural:** a higienização do §3.3 embaralha
+`fullname`, então nenhum teste tinha nome de disciplina real para casar. O bug
+morava exatamente no vão entre "o que a fixture preserva" e "o que o usuário
+digita". T83 testa contra lista sintética, que é o que dá para fazer sem
+desfazer a higienização.
+
+**Confirmado ao vivo depois do conserto:** `"eletronica"` passou de "não achou"
+para ambíguo com três candidatas (`PSI3321-REOF-2025`, `PSI3322-2026-REOF`,
+`PSI3323-2026`) — que é a resposta certa, e é o Invariante 6 não escolhendo
+sozinho. `"laboratorio de eletronica"` resolve direto.
+
+**Continua não resolvendo abreviação:** `"lab de eletronica"` não acha, porque
+"lab" não é pedaço de "laboratorio". Casamento aproximado é decisão de escopo,
+não correção de bug, e fica fora até alguém pedir.
+
+**Erro de processo desta sessão, registrado porque quase custou a correção.**
+Rodei `git checkout` num arquivo com a correção ainda não commitada, para
+desfazer uma sabotagem — e apaguei o conserto junto. O teste denunciou na hora
+(T83 vermelho). A lição não é sobre git: **sabotagem tem que ser desfeita pelo
+inverso exato da sabotagem**, nunca por um comando que restaura "o estado
+anterior" quando o estado anterior inclui trabalho novo.
+
+
+### 31/08/2026 — o PR foi mergeado no meio do trabalho; 4 commits ficaram órfãos
+
+Registrado porque é falha de processo, não de código, e a próxima sessão pode
+repetir.
+
+O PR #10 foi aberto quando a branch tinha **5 commits** e mergeado nesse estado.
+A sessão continuou e empurrou **4 commits** para a mesma branch — `material`, os
+dois bugfixes e o handoff. Eles foram para a branch e **não** para a `main`: um
+PR mergeado não recolhe commit novo. Enquanto isso a `main` andou duas vezes
+(RUCard no #11, handshake stdio no #12), e a branch ficou simultaneamente à
+frente e atrás.
+
+Ninguém notou por horas. O sinal que faltava é banal: `git log origin/main..HEAD`
+é uma linha e responde "o que meu trabalho tem que a main não tem". A pergunta do
+dono ("tudo foi mergeado, né?") foi o que provocou a checagem — e a resposta
+honesta só existiu porque a checagem foi feita em vez de respondida de cabeça.
+
+**Lição operacional:** commit empurrado depois do merge do PR precisa de PR novo.
+Não existe "o PR pega o resto".
+
+**O merge da `main` de volta rendeu dois achados que valem mais que o incidente.**
+
+**Primeiro: `material` estava entregando ao modelo uma ferramenta mais pobre que
+a declarada.** O §9 acima (handshake) mediu que o SDK deriva o schema da
+ASSINATURA e ignora o `inputSchema`. `material` nasceu antes disso e por isso não
+usava `usp_mcp.adaptador.anotar` — o modelo recebia `{"title": "Disciplina",
+"type": "string"}` no lugar de "Sigla da disciplina como no e-Disciplinas, por
+exemplo PSI3323. Espaço e caixa não importam. Casa também com pedaço do nome."
+Corrigido aplicando `anotar` às duas ferramentas do Moodle.
+
+**Segundo: o handshake pegou um defeito que a suíte em processo não pegou.** Ao
+registrar `_material` copiei o estilo do `_o_que_vence` e escrevi
+`disciplina=None`. No SDK é a **ausência de default** que torna o parâmetro
+obrigatório no fio — então `disciplina` virou opcional enquanto o `inputSchema` a
+declara em `required`, e o modelo via uma ferramenta que aceita ser chamada sem
+disciplina nenhuma. T78-T81 passavam: eles comparam nomes de parâmetro, não
+obrigatoriedade. H6 falhou na hora, com a mensagem certa.
+
+Isso é evidência direta a favor de manter os **dois** caminhos de teste do
+entrypoint: em processo alcança o dicionário montado e a mensagem de SDK ausente;
+no fio alcança o que o SDK decide sozinho. Nenhum dos dois é redundante.
+
+Depois do merge: **309 passed, 6 skipped**.
