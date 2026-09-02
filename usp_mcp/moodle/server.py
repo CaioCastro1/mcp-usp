@@ -18,6 +18,7 @@ from __future__ import annotations
 import os
 
 from ..env import carregar_env
+from .arquivo import baixar_arquivo
 from .cliente import ClienteMoodle
 from .erros import ErroMoodle
 from .material import material
@@ -28,10 +29,12 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Duas ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08).
-# Os nomes vêm das perguntas do dono, não das funções do Moodle por trás.
+# Três ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09). Os nomes vêm das perguntas do dono, não das funções do
+# Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
+_NOME_ARQUIVO = "baixar_arquivo"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -112,6 +115,50 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_ARQUIVO,
+            "description": (
+                "Baixa um arquivo publicado no espaço da disciplina no "
+                "e-Disciplinas (Moodle da USP) e devolve o CAMINHO dele no disco "
+                "desta máquina, para que você mesmo o abra com a sua ferramenta "
+                "de leitura de arquivos. Use para 'me dá a lista 2 de PSI3323', "
+                "'abre a apostila de amp op', 'pega a prova anterior'. Para saber "
+                "que arquivos existem antes de escolher, use `material`."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PSI3323. Espaço e caixa não importam. Casa "
+                            "também com pedaço do nome."
+                        ),
+                    },
+                    "nome": {
+                        "type": "string",
+                        "description": (
+                            "Pedaço do nome do arquivo, como aparece em "
+                            "`material` — 'lista 2', 'apostila', 'regras'. "
+                            "Acento e caixa não importam. Se casar com mais de "
+                            "um, a resposta lista os candidatos em vez de "
+                            "escolher por você."
+                        ),
+                    },
+                    "todos": {
+                        "type": "boolean",
+                        "description": (
+                            "Baixa TODOS os arquivos que casarem, em vez de "
+                            "recusar a ambiguidade. Padrão falso. Há teto por "
+                            "chamada, e o que ficar de fora é nomeado na saída."
+                        ),
+                    },
+                },
+                "required": ["disciplina", "nome"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -123,10 +170,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     porque "ferramenta não existe" e "ferramenta existe mas não achou nada"
     têm curas diferentes para quem lê o erro.
     """
-    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL):
+    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL, _NOME_ARQUIVO):
         raise ErroMoodle(
             f"Ferramenta desconhecida: {nome!r}. As ferramentas expostas por "
-            f"este servidor são {_NOME_FERRAMENTA!r} e {_NOME_MATERIAL!r}."
+            f"este servidor são {_NOME_FERRAMENTA!r}, {_NOME_MATERIAL!r} e "
+            f"{_NOME_ARQUIVO!r}."
         )
 
     if cliente is None:
@@ -149,6 +197,15 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
             cliente,
             argumentos["disciplina"],
             busca=argumentos.get("busca"),
+        ).texto
+
+    if nome == _NOME_ARQUIVO:
+        return baixar_arquivo(
+            cliente,
+            argumentos["disciplina"],
+            argumentos["nome"],
+            todos=bool(argumentos.get("todos")),
+            raiz=argumentos.get("raiz"),
         ).texto
 
     return o_que_vence(
@@ -185,7 +242,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
 
     from usp_mcp.adaptador import anotar
 
-    porta_vence, porta_material = listar_ferramentas()
+    porta_vence, porta_material, porta_arquivo = listar_ferramentas()
     descritor = porta_vence
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -214,6 +271,25 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     # `busca` não chegam ao modelo — ele veria só {"title": "Disciplina"}.
     anotar(_material, porta_material["inputSchema"], {"disciplina": str, "busca": str | None})
     servidor.tool(name=porta_material["name"], description=porta_material["description"])(_material)
+
+    def _baixar_arquivo(disciplina, nome, todos=False) -> str:
+        # `disciplina` e `nome` SEM default: no SDK é a ausência de default que
+        # torna o parâmetro obrigatório no fio, e o `inputSchema` os declara em
+        # `required`. Com `=None` os dois divergiriam — foi assim que H6 pegou
+        # `material` em 31/08.
+        return chamar_ferramenta(
+            porta_arquivo["name"],
+            {"disciplina": disciplina, "nome": nome, "todos": todos},
+        )
+
+    anotar(
+        _baixar_arquivo,
+        porta_arquivo["inputSchema"],
+        {"disciplina": str, "nome": str, "todos": bool},
+    )
+    servidor.tool(
+        name=porta_arquivo["name"], description=porta_arquivo["description"]
+    )(_baixar_arquivo)
 
     servidor.run(transport="stdio")
 
@@ -269,7 +345,15 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_material(disciplina: str, busca: str | None = None) -> str:
         return ""
 
-    sondas = {"o_que_vence": _sonda_vence, "material": _sonda_material}
+    @servidor.tool(name="baixar_arquivo", description="verificação")
+    def _sonda_arquivo(disciplina: str, nome: str, todos: bool = False) -> str:
+        return ""
+
+    sondas = {
+        "o_que_vence": _sonda_vence,
+        "material": _sonda_material,
+        "baixar_arquivo": _sonda_arquivo,
+    }
     divergiu = False
     for ferramenta in listar_ferramentas():
         nome = ferramenta["name"]
