@@ -87,8 +87,9 @@ def listar_ferramentas() -> list[dict]:
                 "postou. Use para 'que arquivos tem em PSI3323', 'cadê as regras "
                 "da disciplina', 'tem prova antiga em PTC3314', 'onde está a "
                 "lista de exercícios'. NÃO devolve o link de download do arquivo "
-                "interno, porque baixá-lo exigiria a credencial do usuário — "
-                "diz o nome e onde está, e a pessoa abre pelo e-Disciplinas."
+                "interno — um endereço sem a credencial não abre, e um com ela "
+                "exporia o token — mas diz o nome, o tipo e o tamanho de cada "
+                "um. Para baixar de fato um destes arquivos, use `baixar_arquivo`."
             ),
             "inputSchema": {
                 "type": "object",

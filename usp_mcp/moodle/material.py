@@ -274,9 +274,12 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         linhas.extend(_formatar_item(i) for i in itens)
 
     avisos = [
-        "Link de arquivo interno do e-Disciplinas não é entregue aqui: baixá-lo "
-        "exige a sua credencial na URL, e ela não sai desta máquina (Invariante 3). "
-        "Abra pelo e-Disciplinas.",
+        "O link do arquivo interno do e-Disciplinas não é entregue aqui: um "
+        "endereço sem a credencial não abre, e um com ela poria a credencial "
+        "no seu contexto — por isso ele não sai desta máquina (Invariante 3), "
+        "mesmo sabendo que a requisição de download autentica pelo corpo do "
+        "pedido, sem precisar colar a credencial no endereço. Para baixar de "
+        "fato um destes arquivos, use a ferramenta `baixar_arquivo`.",
     ]
     if conteudo.sem_conteudo:
         avisos.append(

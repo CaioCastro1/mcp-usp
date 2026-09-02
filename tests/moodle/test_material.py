@@ -450,3 +450,27 @@ def test_T102b_o_item_carrega_secao_modulo_e_fileid(conteudo_bruto):
     assert {i.fileid for i in itens} == {"9599793", "9599833"}
     assert all(i.secao and i.modulo for i in itens)
     assert all(i.fileurl_bruta and "pluginfile.php" in i.fileurl_bruta for i in itens)
+
+
+@pytest.mark.politica
+def test_T106_aviso_nao_afirma_a_premissa_refutada_e_aponta_baixar_arquivo(
+    disciplinas_brutas, conteudo_bruto
+):
+    """§9 de 01/09/2026: o token autentica no CORPO do POST, não na URL — a
+    premissa antiga ('baixá-lo exigiria a credencial NA URL') foi medida
+    falsa, e o texto não pode mais afirmá-la. A parte verdadeira continua
+    (a URL em si não sai, porque com token exporia a credencial e sem token
+    não abre) — T68/T68b/T68c continuam garantindo isso. O que muda é que o
+    aviso deixa de ser um beco sem saída e aponta para `baixar_arquivo`."""
+    cliente = _cliente_completo(disciplinas_brutas, conteudo_bruto)
+    r = mat.material(cliente, "PSI3323", agora=lambda: 0.0)
+
+    # A premissa refutada (§9, 01/09): não é mais verdade que baixar "exige"
+    # colar a credencial na URL — o corpo do POST autentica sozinho.
+    assert "exige a sua credencial na URL" not in r.texto
+    assert "exigiria" not in r.texto.lower()
+    # A parte que continua certa: a URL em si não sai.
+    assert "não sai desta máquina" in r.texto or "não sai" in r.texto
+    # E a saída deixa de ser um beco sem saída ("abra pelo e-Disciplinas"):
+    # aponta para a ferramenta que de fato baixa.
+    assert "baixar_arquivo" in r.texto

@@ -9,7 +9,7 @@ import pytest
 
 from usp_mcp.moodle import arquivo as arq
 from usp_mcp.moodle import disciplinas as dis
-from usp_mcp.moodle.erros import ErroMoodle
+from usp_mcp.moodle.erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel
 
 from .conftest import ClienteFalso
 
@@ -258,3 +258,153 @@ def test_T98c_a_ordem_do_corte_e_a_da_listagem(
 
     # AULA 2 (fileid 9752459) vem antes de AULA 3 e AULA 4 na listagem.
     assert r.baixados[0].fileid == "9752459"
+
+
+# --- achados da revisão final: um arquivo ruim não derruba o lote ----------
+
+# A colisão de T87/T88: mesmo nome, dois fileids, seções "Geral" e "AULA 6".
+_URL_DICAS_GERAL = (
+    "https://edisciplinas.usp.br/webservice/pluginfile.php/9599793/"
+    "mod_resource/content/2/Dicas%20para%20a%20Prova.pdf?forcedownload=1"
+)
+
+
+@pytest.mark.contrato
+def test_T103_plural_uma_falha_nao_derruba_o_lote(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """Invariante 6 (erro legível vence silêncio) e 7 (nada de corte calado):
+    se o SEGUNDO arquivo de um lote falhar, o primeiro (já baixado) continua
+    reportado, e o que falhou é NOMEADO com o motivo — o lote inteiro não pode
+    virar uma exceção que apaga o que já deu certo."""
+
+    def falha(*_a, **_k):
+        raise MoodleIndisponivel("e-Disciplinas fora do ar")
+
+    cliente = _cliente(
+        conteudo_bruto, disciplinas_brutas, arquivos={_URL_DICAS_GERAL: falha}
+    )
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) == 1
+    assert r.baixados[0].fileid == "9599833"  # o da seção AULA 6, que não falhou
+    assert len(r.recusados) == 1
+    assert r.recusados[0].nome == "Dicas para a Prova.pdf"
+    assert "fora do ar" in r.recusados[0].motivo
+    assert r.recusados[0].nome in r.texto
+
+
+@pytest.mark.politica
+def test_T103b_plural_recusa_de_seguranca_e_nomeada_no_lote(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """O segundo achado do finding 1: um item cujo endereço tem
+    'pluginfile.php/' mas aponta para host ESTRANHO ainda parece interno (tem
+    fileid) — `cliente.baixar` recusa com `FuncaoBloqueada`, e essa recusa É
+    UM EVENTO DE SEGURANÇA que precisa chegar ao chamador legível, não como um
+    crash que engole o resto do lote."""
+
+    def recusa(*_a, **_k):
+        raise FuncaoBloqueada(
+            "Download recusado: aponta para host fora da allowlist."
+        )
+
+    cliente = _cliente(
+        conteudo_bruto, disciplinas_brutas, arquivos={_URL_DICAS_GERAL: recusa}
+    )
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) == 1
+    assert len(r.recusados) == 1
+    assert "recusado" in r.recusados[0].motivo.lower()
+    assert r.recusados[0].nome in r.texto
+
+
+@pytest.mark.contrato
+def test_T103c_singular_erro_de_download_sobe_como_excecao(
+    conteudo_bruto, disciplinas_brutas, tmp_path, monkeypatch
+):
+    """No singular há EXATAMENTE um arquivo pedido: engolir a falha dele numa
+    linha de 'recusado' leria como resultado parcial que não existiu. A
+    exceção sobe crua, porque aqui ela é mais legível que um texto suave
+    (Invariante 6) — decisão deliberada, distinta do modo plural acima."""
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    def falha(*_a, **_k):
+        raise MoodleIndisponivel("e-Disciplinas fora do ar")
+
+    monkeypatch.setattr(cliente, "baixar", falha)
+
+    with pytest.raises(MoodleIndisponivel):
+        arq.baixar_arquivo(cliente, "PSI3323", "Grupos", raiz=tmp_path)
+
+
+# --- achados da revisão final: cache truncado não é servido como bom -------
+
+
+@pytest.mark.contrato
+def test_T104_arquivo_truncado_em_disco_e_rebaixado(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """§6.3 do design: 'arquivo truncado entregue como bom é o pior resultado
+    possível'. Um processo morto no meio da gravação não pode virar cache
+    válido só porque o arquivo existe e não está vazio."""
+    cliente1 = _cliente(conteudo_bruto, disciplinas_brutas)
+    r1 = arq.baixar_arquivo(cliente1, "PSI3323", "Grupos", raiz=tmp_path)
+    caminho = r1.baixados[0].caminho
+    tamanho_certo = caminho.stat().st_size
+    assert len(cliente1.downloads) == 1
+
+    # Simula o corte: trunca o arquivo já gravado pela metade.
+    caminho.write_bytes(caminho.read_bytes()[: tamanho_certo // 2])
+    assert caminho.stat().st_size != tamanho_certo
+
+    cliente2 = _cliente(conteudo_bruto, disciplinas_brutas)
+    r2 = arq.baixar_arquivo(cliente2, "PSI3323", "Grupos", raiz=tmp_path)
+
+    # A prova de que rebaixou é o TRANSPORTE ter sido chamado — a saída
+    # devolveria bytes de qualquer jeito (dublê).
+    assert len(cliente2.downloads) == 1, "arquivo truncado foi servido do cache"
+    assert r2.baixados[0].reusado is False
+    assert caminho.stat().st_size == tamanho_certo
+
+
+# --- achados da revisão final: sucesso também precisa distinguir a colisão -
+
+
+@pytest.mark.contrato
+def test_T105_todos_sobre_a_colisao_produz_texto_distinguivel(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """As duas 'Dicas para a Prova.pdf' de T87/T88 só se distinguem por seção
+    e módulo — e isso precisa estar no texto de SUCESSO também, não só na
+    recusa por ambiguidade (T87), senão `todos=true` devolve duas linhas
+    idênticas na parte que o texto mostra."""
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) == 2
+    assert "seção 'Geral'" in r.texto
+    assert "seção 'AULA 6'" in r.texto
+
+
+@pytest.mark.contrato
+def test_T105b_recusa_por_mesmo_nome_nao_promete_desambiguar_por_nome(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """Quando os candidatos têm o MESMO nome de arquivo (a colisão real de
+    T87), 'repita com um trecho mais específico' promete o que a pessoa não
+    consegue fazer: o casamento é por nome de arquivo, e o nome é idêntico
+    nos dois. A saída honesta é sugerir `todos=true`."""
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", raiz=tmp_path)
+
+    # A promessa antiga não aparece mais: "repita com um trecho mais
+    # específico" some da recusa quando isso não ajudaria em nada.
+    assert "Repita com um trecho mais específico" not in r.texto
+    assert "mesmo nome" in r.texto
+    assert "todos=true" in r.texto
