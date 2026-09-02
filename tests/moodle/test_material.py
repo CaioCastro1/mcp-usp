@@ -383,3 +383,70 @@ def test_t83_acento_nao_impede_o_casamento_por_nome():
 
     # A sigla continua ganhando de qualquer casamento por nome.
     assert disc.resolver(lista, "MAT2455").disciplina.courseid == 2
+
+
+# --- T68b, T68c, T102 -------------------------------------------------------
+
+@pytest.mark.politica
+def test_T68b_o_texto_entregue_ao_modelo_nunca_contem_url_interna(
+    conteudo_bruto, disciplinas_brutas
+):
+    """T68 olha só `url_externa`; um campo novo no Item passaria por baixo dele.
+
+    Esta asserção é sobre o que de fato chega ao modelo: o texto da resposta.
+    """
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 1},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": conteudo_bruto,
+        }
+    )
+    disc.limpar_cache()
+    resposta = mat.material(cliente, "PSI3323")
+
+    assert "pluginfile.php" not in resposta.texto
+    assert "/webservice/" not in resposta.texto
+    assert "token" not in resposta.texto.lower()
+
+
+@pytest.mark.politica
+def test_T68c_como_dict_nao_carrega_a_url_interna(conteudo_bruto):
+    """`como_dict` alimenta a medição de custo e é fácil de estender sem pensar."""
+    import json as _json
+
+    c = mat.projetar_material(conteudo_bruto)
+    serializado = _json.dumps(mat.como_dict(c), ensure_ascii=False)
+
+    assert "pluginfile.php" not in serializado
+    assert "/webservice/" not in serializado
+
+
+@pytest.mark.contrato
+def test_T102_busca_por_nome_ignora_acento(conteudo_bruto, disciplinas_brutas):
+    """Medido em 01/09: 'formulario' não achava 'Formulário Provas
+    Substitutivas.pdf'. Mesmo bug do acento de T83, em outro lugar."""
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 1},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": conteudo_bruto,
+        }
+    )
+    disc.limpar_cache()
+    resposta = mat.material(cliente, "PSI3323", busca="formulario")
+
+    assert resposta.mostrados >= 1
+    assert "Formulário" in resposta.texto
+
+
+@pytest.mark.contrato
+def test_T102b_o_item_carrega_secao_modulo_e_fileid(conteudo_bruto):
+    """O que `arquivo.py` precisa para desempatar a colisão real."""
+    c = mat.projetar_material(conteudo_bruto)
+    itens = [i for s in c.secoes for i in s.itens if i.nome == "Dicas para a Prova.pdf"]
+
+    assert len(itens) == 2, "a colisão real de PSI3323 sumiu da fixture"
+    assert {i.fileid for i in itens} == {"9599793", "9599833"}
+    assert all(i.secao and i.modulo for i in itens)
+    assert all(i.fileurl_bruta and "pluginfile.php" in i.fileurl_bruta for i in itens)
