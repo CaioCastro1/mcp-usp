@@ -178,9 +178,11 @@ class ClienteFalso:
     pelo T47 do Jupiter no mesmo dia.
     """
 
-    def __init__(self, respostas: dict):
+    def __init__(self, respostas: dict, arquivos: dict | None = None):
         self._respostas = respostas
+        self._arquivos = arquivos or {}
         self.chamadas: list[tuple[str, dict]] = []
+        self.downloads: list[str] = []
 
     def chamar(self, funcao: str, **params):
         self.chamadas.append((funcao, params))
@@ -191,6 +193,18 @@ class ClienteFalso:
             )
         resposta = self._respostas[funcao]
         return resposta(params) if callable(resposta) else resposta
+
+    def baixar(self, fileurl: str, *, tamanho_esperado=None, teto_bytes=None) -> bytes:
+        """Grava a URL pedida — asserção sobre o que foi ENVIADO, não sobre a saída.
+
+        `downloads` vazio é o que prova que um caminho NÃO baixou; a saída não
+        prova isso, porque o dublê devolveria bytes de qualquer jeito.
+        """
+        self.downloads.append(fileurl)
+        if fileurl in self._arquivos:
+            return self._arquivos[fileurl]
+        conteudo = b"%PDF-1.4 " + b"x" * max((tamanho_esperado or 9) - 9, 0)
+        return conteudo
 
     def params_de(self, funcao: str) -> dict:
         for nome, params in self.chamadas:
