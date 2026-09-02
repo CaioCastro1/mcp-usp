@@ -172,3 +172,89 @@ def test_T99c_nenhuma_url_interna_aparece_no_texto_da_resposta(
 
     assert "pluginfile.php" not in r.texto
     assert "/webservice/" not in r.texto
+
+
+# --- T88, T97, T98: plural e tetos -----------------------------------------
+
+@pytest.mark.contrato
+def test_T88_todos_baixa_a_colisao_inteira_em_caminhos_distintos(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) == 2
+    caminhos = {b.caminho for b in r.baixados}
+    assert len(caminhos) == 2, "mesmo nome sobrescreveu — o fileid não entrou no caminho"
+    assert {b.fileid for b in r.baixados} == {"9599793", "9599833"}
+    assert all(c.is_file() for c in caminhos)
+
+
+@pytest.mark.contrato
+def test_T97_arquivo_acima_do_teto_e_recusado_ANTES_de_baixar(
+    conteudo_bruto, disciplinas_brutas, tmp_path, monkeypatch
+):
+    """O `filesize` vem na listagem: dá para recusar sem gastar banda nenhuma."""
+    monkeypatch.setattr(arq, "TETO_ARQUIVO_BYTES", 1000)
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "Grupos", raiz=tmp_path)
+
+    assert cliente.downloads == [], "recusou pelo teto e mesmo assim baixou"
+    assert r.baixados == ()
+    assert len(r.recusados) == 1
+    assert "teto" in r.recusados[0].motivo.lower()
+    assert r.recusados[0].nome in r.texto
+
+
+@pytest.mark.contrato
+def test_T98_plural_acima_do_teto_de_contagem_nomeia_o_que_ficou_de_fora(
+    conteudo_bruto, disciplinas_brutas, tmp_path, monkeypatch
+):
+    """Invariante 7: cortou, a saída diz — e diz QUAIS, não só quantos."""
+    monkeypatch.setattr(arq, "TETO_PLURAL_ARQUIVOS", 1)
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) == 1
+    assert len(r.recusados) == 1
+    assert r.recusados[0].nome in r.texto
+    assert len(cliente.downloads) == 1
+
+
+@pytest.mark.contrato
+def test_T98b_plural_acima_do_teto_de_bytes_para_no_limite(
+    conteudo_bruto, disciplinas_brutas, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(arq, "TETO_PLURAL_BYTES", 1)
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert len(r.baixados) <= 1
+    assert r.recusados
+
+
+@pytest.mark.contrato
+def test_T98c_a_ordem_do_corte_e_a_da_listagem(
+    conteudo_bruto, disciplinas_brutas, tmp_path, monkeypatch
+):
+    """Quem leu a lista em `material` e pediu todos=true recebe o PREFIXO do que
+    viu — nada de 'os menores primeiro' nem de ordenação implícita.
+
+    'roteiro' casa com três arquivos de tamanhos bem diferentes — 841.661 B
+    (AULA 2, primeiro na listagem), 269.887 B (AULA 3) e 1.339.475 B (AULA 4).
+    O da AULA 2 não é nem o menor nem o maior dos três: qualquer ordenação por
+    tamanho (crescente ou decrescente) o tira da primeira posição. As duas
+    'Dicas para a Prova.pdf' de T87/T88 têm o MESMO tamanho e não serviriam
+    aqui — um sort por tamanho seria um no-op estável entre elas.
+    """
+    monkeypatch.setattr(arq, "TETO_PLURAL_ARQUIVOS", 1)
+    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "roteiro", todos=True, raiz=tmp_path)
+
+    # AULA 2 (fileid 9752459) vem antes de AULA 3 e AULA 4 na listagem.
+    assert r.baixados[0].fileid == "9752459"

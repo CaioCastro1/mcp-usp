@@ -30,6 +30,11 @@ from .texto import casa
 # diferentes — e é este nome que o `monkeypatch` do teste alcança.
 TETO_ARQUIVO_BYTES = _TETO_CLIENTE
 
+# Plural: os 19 PDFs de PSI3323 somam 15,9 MB (medido em 01/09). Dez arquivos e
+# 100 MB é folga sobre o pior caso conhecido, e o corte é declarado.
+TETO_PLURAL_ARQUIVOS = 10
+TETO_PLURAL_BYTES = 100 * 1024 * 1024
+
 
 @dataclass(frozen=True)
 class Baixado:
@@ -170,6 +175,7 @@ def _entregar(cliente, cabecalho, casados, courseid, raiz, todos) -> RespostaArq
     baixados: list[Baixado] = []
     links: list[Link] = []
     recusados: list[Recusado] = []
+    acumulado = 0
 
     for item in casados:
         if not item.fileurl_bruta or not item.fileid:
@@ -189,7 +195,24 @@ def _entregar(cliente, cabecalho, casados, courseid, raiz, todos) -> RespostaArq
                 )
             )
             continue
+        if todos and len(baixados) >= TETO_PLURAL_ARQUIVOS:
+            recusados.append(
+                Recusado(
+                    nome=item.nome,
+                    motivo=f"teto de {TETO_PLURAL_ARQUIVOS} arquivos por chamada",
+                )
+            )
+            continue
+        if todos and acumulado + (item.tamanho or 0) > TETO_PLURAL_BYTES and baixados:
+            recusados.append(
+                Recusado(
+                    nome=item.nome,
+                    motivo=f"teto de {TETO_PLURAL_BYTES // (1024 * 1024)} MB por chamada",
+                )
+            )
+            continue
         baixados.append(_baixar_um(cliente, item, courseid, raiz))
+        acumulado += item.tamanho or 0
 
     linhas = [f"{cabecalho} — {len(baixados)} arquivo(s) baixado(s)."]
     for b in baixados:
