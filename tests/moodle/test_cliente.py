@@ -317,6 +317,81 @@ def test_T94b_tamanho_batendo_devolve_os_bytes():
     assert cliente.baixar(URL_ARQUIVO, tamanho_esperado=5) == b"12345"
 
 
+class _RespostaHTTPFalsa:
+    """Simula o objeto que `urllib.request.urlopen` devolve, com corpo maior
+    que qualquer teto usado nos testes abaixo.
+
+    Existe para exercitar o transporte REAL (`_transporte_download_padrao`) e
+    não o dublê `_DownloadFalso` — só assim o `+ 1` de
+    `resp.read(teto_bytes + 1)` fica sob teste. Um arquivo interno sem
+    `filesize` utilizável não pode ser recusado por antecipação (não há como
+    saber o tamanho antes de ler); o byte extra é o que permite ao download
+    real notar que ultrapassou o teto, em vez de parar silenciosamente em
+    exatamente `teto_bytes` e devolver um arquivo truncado como se fosse bom.
+    """
+
+    def __init__(self, corpo: bytes, content_type: str = "application/pdf"):
+        self._corpo = corpo
+        self._content_type = content_type
+        self.pedidos_de_leitura: list[int] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    @property
+    def headers(self):
+        return {"Content-Type": self._content_type}
+
+    def read(self, n):
+        self.pedidos_de_leitura.append(n)
+        return self._corpo[:n]
+
+
+def test_T94c_corpo_acima_do_teto_levanta_mesmo_sem_tamanho_esperado(monkeypatch):
+    """Caso real: arquivo sem `filesize` conhecido de antemão. A única forma
+    de saber que ele passa do teto é o byte extra que sobra na leitura.
+    """
+    resposta_falsa = _RespostaHTTPFalsa(b"x" * 20)
+    monkeypatch.setattr(
+        mod_cliente.urllib.request, "urlopen", lambda *a, **k: resposta_falsa
+    )
+    cliente = ClienteMoodle(
+        token=TOKEN_DE_TESTE, url=URL_TESTE, transporte=lambda **k: {}
+    )
+
+    with pytest.raises(ErroMoodle) as erro:
+        cliente.baixar(URL_ARQUIVO, teto_bytes=5)
+
+    assert "5" in str(erro.value)
+    # A prova de que o "+1" foi o que permitiu detectar: só 6 bytes foram
+    # pedidos ao transporte real — nunca os 20 disponíveis no corpo falso.
+    assert resposta_falsa.pedidos_de_leitura == [6]
+
+
+def test_T94d_corpo_exatamente_no_teto_nao_levanta_e_devolve_os_bytes():
+    """O que separa `>` de `>=`: no limite exato, o arquivo é bom e não pode
+    ser recusado."""
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    assert cliente.baixar(URL_ARQUIVO, teto_bytes=5) == b"12345"
+
+
+def test_T94e_o_teto_bytes_chega_ao_transporte_de_download():
+    """Asserte sobre o que foi ENVIADO: sem isso, o teto poderia ser ignorado
+    na leitura e o teste ainda passaria — o dublê devolve o que o teste
+    mandou, não o que a implementação de fato repassou."""
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    cliente.baixar(URL_ARQUIVO, teto_bytes=999)
+
+    assert download.chamadas[0]["teto_bytes"] == 999
+
+
 def test_T99_o_token_vai_no_corpo_e_nunca_na_url():
     download = _DownloadFalso()
     cliente = _cliente_com(download)
