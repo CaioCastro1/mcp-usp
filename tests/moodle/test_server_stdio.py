@@ -50,11 +50,15 @@ def servidor_montado(monkeypatch):
 
 
 @pytest.mark.contrato
-def test_t78_main_registra_as_duas_ferramentas(servidor_montado):
+def test_t78_main_registra_as_tres_ferramentas(servidor_montado):
     """O bug histórico em uma asserção: API errada do SDK e nada aqui roda."""
     ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
 
-    assert sorted(f.name for f in ferramentas) == ["material", "o_que_vence"]
+    assert sorted(f.name for f in ferramentas) == [
+        "baixar_arquivo",
+        "material",
+        "o_que_vence",
+    ]
     assert servidor_montado["transporte"] == "stdio", (
         "o adaptador deixou de escutar em stdio — o .mcp.json fala stdio"
     )

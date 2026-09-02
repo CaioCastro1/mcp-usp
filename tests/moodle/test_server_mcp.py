@@ -15,14 +15,10 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — duas ferramentas. Crescer foi decisão registrada no §9 (31/08).
-
-    A asserção trava o conjunto inteiro, não um mínimo: uma terceira ferramenta
-    aparecendo aqui sem passar pelo §9 deixa este teste vermelho, e ele está
-    certo em ficar.
-    """
+    """T42 — três ferramentas. Cada crescimento é decisão registrada no §9:
+    a segunda (`material`) em 31/08, a terceira (`baixar_arquivo`) em 01/09."""
     fs = server.listar_ferramentas()
-    assert [f["name"] for f in fs] == ["o_que_vence", "material"]
+    assert [f["name"] for f in fs] == ["o_que_vence", "material", "baixar_arquivo"]
 
 
 def test_o_nome_vem_da_pergunta_nao_da_funcao_do_moodle():
@@ -41,3 +37,47 @@ def test_ferramenta_desconhecida_da_erro_legivel():
     with pytest.raises(Exception) as e:
         server.chamar_ferramenta("apagar_tudo", {})
     assert "apagar_tudo" in str(e.value)
+
+
+def test_T100_o_descritor_de_baixar_arquivo_fala_a_lingua_de_quem_pergunta():
+    f = [x for x in server.listar_ferramentas() if x["name"] == "baixar_arquivo"][0]
+
+    assert "pluginfile" not in f["description"]
+    assert "core_course_get_contents" not in f["description"]
+    # A descrição TEM de dizer que devolve um caminho a ser aberto — sem isso o
+    # modelo recebe um path e não sabe que o próximo passo é dele.
+    assert "caminho" in f["description"].lower()
+    props = f["inputSchema"]["properties"]
+    assert set(props) == {"disciplina", "nome", "todos"}
+    assert f["inputSchema"]["required"] == ["disciplina", "nome"]
+    assert all(p.get("description") for p in props.values())
+
+
+def test_T101_chamar_ferramenta_roteia_baixar_arquivo_com_cliente_injetado(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """Sem credencial nenhuma: a injeção de cliente é o que torna a fronteira
+    testável offline (§9, 31/08)."""
+    from usp_mcp.moodle import disciplinas as dis
+
+    from .conftest import ClienteFalso
+
+    dis.limpar_cache()
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 1},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": conteudo_bruto,
+        }
+    )
+
+    saida = server.chamar_ferramenta(
+        "baixar_arquivo",
+        {"disciplina": "PSI3323", "nome": "Grupos", "raiz": str(tmp_path)},
+        cliente=cliente,
+    )
+
+    dis.limpar_cache()
+    assert isinstance(saida, str)
+    assert "Prova-PSI3323-2026-Grupos.pdf" in saida
+    assert "pluginfile.php" not in saida
