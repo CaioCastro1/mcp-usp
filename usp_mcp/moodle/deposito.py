@@ -78,13 +78,26 @@ def caminho_para(
     return caminho
 
 
-def ja_baixado(caminho: Path) -> bool:
-    """Existe e não está vazio.
+def ja_baixado(caminho: Path, tamanho_esperado: int | None = None) -> bool:
+    """Existe, não está vazio, e (se o chamador souber o tamanho certo) bate
+    com ele.
 
     Zero byte em disco é resto de gravação interrompida, não cache válido —
-    tratá-lo como pronto entregaria um arquivo vazio com cara de sucesso.
+    tratá-lo como pronto entregaria um arquivo vazio com cara de sucesso. O
+    mesmo vale, com um dado a mais, para um corte no MEIO da gravação: um
+    processo morto aos 3 dos 6 MB de um PDF deixa um arquivo não-vazio, e sem
+    o tamanho esperado ele passaria por baixado para sempre. `tamanho_esperado`
+    é opcional e por isso este módulo continua sem saber nada de `Item` do
+    Moodle — quem sabe o tamanho (`arquivo.py`) que o repassa.
     """
-    return caminho.is_file() and caminho.stat().st_size > 0
+    if not caminho.is_file():
+        return False
+    tamanho_em_disco = caminho.stat().st_size
+    if tamanho_em_disco == 0:
+        return False
+    if tamanho_esperado is not None and tamanho_em_disco != tamanho_esperado:
+        return False
+    return True
 
 
 def gravar(caminho: Path, dados: bytes) -> Path:

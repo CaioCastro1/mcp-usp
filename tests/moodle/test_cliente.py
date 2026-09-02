@@ -251,6 +251,7 @@ def _cliente_com(download):
     )
 
 
+@pytest.mark.politica
 def test_T91_url_de_outro_host_e_recusada_antes_de_qualquer_io():
     """A credencial vai no CORPO do POST: outro host receberia o token."""
     download = _DownloadFalso()
@@ -264,6 +265,7 @@ def test_T91_url_de_outro_host_e_recusada_antes_de_qualquer_io():
     assert "evil.example.com" in str(erro.value)
 
 
+@pytest.mark.politica
 def test_T91b_url_no_host_certo_mas_fora_do_pluginfile_e_recusada():
     download = _DownloadFalso()
     cliente = _cliente_com(download)

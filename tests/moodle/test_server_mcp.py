@@ -81,3 +81,16 @@ def test_T101_chamar_ferramenta_roteia_baixar_arquivo_com_cliente_injetado(
     assert isinstance(saida, str)
     assert "Prova-PSI3323-2026-Grupos.pdf" in saida
     assert "pluginfile.php" not in saida
+
+
+def test_T106_descricao_de_material_nao_afirma_premissa_refutada():
+    """§9 de 01/09: 'baixá-lo exigiria a credencial do usuário' foi medido
+    falso — o corpo do POST autentica sem token na URL. `material` é o
+    primeiro passo natural de quem quer um arquivo ('me dá a lista 2 de
+    PSI3323'), e a descrição não pode ler como beco sem saída: precisa
+    apontar para `baixar_arquivo`."""
+    f = [x for x in server.listar_ferramentas() if x["name"] == "material"][0]
+    descricao = f["description"]
+
+    assert "exigiria" not in descricao.lower()
+    assert "baixar_arquivo" in descricao

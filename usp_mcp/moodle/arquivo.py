@@ -98,7 +98,7 @@ def _baixar_um(cliente, item, courseid: int, raiz) -> Baixado:
         filename=item.nome,
         raiz=raiz,
     )
-    reusado = deposito.ja_baixado(caminho)
+    reusado = deposito.ja_baixado(caminho, item.tamanho)
     if not reusado:
         dados = cliente.baixar(item.fileurl_bruta, tamanho_esperado=item.tamanho)
         deposito.gravar(caminho, dados)
@@ -160,10 +160,21 @@ def baixar_arquivo(
             f"  - {c.nome} [{_kb(c.tamanho)}] — seção {c.secao!r}, módulo {c.modulo!r}"
             for c in candidatos
         ]
-        linhas.append(
-            "Repita com um trecho mais específico, ou com todos=true para baixar "
-            f"os {len(casados)}."
-        )
+        if len({c.nome for c in candidatos}) > 1:
+            linhas.append(
+                "Repita com um trecho mais específico, ou com todos=true para "
+                f"baixar os {len(casados)}."
+            )
+        else:
+            # A colisão real de PSI3323 (T87): o nome dos candidatos é
+            # IDÊNTICO. "Um trecho mais específico" promete o que quem lê não
+            # consegue fazer, porque o casamento é por nome de arquivo — a
+            # saída honesta é a única forma que de fato pega os dois.
+            linhas.append(
+                f"Os {len(casados)} candidatos têm o mesmo nome de arquivo — um "
+                "trecho mais específico não vai distingui-los. Use todos=true "
+                "para baixar todos."
+            )
         return RespostaArquivo(texto="\n".join(linhas), candidatos=candidatos)
 
     return _entregar(cliente, cabecalho, casados, alvo.courseid, raiz, todos)
@@ -211,13 +222,34 @@ def _entregar(cliente, cabecalho, casados, courseid, raiz, todos) -> RespostaArq
                 )
             )
             continue
-        baixados.append(_baixar_um(cliente, item, courseid, raiz))
+        if todos:
+            # Invariante 6/7: no modo PLURAL um arquivo ruim não pode derrubar
+            # o lote inteiro nem sumir calado — vira `Recusado` nomeado, e os
+            # outros continuam. Isto cobre tanto falha de transporte quanto a
+            # recusa de segurança de `cliente.baixar` (host fora da allowlist):
+            # as duas são `ErroMoodle`, e as duas precisam chegar legíveis.
+            try:
+                baixado = _baixar_um(cliente, item, courseid, raiz)
+            except ErroMoodle as exc:
+                recusados.append(Recusado(nome=item.nome, motivo=str(exc)))
+                continue
+        else:
+            # No SINGULAR há exatamente um arquivo pedido: converter a falha
+            # dele numa linha de "recusado" leria como um resultado parcial
+            # que não existiu. A exceção sobe crua — aqui ela é a resposta
+            # mais legível que existe (Invariante 6), não a mais silenciosa.
+            baixado = _baixar_um(cliente, item, courseid, raiz)
+        baixados.append(baixado)
         acumulado += item.tamanho or 0
 
     linhas = [f"{cabecalho} — {len(baixados)} arquivo(s) baixado(s)."]
     for b in baixados:
         marca = " (já estava em disco)" if b.reusado else ""
         linhas.append(f"\n{b.nome} [{b.tipo}, {_kb(b.tamanho)}]{marca}")
+        # secao/modulo aqui também: sem isso, dois arquivos de mesmo nome
+        # (a colisão real de T87/T88) produzem duas linhas de sucesso
+        # idênticas, distinguíveis só pelo diretório numérico do caminho.
+        linhas.append(f"  seção {b.secao!r}, módulo {b.modulo!r}")
         linhas.append(f"  {b.caminho}")
     for l in links:
         linhas.append(f"\n{l.nome} — é um link externo, não um arquivo do e-Disciplinas:")

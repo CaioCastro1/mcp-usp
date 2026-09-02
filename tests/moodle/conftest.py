@@ -202,7 +202,11 @@ class ClienteFalso:
         """
         self.downloads.append(fileurl)
         if fileurl in self._arquivos:
-            return self._arquivos[fileurl]
+            valor = self._arquivos[fileurl]
+            # Chamável = o teste quer simular uma FALHA deste download
+            # específico (ex.: MoodleIndisponivel, FuncaoBloqueada) sem
+            # derrubar os outros arquivos do mesmo lote.
+            return valor() if callable(valor) else valor
         conteudo = b"%PDF-1.4 " + b"x" * max((tamanho_esperado or 9) - 9, 0)
         return conteudo
 
