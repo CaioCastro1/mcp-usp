@@ -8,8 +8,9 @@
 
 ## Estado
 
-CONCLUÍDO e verificado ao vivo. `./scripts/gate.sh`: **361 passed, 6 skipped**.
-Branch `claude/moodle-pdf-file-access-f283b3`, 15 commits. **PR ainda não aberto.**
+CONCLUÍDO e verificado ao vivo. `./scripts/gate.sh`: **366 passed, 6 skipped**.
+**Quatro PRs mergeados na `main`** — #15 (a ferramenta), #16 (pesquisa de
+empacotamento), #17 (rótulo do módulo) e #18 (a reversão do §5 abaixo).
 
 ## O que foi feito
 
@@ -34,6 +35,31 @@ Isto é a validação mais forte do desenho, e veio por acaso: `pypdf` teria dev
 **9 bytes** para a Lista 2 e chamado isso de conteúdo. Entregando o caminho, o agente
 abriu o PDF como imagem e leu a matemática manuscrita.
 
+## O que veio DEPOIS desta sessão, e não estava no plano
+
+Três coisas nasceram de perguntas do dono, já com o trabalho fechado. Cada uma tem
+sua entrada no §9; aqui fica só o ponteiro e o que muda para quem retoma.
+
+**1. O rótulo do professor entra na listagem (PR #17).** `material` passou a emitir
+o nome do módulo quando ele diz algo que o nome do arquivo não diz — 20 dos 29 itens
+de PSI3323, os 9 redundantes omitidos, +253 tokens no texto final. Sem ele, nem o
+modelo nem uma pessoa tinham como saber que `LT-RPS-aula11-12.pdf` é a aula de carta
+de Smith. **É o que torna a descoberta por assunto possível.**
+
+**2. Um casamento por palavras foi construído e revertido no mesmo dia (PR #18).**
+A pergunta do dono foi: *"não deveria ser um agente receber os temas e ver qual
+arquivo parece mais apto?"* — e derrubou o desenho. Busca semântica é do modelo, não
+de heurística de string no servidor. **Se você for reintroduzir algo assim, leia o §9
+de 03/09 primeiro:** o argumento contra está lá inteiro, com o critério que separa os
+dois casos — entregar dado descartado é sempre certo; decidir no lugar do modelo
+raramente é.
+
+**3. A pesquisa de empacotamento (PR #16).** O §6 descrevia, sem saber o nome, um
+**MCP Bundle** (`.mcpb`). Análise em `notas/mcpb-e-distribuicao.md`, §6.1 no
+`SPEC1.md`. **Nada foi testado** — é leitura de documentação. Conector remoto está
+fora para o Moodle por três motivos, sendo o terceiro definitivo: exige OAuth 2.0, e
+o e-Disciplinas não oferece fluxo OAuth.
+
 ## Cuidados — o que a próxima sessão pode quebrar sem perceber
 
 **Não faça `material` emitir a URL interna.** T68 assere apenas sobre `url_externa`
@@ -51,6 +77,10 @@ prova isso pelo transporte **não** chamado.
 
 **Não confie em status HTTP no download.** Erro de credencial vem como 200 com JSON.
 
+**Não "melhore" a busca pondo semântica no servidor.** Já foi feito e desfeito no
+mesmo dia; o §9 de 03/09 tem o argumento. O caminho é o modelo ler a listagem — que
+por isso carrega o rótulo do módulo.
+
 **Não tire o `fileid` nem o `timemodified` do caminho do depósito.** O primeiro
 resolve uma colisão real (`Dicas para a Prova.pdf` existe duas vezes em PSI3323, com
 ids diferentes); o segundo é o que faz o reuso funcionar sem invalidação explícita.
@@ -60,8 +90,8 @@ isso, um arquivo interrompido no meio da escrita seria servido para sempre como 
 
 ## Sobre a suíte, e onde ela não alcança
 
-**Duas vezes a sabotagem revelou teste fraco nesta trilha**, e as duas eram testes que
-eu mesmo tinha escrito no plano:
+**Três vezes a sabotagem revelou teste fraco nesta trilha**, e as três eram testes que
+eu mesmo tinha escrito:
 
 - **T98c** provava que o corte do modo plural segue a ordem da listagem — usando dois
   arquivos de tamanho **byte-idêntico**. Ordenar por tamanho era no-op sobre eles: o
@@ -69,6 +99,13 @@ eu mesmo tinha escrito no plano:
   tamanhos distintos, escolhendo o do **meio**, para que qualquer ordenação o desloque.
 - **O ramo do teto por arquivo** em `cliente.baixar` nasceu sem teste nenhum, e o
   revisor achou sabotando com `if False:` contra a suíte inteira verde.
+- **O T110** (já removido com o PR #18) não detectava a troca de `all` por `any`,
+  porque os quatro itens que só o `any` trazia **também** continham a palavra buscada:
+  o conteúdo não distinguia os casos, só a contagem.
+
+O defeito foi sempre o mesmo, e não é "esqueci de testar": é **escolher um exemplo em
+que o código certo e o errado produzem o mesmo resultado**. Escrever o teste antes não
+protege disso. Sabotar protege, e custa trinta segundos por asserção.
 
 A lição operacional é a do item 11 do `CLAUDE.md`, com um detalhe: escrever o teste
 antes não basta se o **dado** do teste não distingue os casos.
@@ -82,6 +119,17 @@ Segue no backlog.
 foi a decisão certa), MCP Resources (a função pura já devolve o que eles precisariam),
 `mod_folder` (segue questão aberta do §4), OCR, e limpeza do depósito por idade
 (backlog de 03/09 — hoje ele só cresce).
+
+## Uma armadilha de método, desta sessão
+
+Editar código por script (remoção em massa, corte por índice de linha) quebrou
+`arquivo.py` com um `NameError` e removeu **dois testes que não deviam sair**. Quem
+pegou as duas vezes foi um `assert` de sanidade **dentro do próprio script, antes de
+escrever o arquivo**. O gate teria pego o `NameError`; não pegaria dois testes a
+menos — suíte com menos testes fica igualmente verde.
+
+Se for editar por script: a verificação vai antes da escrita, e conta o que deveria
+sobrar.
 
 ## Como retomar
 
