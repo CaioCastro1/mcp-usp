@@ -32,7 +32,7 @@ from datetime import datetime
 
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle
-from .texto import casa
+from .texto import casa, normalizar
 
 # Host + caminho que caracterizam arquivo servido pelo webservice do Moodle, e
 # que por isso exigiria o token para ser baixado.
@@ -182,6 +182,7 @@ def como_dict(conteudo: Conteudo) -> list[dict]:
                     "tipo": i.tipo,
                     "tamanho": i.tamanho,
                     "modificado": i.modificado.isoformat() if i.modificado else None,
+                    "modulo": rotulo_do_modulo(i),
                     "url": i.url_externa,
                 }
                 for i in s.itens
@@ -189,6 +190,29 @@ def como_dict(conteudo: Conteudo) -> list[dict]:
         }
         for s in conteudo.secoes
     ]
+
+
+def rotulo_do_modulo(item: Item) -> str | None:
+    """O nome que o professor deu ao módulo, quando ele acrescenta informação.
+
+    **É a única descrição semântica que o e-Disciplinas oferece**, e ela era
+    descartada: `Formulário Provas Substitutivas.pdf` mora no módulo "Formulário
+    para pedido de prova substitutiva", e quem procurasse pelo tema não tinha
+    como achar. Medido em 03/09: os nomes de módulo de PSI3323 custam ~328
+    tokens, 20% da projeção — contra ~3.569 dos `summary` de seção, que é o
+    campo caro e o que menos promete.
+
+    Devolve `None` quando o módulo repete o nome do arquivo, o que acontece em
+    **9 dos 29 itens**: imprimir os dois seria pagar token para dizer a mesma
+    coisa duas vezes. A comparação é normalizada, então "Como criar uma rede
+    privada virtual…" casa com o arquivo de mesmo nome apesar da pontuação.
+    """
+    if not item.modulo:
+        return None
+    mod, arq = normalizar(item.modulo), normalizar(item.nome)
+    if not mod or mod in arq or arq in mod:
+        return None
+    return item.modulo
 
 
 def _formatar_item(item: Item) -> str:
@@ -199,6 +223,8 @@ def _formatar_item(item: Item) -> str:
         partes.append(f", {item.modificado.strftime('%d/%m/%Y')}")
     partes.append("]")
     linha = "".join(partes)
+    if (rotulo := rotulo_do_modulo(item)) is not None:
+        linha += f"\n    ({rotulo})"
     if item.url_externa:
         linha += f"\n    {item.url_externa}"
     return linha
