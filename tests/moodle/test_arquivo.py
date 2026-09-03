@@ -511,34 +511,24 @@ def test_T105b_recusa_por_mesmo_nome_nao_promete_desambiguar_por_nome(
     assert "todos=true" in r.texto
 
 
-# --- T108, T109: casar pelo rótulo do professor, com prioridade ------------
+# --- T109: o casamento é por nome de arquivo, e só ------------------------
 
-@pytest.mark.contrato
-def test_T108_casa_pelo_nome_do_modulo_quando_o_do_arquivo_nao_casa(
-    conteudo_bruto, disciplinas_brutas, tmp_path
-):
-    """"pedido de prova substitutiva" só existe no nome do MÓDULO; o arquivo se
-    chama `Formulário Provas Substitutivas.pdf`. Sem isto, perguntar pelo tema
-    não acha nada (verificado ao vivo em 03/09 com PTC3314)."""
-    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
-
-    r = arq.baixar_arquivo(
-        cliente, "PSI3323", "pedido de prova substitutiva", raiz=tmp_path
-    )
-
-    assert len(r.baixados) == 1
-    assert r.baixados[0].nome == "Formulário Provas Substitutivas.pdf"
 
 
 @pytest.mark.contrato
-def test_T109_o_nome_do_arquivo_tem_prioridade_e_o_modulo_nao_amplia(
+def test_T109_o_casamento_olha_o_nome_do_arquivo_e_so_ele(
     conteudo_bruto, disciplinas_brutas, tmp_path
 ):
-    """O módulo só é consultado quando o nome do arquivo não achou NADA.
+    """O casamento é por nome de arquivo, e nada além dele.
 
-    Sem essa prioridade, um termo que já resolvia viraria ambíguo: "dicas" casa
-    com dois arquivos por nome, e olhar o módulo junto não pode transformar isso
-    em três nem mudar quem casou.
+    Decidido em 03/09 (§9), depois de uma tentativa contrária que foi construída,
+    medida e revertida: o trabalho semântico — "qual destes é a lista sobre carta
+    de Smith" — é do modelo que leu a listagem, não de uma heurística de string
+    aqui dentro. `material` emite o rótulo do professor junto de cada arquivo
+    exatamente para tornar essa escolha possível.
+
+    Este teste trava o escopo: "dicas" casa com dois arquivos POR NOME, e nada
+    além do nome pode entrar nessa conta.
     """
     cliente = _cliente(conteudo_bruto, disciplinas_brutas)
 
@@ -560,46 +550,14 @@ def test_T109b_termo_que_nao_casa_em_lugar_nenhum_segue_nao_casando(
     assert cliente.downloads == []
 
 
-@pytest.mark.contrato
-def test_T110_segunda_tentativa_casa_palavra_a_palavra_e_nao_trecho_contiguo(
-    conteudo_bruto, disciplinas_brutas, tmp_path
-):
-    """Busca por TEMA não é substring: as palavras vêm separadas por outras.
-
-    `Tutorial_Básico_Multisim_11.pdf` tem "Básico" entre as duas palavras, então
-    "tutorial multisim" não é trecho contíguo de nada — nem do nome do arquivo,
-    nem do módulo "Tutorial básico para aprender a usar o Multisim". Verificado
-    ao vivo em 03/09 com o caso que motivou isto: "resolução do capítulo 3" não
-    achava `Lista 2.pdf` de PTC3314, cujo módulo é "Resolução Exercícios do
-    Capítulo 3 da apostila do curso".
-    """
-    cliente = _cliente(conteudo_bruto, disciplinas_brutas)
-
-    r = arq.baixar_arquivo(cliente, "PSI3323", "tutorial multisim", todos=True, raiz=tmp_path)
-
-    # Os três destinos: um dos dois achados é `url` externo e vai para `links`,
-    # não para `baixados` — olhar só um subconjunto esconderia metade do
-    # resultado, que é o Invariante 7 aplicado ao próprio teste.
-    achados = list(r.baixados) + list(r.candidatos) + list(r.links)
-    nomes = {a.nome for a in achados}
-
-    # TODAS as palavras têm de casar, não qualquer uma — e o que separa os dois
-    # é a CONTAGEM, não o conteúdo: com `any`, os quatro itens extras também
-    # contêm "Multisim" (medido em 03/09), então uma asserção sobre o texto de
-    # cada achado passaria em ambos os casos. Foi assim que o T98c original
-    # nasceu incapaz de detectar a própria sabotagem.
-    assert nomes == {
-        "Tutorial_Básico_Multisim_11.pdf",
-        "Video Tutorial do Multisim 12",
-    }, f"casou por uma palavra só, ou deixou de casar: {sorted(nomes)}"
 
 
 @pytest.mark.contrato
-def test_T110b_a_segunda_tentativa_nao_atropela_a_primeira(
+def test_T110b_nome_exato_resolve_direto(
     conteudo_bruto, disciplinas_brutas, tmp_path
 ):
-    """Termo que já resolvia por nome continua resolvendo igual — a busca ampla
-    só existe quando a estreita devolve vazio."""
+    """O caminho normal e esperado: o modelo leu a listagem em `material` e
+    repetiu o nome que viu lá."""
     cliente = _cliente(conteudo_bruto, disciplinas_brutas)
 
     r = arq.baixar_arquivo(cliente, "PSI3323", "Grupos", raiz=tmp_path)
