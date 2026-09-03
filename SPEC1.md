@@ -1672,3 +1672,58 @@ almoçar, `material` não resume a lista — e ler o PDF é interpretação, nã
 **Descartado junto:** extrair texto no servidor (perde figura, cria dependência,
 achata 29 páginas em um blob), e devolver texto **e** caminho (a dependência volta
 inteira para produzir a metade pior).
+
+### 03/09/2026 — `baixar_arquivo` verificada ao vivo, e um PDF escaneado refuta a medição de 01/09
+
+**A ferramenta funciona contra o e-Disciplinas de verdade**, exercitada pelo fio MCP
+(não por script), no servidor stdio deste worktree, em **PTC3314** — disciplina
+diferente da amostra de desenho, de propósito: uma disciplina só não prova resolução.
+
+| caminho | resultado |
+|---|---|
+| `material` em PTC3314 | 53 itens (contra 29 de PSI3323) |
+| singular, `nome="Lista 2"` | baixou, gravou, devolveu o caminho |
+| ambiguidade, `nome="lista"` | recusou nomeando **seção e módulo** dos 2 candidatos |
+| `todos=true` | baixou os 2 — e o segundo veio marcado "(já estava em disco)" |
+| teto, `nome="senoide"`, `todos=true` | **4 arquivos de 122 a 178 MB, todos nomeados, nenhum baixado** |
+
+O caminho do teto vale registrar: a suíte só o alcança trocando a constante por
+`monkeypatch`, e aqui ele foi exercitado por arquivos reais que passam do teto por
+duas a três vezes. Os quatro saíram **nomeados** na resposta (Invariante 7), não
+contados.
+
+**O achado que refuta o §9 de 01/09.** Aquela entrada registrou, sobre os 19 PDFs de
+PSI3323: *"Zero escaneados: 19 de 19 têm camada de texto, nenhum exigiria OCR."* A
+medição estava certa para aquela disciplina e **errada como fato do sistema** — a
+primeira disciplina nova mostrou o contrário:
+
+| | páginas | texto extraível |
+|---|---|---|
+| `Lista 1.pdf` (PTC3314) | 16 | **15 B no total — 0 B/página** |
+| `Lista 2.pdf` (PTC3314) | 10 | **9 B no total — 0 B/página** |
+
+São resoluções **manuscritas e escaneadas**. Não têm camada de texto nenhuma.
+
+**Isto é a validação mais forte que o desenho podia receber, e ela veio por acaso.**
+A alternativa descartada em 01/09 — extrair o texto no servidor com `pypdf` — teria
+devolvido **9 bytes** para a Lista 2 e chamado isso de conteúdo: uma casca vazia com
+aparência de sucesso, que é a forma do Invariante 6 que mais custa a notar. Entregando
+o **caminho**, o agente abriu o PDF como imagem e leu a matemática manuscrita — sem
+OCR, sem dependência nova, sem nada no servidor entender de PDF.
+
+O argumento de 01/09 era "extrair texto perde as figuras". O caso real é pior e melhor
+que o argumento: há PDFs em que o texto **é** a figura.
+
+**Terceira vez nesta sessão que "amostra não prova ausência" mordeu** — e a primeira
+em que mordeu a mim, contra uma medição que eu mesmo tinha acabado de registrar com
+19 de 19. A regra não é sobre desconfiar de amostra pequena: 19 não é pequena. É sobre
+não converter "não vi" em "não existe" quando a próxima observação é barata.
+
+**Verificado também, sem chamada extra:** o depósito nasce em
+`~/.cache/usp-mcp/moodle/<courseid>/<fileid>-<timemodified>/<slug>.pdf`, fora do
+repositório (`git status` limpo depois de baixar 4 MB), com o nome legível preservado
+e os bytes começando em `%PDF-`.
+
+**Não medido nesta verificação, e registrado como tal:** o tempo de cada chamada. O
+cache de disciplinas já estava quente no processo do servidor, então o custo de
+~14,7 s da lista de matrículas não apareceu e não foi cronometrado.

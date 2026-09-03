@@ -187,7 +187,16 @@ serve para prever custo antes de baixar.
 | **Sem camada de texto (escaneado)** | **0 de 19** |
 
 Os 19, e não três, justamente porque três amostras não provam ausência — o erro
-que este repo já cometeu e registrou duas vezes. Nenhum PDF exigiu OCR.
+que este repo já cometeu e registrou duas vezes. Nenhum PDF **desta disciplina**
+exigiu OCR.
+
+> **Ressalva escrita em 03/09/2026, e ela desmente a leitura fácil desta tabela.**
+> "Zero escaneados" vale para PSI3323 e **não** é fato do sistema. A primeira
+> disciplina nova refutou: `Lista 1.pdf` (16 páginas) e `Lista 2.pdf` (10 páginas)
+> de PTC3314 são resoluções **manuscritas e escaneadas**, com **0 B de texto por
+> página**. Dezenove de dezenove é uma amostra convincente e ainda assim não era
+> ausência. Ver §9 de 03/09 no `SPEC1.md` — e note que a ferramenta funciona
+> nesses arquivos justamente porque **não** extrai texto.
 
 **Um PDF cabe no contexto; a disciplina inteira não.** ~2,7k tokens de média
 contra ~50,9k para as 19. A segunda ferramenta é **um arquivo por vez**, como a
