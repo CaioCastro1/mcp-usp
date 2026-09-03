@@ -21,7 +21,7 @@ from pathlib import Path
 from . import deposito
 from .cliente import TETO_ARQUIVO_BYTES as _TETO_CLIENTE
 from .disciplinas import carregar, resolver
-from .erros import ErroMoodle
+from .erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel, RespostaIlegivel, TokenInvalido
 from .material import projetar_material
 from .texto import casa
 
@@ -87,6 +87,27 @@ _AVISO_LEITURA = (
 
 def _kb(n) -> str:
     return f"{n // 1024} kB" if n else "tamanho desconhecido"
+
+
+# Motivo seguro por TIPO de exceção, nunca `str(exc)` cru: a mensagem de
+# `FuncaoBloqueada` (cliente.py) embute a `fileurl` recusada e o prefixo
+# esperado — ecoar isso no texto que vai ao modelo vazaria endereço mesmo
+# sem vazar credencial, e violaria T99c/T68b (nenhuma URL de webservice no
+# texto). O padrão é "não emitir a menos que", não o oposto: um tipo de
+# `ErroMoodle` que ainda não existe cai no `else` genérico, que nunca
+# carrega texto de exceção nenhum — assim um erro novo não pode criar um
+# vazamento novo sem alguém decidir explicitamente que a mensagem dele é
+# segura o bastante para entrar aqui.
+def _motivo_seguro(exc: ErroMoodle) -> str:
+    if isinstance(exc, FuncaoBloqueada):
+        return "recusado por segurança: o endereço do arquivo não é do e-Disciplinas"
+    if isinstance(exc, MoodleIndisponivel):
+        return "o e-Disciplinas não respondeu ao baixar este arquivo"
+    if isinstance(exc, TokenInvalido):
+        return "credencial recusada ao baixar este arquivo"
+    if isinstance(exc, RespostaIlegivel):
+        return "o e-Disciplinas devolveu algo ilegível ao baixar este arquivo"
+    return "falha ao baixar este arquivo"
 
 
 def _baixar_um(cliente, item, courseid: int, raiz) -> Baixado:
@@ -231,7 +252,7 @@ def _entregar(cliente, cabecalho, casados, courseid, raiz, todos) -> RespostaArq
             try:
                 baixado = _baixar_um(cliente, item, courseid, raiz)
             except ErroMoodle as exc:
-                recusados.append(Recusado(nome=item.nome, motivo=str(exc)))
+                recusados.append(Recusado(nome=item.nome, motivo=_motivo_seguro(exc)))
                 continue
         else:
             # No SINGULAR há exatamente um arquivo pedido: converter a falha
