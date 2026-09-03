@@ -31,6 +31,17 @@ from .erros import (
 
 _URL_SUFIXO_WEBSERVICE = "/webservice/rest/server.php"
 
+# Caminho que caracteriza arquivo servido pelo webservice — a allowlist do
+# download. Não é o mesmo endpoint das funções (`/webservice/rest/server.php`).
+_PREFIXO_ARQUIVO = "/webservice/pluginfile.php/"
+
+# Timeout do download. Maior arquivo medido em 01/09: 6,3 MB. Mais generoso que o
+# das funções porque aqui o custo é banda, não processamento do Moodle.
+_TIMEOUT_DOWNLOAD_SEGUNDOS = 120
+
+# Teto por arquivo. Maior medido: 6,3 MB — folga deliberada de ~8x.
+TETO_ARQUIVO_BYTES = 50 * 1024 * 1024
+
 # Timeout do transporte HTTP padrão. Não é configurável por parâmetro porque
 # nenhum teste exercita esse caminho (só tests/moodle/test_live.py, pulado) —
 # um valor fixo e conservador é suficiente até haver dado medido que peça algo
@@ -84,6 +95,39 @@ def _transporte_padrao(*, url: str, dados: dict) -> dict:
     return json.loads(bruto)
 
 
+def _levantar_se_erro(rotulo: str, resposta) -> None:
+    """Traduz o erro do Moodle, e é chamada pelos DOIS caminhos.
+
+    Existe como função e não embutida em `chamar` porque o download
+    (`baixar`) recebe o mesmo formato de erro por outro transporte. Duplicar a
+    tradução criaria duas mensagens diferentes para `invalidtoken`, e a
+    divergência só apareceria no dia em que o token expirasse.
+    """
+    if not (isinstance(resposta, dict) and "errorcode" in resposta):
+        return
+    errorcode = resposta["errorcode"]
+    if errorcode == "invalidtoken":
+        raise TokenInvalido(
+            "Token do Moodle inválido ou expirado — gere um novo e "
+            "atualize MOODLE_TOKEN no .env (ver §8 do SPEC1.md)."
+        )
+    mensagem = resposta.get("message", "") or resposta.get("error", "")
+    raise ErroMoodle(f"Moodle recusou {rotulo}: {errorcode} — {mensagem}")
+
+
+def _transporte_download_padrao(*, url: str, dados: dict, teto_bytes: int):
+    """POST form-urlencoded que devolve (content_type, bytes). Só stdlib.
+
+    Lê no máximo `teto_bytes + 1` de propósito: é assim que um arquivo sem
+    `filesize` utilizável ainda respeita o teto, e o byte extra é o que permite
+    detectar que o teto foi ultrapassado em vez de truncar calado.
+    """
+    corpo = urllib.parse.urlencode(dados).encode("utf-8")
+    requisicao = urllib.request.Request(url, data=corpo, method="POST")
+    with urllib.request.urlopen(requisicao, timeout=_TIMEOUT_DOWNLOAD_SEGUNDOS) as resp:
+        return resp.headers.get("Content-Type", ""), resp.read(teto_bytes + 1)
+
+
 class ClienteMoodle:
     """Uma função por invocação, escolhida à mão (Regra de Ouro, §3.1).
 
@@ -97,6 +141,7 @@ class ClienteMoodle:
         token: str,
         url: str,
         transporte=None,
+        transporte_download=None,
         permitir_escrita: bool = False,
     ) -> None:
         # Falhar cedo (Invariante 6): token vazio nunca deveria chegar a uma
@@ -109,6 +154,11 @@ class ClienteMoodle:
         self._token = _TokenOculto(token)
         self.url = url
         self.transporte = transporte if transporte is not None else _transporte_padrao
+        self.transporte_download = (
+            transporte_download
+            if transporte_download is not None
+            else _transporte_download_padrao
+        )
         self.permitir_escrita = permitir_escrita
 
     def chamar(self, funcao: str, **params) -> dict:
@@ -149,16 +199,71 @@ class ClienteMoodle:
                 "conexão recusada). Tente de novo mais tarde."
             ) from exc
 
-        if isinstance(resposta, dict) and "errorcode" in resposta:
-            errorcode = resposta["errorcode"]
-            mensagem = resposta.get("message", "")
-            if errorcode == "invalidtoken":
-                raise TokenInvalido(
-                    "Token do Moodle inválido ou expirado — gere um novo e "
-                    "atualize MOODLE_TOKEN no .env (ver §8 do SPEC1.md)."
-                )
-            # Erro real do Moodle: repassado legível, com o errorcode cru
-            # preservado (Invariante 6 — não engolir, não normalizar).
-            raise ErroMoodle(f"Moodle recusou {funcao}: {errorcode} — {mensagem}")
+        _levantar_se_erro(funcao, resposta)
 
         return resposta
+
+    def baixar(
+        self,
+        fileurl: str,
+        *,
+        tamanho_esperado: int | None = None,
+        teto_bytes: int = TETO_ARQUIVO_BYTES,
+    ) -> bytes:
+        """Baixa UM arquivo do webservice do Moodle. O token vai no CORPO.
+
+        Medido em 01/09/2026 (§9): o corpo do POST autentica igual à query
+        string, e por isso a credencial nunca precisa entrar numa URL. Também
+        medido: erro de credencial chega com **HTTP 200** e `Content-Type:
+        application/json` — checar status não serve de nada aqui.
+
+        A restrição de origem é a allowlist deste caminho. Ela roda antes de
+        qualquer I/O: como o token viaja no corpo, uma URL de outro host
+        entregaria a credencial do dono a esse host.
+        """
+        esperado = f"{self.url}{_PREFIXO_ARQUIVO}"
+        if not fileurl.startswith(esperado):
+            raise FuncaoBloqueada(
+                f"Download recusado: {fileurl!r} não começa com {esperado!r}. "
+                "O token vai no corpo da requisição, então baixar de outro "
+                "endereço entregaria a sua credencial a ele."
+            )
+
+        try:
+            content_type, corpo = self.transporte_download(
+                url=fileurl,
+                dados={"token": self._token.get()},
+                teto_bytes=teto_bytes,
+            )
+        except OSError as exc:
+            raise MoodleIndisponivel(
+                "O e-Disciplinas não respondeu ao download (timeout ou conexão "
+                "recusada). Tente de novo mais tarde."
+            ) from exc
+
+        if "json" in (content_type or "").lower():
+            try:
+                _levantar_se_erro("o download do arquivo", json.loads(corpo))
+            except ValueError as exc:
+                raise RespostaIlegivel(
+                    "O e-Disciplinas devolveu algo que não é o arquivo nem um "
+                    "erro compreensível no lugar do download."
+                ) from exc
+            raise RespostaIlegivel(
+                "O e-Disciplinas devolveu JSON no lugar do arquivo, sem "
+                "`errorcode` para explicar o motivo."
+            )
+
+        if len(corpo) > teto_bytes:
+            raise ErroMoodle(
+                f"O arquivo passa do teto de {teto_bytes} bytes e não foi "
+                "gravado. Baixe pelo e-Disciplinas."
+            )
+
+        if tamanho_esperado is not None and len(corpo) != tamanho_esperado:
+            raise ErroMoodle(
+                f"O download veio incompleto: esperava {tamanho_esperado} bytes "
+                f"e recebeu {len(corpo)}. Nada foi gravado."
+            )
+
+        return corpo
