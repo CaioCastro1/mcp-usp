@@ -23,7 +23,7 @@ from .cliente import TETO_ARQUIVO_BYTES as _TETO_CLIENTE
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel, RespostaIlegivel, TokenInvalido
 from .material import projetar_material
-from .texto import casa
+from .texto import casa, casa_por_palavras
 
 # Rebatizado como nome DESTE módulo de propósito: o cliente guarda o teto do
 # transporte, este é o teto da ferramenta. Mesmo valor, dois donos com razões
@@ -157,6 +157,18 @@ def baixar_arquivo(
     )
     itens = [i for s in conteudo.secoes for i in s.itens]
     casados = [i for i in itens if casa(nome, i.nome)]
+    if not casados:
+        # O nome do arquivo não achou nada: tenta o rótulo que o professor deu
+        # ao módulo, que é onde mora a descrição do assunto. Só AQUI, e não
+        # junto: consultar os dois de uma vez transformaria em ambíguo um termo
+        # que já resolvia — "dicas" casa com dois arquivos por nome, e o módulo
+        # não pode mudar isso. Nome primeiro, rótulo como segunda tentativa.
+        casados = [
+            i
+            for i in itens
+            if casa_por_palavras(nome, i.nome)
+            or (i.modulo and casa_por_palavras(nome, i.modulo))
+        ]
     cabecalho = f"{alvo.sigla} ({alvo.rotulo})"
 
     if not casados:

@@ -474,3 +474,47 @@ def test_T106_aviso_nao_afirma_a_premissa_refutada_e_aponta_baixar_arquivo(
     # E a saída deixa de ser um beco sem saída ("abra pelo e-Disciplinas"):
     # aponta para a ferramenta que de fato baixa.
     assert "baixar_arquivo" in r.texto
+
+
+# --- T106, T107: o rótulo do professor entra na listagem -------------------
+
+@pytest.mark.contrato
+def test_T106_o_nome_do_modulo_sai_quando_diz_algo_que_o_arquivo_nao_diz(
+    conteudo_bruto, disciplinas_brutas
+):
+    """Medido em 03/09: o nome do módulo é a única descrição semântica que
+    existe, e ela era jogada fora. `Formulário Provas Substitutivas.pdf` mora
+    no módulo "Formulário para pedido de prova substitutiva" — quem procura por
+    "pedido de prova substitutiva" não tinha como achar."""
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 1},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": conteudo_bruto,
+        }
+    )
+    disc.limpar_cache()
+    texto = mat.material(cliente, "PSI3323").texto
+
+    assert "Formulário para pedido de prova substitutiva" in texto
+    assert "Tutorial básico para aprender a usar o Multisim" in texto
+
+
+@pytest.mark.contrato
+def test_T107_o_nome_do_modulo_e_omitido_quando_repete_o_do_arquivo(
+    conteudo_bruto, disciplinas_brutas
+):
+    """9 dos 29 itens de PSI3323 têm módulo redundante com o nome do arquivo.
+    Imprimir os dois seria pagar tokens para dizer a mesma coisa duas vezes."""
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 1},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": conteudo_bruto,
+        }
+    )
+    disc.limpar_cache()
+    texto = mat.material(cliente, "PSI3323").texto
+
+    # arquivo e módulo idênticos: o rótulo não pode aparecer duas vezes
+    assert texto.count("Planilha de Notas - PSI3323 - 2o. Semestre de 2026") == 1
