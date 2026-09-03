@@ -326,6 +326,31 @@ Uma coisa já está decidida porque é consequência dos Invariantes 3 e 4, não
 Aberto: linguagem e runtime, transporte exato, hospedagem, se há um core compartilhado ou
 dois projetos. Decidir depois de saber o tamanho e a forma das respostas.
 
+### 6.1 O formato que corresponde a esta decisão tem nome — pesquisado em 03/09/2026
+
+A decisão acima descreve, sem saber, o **MCP Bundle** (`.mcpb`): servidor local
+empacotado, stdio, instalado com um clique, sem OAuth. "O token fica na máquina de
+quem usa, cada pessoa traz o seu" é a definição dele. Análise em
+`notas/mcpb-e-distribuicao.md`; **nada foi testado** — é leitura de documentação, e a
+distinção importa (item 9 do `CLAUDE.md`).
+
+O que ele resolve: o `manifest.json` declara `user_config`, o Claude Desktop **gera a
+tela de configuração sozinho**, e `"sensitive": true` mascara o campo. O valor chega
+ao processo como **variável de ambiente** — `"env": {"MOODLE_TOKEN":
+"${user_config.moodle_token}"}` —, exatamente o que `usp_mcp/env.py` já lê. Nenhuma
+linha do código muda.
+
+O que ele custa: a documentação recomenda **Node.js** porque ele vem junto com o
+Claude Desktop; Python é suportado (`compatibility.runtimes.python`, ou o tipo UV) mas
+exige runtime na máquina do usuário. O Claude Desktop roda em macOS e Windows, não
+Linux.
+
+**Conector remoto segue fora para o Moodle, e agora por três motivos:** a rede da USP
+não sai da nuvem (§1.1), o token não pode ir (Invariante 4) e conector remoto
+autenticado exige OAuth 2.0 — que o e-Disciplinas não oferece; ele dá token pessoal
+de web service. Para RUCard e Jupiter, que são dado público, o remoto continua
+viável e é onde ele faria sentido.
+
 ---
 
 ## 7. Anexo A — viés a evitar
@@ -1808,3 +1833,51 @@ e os bytes começando em `%PDF-`.
 **Não medido nesta verificação, e registrado como tal:** o tempo de cada chamada. O
 cache de disciplinas já estava quente no processo do servidor, então o custo de
 ~14,7 s da lista de matrículas não apareceu e não foi cronometrado.
+
+### 03/09/2026 — o §6 tinha um nome que eu não sabia: MCP Bundle. E o cache tinha uma cura que eu tinha descartado cedo demais
+
+**Pesquisa, não decisão.** O dono quer que outras pessoas usem isto, e o §6 estava com
+"linguagem, runtime, transporte, hospedagem" em aberto desde o começo. Detalhe em
+`notas/mcpb-e-distribuicao.md`. **Nada foi testado** — tudo abaixo é leitura de
+documentação, e o item 9 do `CLAUDE.md` vale aqui: medir antes de afirmar que funciona.
+
+**O achado principal é que a decisão do §6 já estava certa e não sabia o nome dela.**
+"Dado autenticado → entrypoint local, cada pessoa traz o seu token" é a definição de um
+**MCP Bundle** (`.mcpb`): zip com o servidor e um `manifest.json`, stdio, um clique para
+instalar, sem OAuth. O §6 ganhou uma subseção 6.1 com isso.
+
+**O que muda na prática, e é grande:** hoje, para outra pessoa usar isto, ela clona o
+repo, cria venv, instala dependências, copia o `.env.example`, gera o token, cola no
+arquivo e edita a configuração do cliente. Com um `.mcpb`, ela dá um clique e digita o
+token num campo que o Claude Desktop desenha sozinho a partir do `user_config` do
+manifest. E **nenhuma linha do nosso código muda**: o valor chega por variável de
+ambiente, que é o que `usp_mcp/env.py` já lê — inclusive com o `setdefault` que faz o
+ambiente ganhar do `.env`, comportamento que passa a ser exatamente o necessário.
+
+**O que fecha, e não é reversível por preferência:** conector **remoto** está fora para
+o Moodle por três motivos independentes — a rede da USP não sai da nuvem (§1.1), o token
+não pode sair da máquina (Invariante 4), e conector remoto autenticado exige **OAuth
+2.0**, que o e-Disciplinas não oferece (ele dá token pessoal de web service). O terceiro
+é novo e é o mais definitivo: não é questão de querermos, é que não há fluxo para
+implementar. Para RUCard e Jupiter o remoto segue viável, e é lá que ele faz sentido.
+
+**O que continua aberto, e virou linha de backlog:** o `.mcpb` recomenda Node.js porque
+ele vem junto com o Claude Desktop; o nosso servidor é Python, suportado mas exigindo
+runtime do usuário. Quanto isso custa em atrito é **medição, não estimativa** — e a
+mesma medição responde onde o `"sensitive": true` guarda o valor, que a spec do manifest
+não diz e que o Invariante 3 quer saber.
+
+**Segundo achado, e ele desfaz uma objeção minha de horas antes.** Registrei em 03/09
+que o depósito só cresce e que limpeza automática era arriscada, porque poderia sumir
+com um arquivo sendo lido. A pesquisa mostrou a peça que faltava: **limpeza no
+startup**, que o `mcp-clip` faz para órfãos de instâncias anteriores. No startup o risco
+não existe — o servidor sobe antes de qualquer leitura da sessão. A objeção caiu; o TTL
+é que não se copia de lá (1 hora, para dado efêmero), porque o nosso dado muda por
+semestre e o Invariante 5 pede TTL colado na taxa de mudança.
+
+**Verificado por inspeção, não por documentação:** o protocolo MCP **não trata** de
+ciclo de vida de arquivo. Os tipos do SDK instalado, olhados quando avaliamos entregar
+blob, não têm noção de cache, quota ou limpeza. O cliente também não tem como saber que
+`~/.cache/usp-mcp/` existe — ele recebe uma string e abre um arquivo. **A limpeza é
+nossa por construção**, e é o preço de ter escolhido entregar caminho em vez de
+conteúdo.
