@@ -1881,3 +1881,51 @@ blob, não têm noção de cache, quota ou limpeza. O cliente também não tem c
 `~/.cache/usp-mcp/` existe — ele recebe uma string e abre um arquivo. **A limpeza é
 nossa por construção**, e é o preço de ter escolhido entregar caminho em vez de
 conteúdo.
+
+### 03/09/2026 — a busca semântica é do modelo, não do servidor: casamento por palavras construído, medido e revertido
+
+**Decisão: `baixar_arquivo` casa por nome de arquivo e nada mais.** A tentativa
+contrária foi construída, verificada ao vivo e revertida no mesmo dia — e o motivo
+da reversão é melhor que o da construção, então fica registrado inteiro.
+
+**O que foi construído.** Perguntar pelo assunto não funcionava: "resolução do
+capítulo 3" não achava `Lista 2.pdf` em PTC3314, cujo módulo se chama exatamente
+"Resolução Exercícios do Capítulo 3 da apostila do curso". A correção teve duas
+metades — o rótulo do módulo passou a sair em `material`, e `baixar_arquivo` ganhou
+uma segunda tentativa que casava palavra a palavra contra nome e rótulo. As duas
+funcionaram ao vivo.
+
+**Por que a segunda metade caiu, e a pergunta veio do dono:** *"não deveria ser um
+agente receber os temas e ver qual arquivo parece mais apto?"* Deveria — e é o
+argumento que este projeto já usa em outro lugar. O §9 de 01/09 decidiu que o
+servidor **entrega o arquivo e não o interpreta**, porque interpretar é do modelo.
+Casar "carta de Smith" com `smith.pdf`, "amp op" com "amplificador operacional",
+"a prova antiga" com o PDF de 2025 é interpretação — e nenhuma regra de substring
+ou de interseção de palavras chega perto de um modelo que leu a lista.
+
+A segunda tentativa não estava errada; estava **redundante com um mecanismo melhor**,
+e pior nos casos difíceis. Ganhava uma ida e volta no caso fácil e errava onde o
+modelo acertaria, ao custo de vinte linhas, uma frouxidão declarada (`"de"` casava
+com 17 dos 29 itens de PSI3323) e uma linha de backlog para vigiá-la.
+
+**O que fica, e é a metade que importa:** `material` emite o rótulo que o professor
+deu ao módulo, quando ele diz algo que o nome do arquivo não diz — 20 dos 29 itens
+de PSI3323; os 9 redundantes são omitidos. Custo medido: **+253 tokens** no texto
+final (786 → 1.039). Isso não é heurística no servidor, é **parar de descartar dado**:
+sem o rótulo, nem o modelo nem uma pessoa têm como saber que `LT-RPS-aula11-12.pdf`
+é a aula de carta de Smith.
+
+**Descartado junto:** os `summary` de seção, que custariam ~3.569 tokens — mais que
+dobrariam a resposta — e são o campo que menos promete. Os títulos de seção medidos
+são `AULA 1`, `Geral`, ou datas como `31 agosto - 6 setembro`.
+
+**E a mensagem de "não achei" mudou de função.** Ela não tenta mais adivinhar: diz
+que `material` lista cada arquivo com o rótulo do professor, que é onde está o
+assunto, e pede para repetir com o nome exato. O erro passou a ser o começo do
+caminho certo, em vez de um beco.
+
+**Lição de método, e ela não é sobre esta ferramenta.** A tentação de resolver no
+servidor o que o modelo resolve melhor é forte porque parece "mais completo". O
+critério que separa os dois casos: **entregar dado que estava sendo descartado é
+sempre certo; decidir no lugar do modelo raramente é.** O rótulo do módulo era a
+primeira coisa; o casamento por palavras era a segunda.
