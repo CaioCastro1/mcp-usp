@@ -23,7 +23,7 @@ from .cliente import TETO_ARQUIVO_BYTES as _TETO_CLIENTE
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel, RespostaIlegivel, TokenInvalido
 from .material import projetar_material
-from .texto import casa, casa_por_palavras
+from .texto import casa
 
 # Rebatizado como nome DESTE módulo de propósito: o cliente guarda o teto do
 # transporte, este é o teto da ferramenta. Mesmo valor, dois donos com razões
@@ -156,27 +156,23 @@ def baixar_arquivo(
         cliente.chamar("core_course_get_contents", courseid=alvo.courseid)
     )
     itens = [i for s in conteudo.secoes for i in s.itens]
+    # Casamento por nome de arquivo, e só. O trabalho semântico — "qual destes
+    # é a lista sobre carta de Smith" — é do modelo que leu a listagem, não de
+    # uma heurística de string aqui: ele resolve sinônimo, abreviação e
+    # contexto, e nenhuma regra de substring resolve. `material` emite o rótulo
+    # do professor junto de cada arquivo exatamente para tornar essa escolha
+    # possível. Decisão de 03/09 no §9, que também diz o que foi tentado antes.
     casados = [i for i in itens if casa(nome, i.nome)]
-    if not casados:
-        # O nome do arquivo não achou nada: tenta o rótulo que o professor deu
-        # ao módulo, que é onde mora a descrição do assunto. Só AQUI, e não
-        # junto: consultar os dois de uma vez transformaria em ambíguo um termo
-        # que já resolvia — "dicas" casa com dois arquivos por nome, e o módulo
-        # não pode mudar isso. Nome primeiro, rótulo como segunda tentativa.
-        casados = [
-            i
-            for i in itens
-            if casa_por_palavras(nome, i.nome)
-            or (i.modulo and casa_por_palavras(nome, i.modulo))
-        ]
     cabecalho = f"{alvo.sigla} ({alvo.rotulo})"
 
     if not casados:
         return RespostaArquivo(
             texto=(
                 f"{cabecalho} — nenhum arquivo com {nome!r} no nome. "
-                f"A disciplina tem {conteudo.total_itens} itens no total; use a "
-                "ferramenta `material` para ver a lista e repita com um nome de lá."
+                f"A disciplina tem {conteudo.total_itens} itens no total. Use a "
+                "ferramenta `material`: ela lista cada arquivo com o rótulo que o "
+                "professor deu ao módulo — é ali que está o assunto, quando o nome "
+                "do arquivo não diz. Escolha na lista e repita com o nome exato."
             )
         )
 

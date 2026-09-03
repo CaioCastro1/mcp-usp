@@ -33,22 +33,3 @@ def casa(termo: str, alvo: str) -> bool:
     listando o espaço inteiro — não é permissividade acidental.
     """
     return normalizar(termo) in normalizar(alvo)
-
-
-def casa_por_palavras(termo: str, alvo: str) -> bool:
-    """Todas as palavras do termo aparecem no alvo, em qualquer posição.
-
-    Existe porque `casa` é trecho **contíguo**, e pergunta por tema não é
-    contígua: quem procura "resolução do capítulo 3" está atrás de um módulo
-    chamado "Resolução Exercícios do Capítulo 3 da apostila do curso", com uma
-    palavra no meio que ele não escreveu. Verificado ao vivo em 03/09 — o
-    casamento por substring devolvia vazio nesse caso exato.
-
-    É deliberadamente mais frouxa que `casa`, e por isso **não a substitui**:
-    é a segunda tentativa, usada só quando a primeira não achou nada. Palavra
-    curta ("de", "a") casa com quase tudo, e o preço disso é uma recusa por
-    ambiguidade — que é resposta legítima e nomeada, não silêncio.
-    """
-    alvo_n = normalizar(alvo)
-    palavras = [p for p in (normalizar(t) for t in (termo or "").split()) if p]
-    return bool(palavras) and all(p in alvo_n for p in palavras)
