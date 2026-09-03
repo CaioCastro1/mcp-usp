@@ -1561,6 +1561,87 @@ no fio alcança o que o SDK decide sozinho. Nenhum dos dois é redundante.
 
 Depois do merge: **309 passed, 6 skipped**.
 
+### 01/09/2026 — os conectores da conta saem deste repositório; o corte é do repo, não da conta
+
+O `.mcp.json` deste projeto declara três servidores e só três: `usp-moodle`,
+`usp-jupiter`, `usp-rucard`, todos stdio local. Mas toda sessão aberta aqui vinha
+carregando **onze conectores claude.ai da conta do dono**, injetados de fora do
+repositório. Medido no `remoteMcpServersConfig` da sessão:
+
+| Conector | UUID (é o nome do servidor no fio) | Ferramentas |
+|---|---|---|
+| Make | `00000000-0000-0000-0000-000000000000` | 81 |
+| Atlassian | `00000000-0000-0000-0000-000000000000` | 40 |
+| Notion | `00000000-0000-0000-0000-000000000000` | 37 |
+| Nekt (`servidor-interno.exemplo`) | `00000000-0000-0000-0000-000000000000` | 34 |
+| Gmail | `00000000-0000-0000-0000-000000000000` | 29 |
+| Supabase | `00000000-0000-0000-0000-000000000000` | 29 |
+| HubSpot | `00000000-0000-0000-0000-000000000000` | 24 |
+| Slack | `00000000-0000-0000-0000-000000000000` | 13 |
+| Google Drive | `00000000-0000-0000-0000-000000000000` | 11 |
+| Google Calendar | `00000000-0000-0000-0000-000000000000` | 9 |
+| visualize (Anthropic) | `00000000-0000-0000-0000-000000000000` | 2 |
+
+São **309 ferramentas** de trabalho da Lastro — CRM, e-mail, Slack, Jira, banco de
+produção — num repositório pessoal sobre bandejão, prazo de disciplina e ementa. A
+superfície não é só ruído de contexto: `send_message`, `execute_sql` e
+`apply_migration` de sistemas da empresa ficam a uma chamada de distância de uma
+sessão cujo assunto é cardápio de RU.
+
+**A decisão:** `disableClaudeAiConnectors: true` no `.claude/settings.json` do
+repositório (versionado). Os onze deixam de ser buscados e conectados; os três
+servidores USP, que vêm do `.mcp.json` por stdio, não são tocados.
+
+**O que foi descartado, e por quê.** A alternativa era `permissions.deny` com uma
+regra `mcp__<uuid>` por conector, poupando o Notion. Perde em duas frentes: o
+conector negado **ainda conecta e ainda ocupa contexto** — só a chamada é
+bloqueada —, e a regra é ancorada num UUID opaco que morre calada se a conta
+rotacionar o conector. Uma denylist por UUID também viola o Invariante 2 em
+espírito: é denylist onde cabia um corte na origem.
+
+**O ponteiro que importa para a próxima sessão:** o gesto é do repositório, e a
+descrição do próprio ajuste diz que qualquer fonte com `true` vence — projeto pode
+optar por sair, mas um `false` de projeto não derruba um `true` de usuário. Nada
+aqui altera a conta: nos outros repositórios da Lastro os conectores continuam
+como estavam.
+
+**Adendo do mesmo dia — as skills, e por que metade não tem alavanca aqui.**
+
+Junto com os conectores vinham skills de trabalho. Elas chegam por três vias
+diferentes, e só duas obedecem a este repositório:
+
+| Skill | Via | Alavanca |
+|---|---|---|
+| `lais-html-report` | `~/.claude/skills/` (disco do usuário) | `skillOverrides` ✔ |
+| `lais-copywriter`, `lastro-briefing-closers`, `fix-trino-query` | sincronizadas da conta claude.ai | `skillOverrides` (provável) |
+| `lais-brand-studio:*` — 11 skills, 5 agentes, 3 servidores MCP | **plugin injetado pelo app** | nenhuma daqui |
+
+O terceiro caso é o que importa registrar, porque custou tempo descobrir. O
+resolvedor de estado de skill do Claude Code começa assim:
+
+```js
+if (e.type !== "prompt" || e.source === "plugin") return "on"
+```
+
+**Skill de plugin é fixada em `on` antes de `skillOverrides` ser lido.** A UI
+confirma pelo outro lado: para `source === "plugin"` ela devolve
+`{value:"on", source:"plugin"}`, um estado travado. Não existe desligar uma skill
+de plugin pelo nome — só desligando o plugin inteiro.
+
+E o `lais-brand-studio` não está instalado no repositório de plugins do CLI: ele é
+injetado pelo app da Claude a cada sessão, por caminho temporário
+(`claude-hostloop-plugins/…/plugin_013HZzpc4BAdU53jsiY3DLhA`, autor "Lastro",
+versão 1.10.3). Sem marketplace, e `enabledPlugins` é documentado no formato
+`plugin-id@marketplace-id`. A linha `"lais-brand-studio": false` ficou no
+`.claude/settings.json` como tentativa, **não verificada** — se na próxima sessão
+as skills `lais-brand-studio:*` ainda aparecerem, a alavanca é o app, não o repo,
+e a linha deve sair para não mentir.
+
+**Lição que vale além deste ajuste:** "está no settings.json" não é o mesmo que
+"está desligado". Três das quatro vias acima passam por caminhos de código
+distintos, e uma delas ignora a configuração por construção. Confirme na sessão
+seguinte quais sumiram de fato antes de considerar a limpeza feita.
+
 ### 01/09/2026 — o download de arquivo do Moodle, medido: o token não precisa ir na URL
 
 **Fechada a questão (a) do §9 de 31/08**, que estava registrada como "continua não
