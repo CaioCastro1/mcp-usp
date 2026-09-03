@@ -5,11 +5,14 @@ sempre `tmp_path`, para não escrever no cache real de quem roda a suíte.
 """
 from __future__ import annotations
 
+import copy
+
 import pytest
 
 from usp_mcp.moodle import arquivo as arq
 from usp_mcp.moodle import disciplinas as dis
-from usp_mcp.moodle.erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel
+from usp_mcp.moodle.cliente import ClienteMoodle
+from usp_mcp.moodle.erros import ErroMoodle, MoodleIndisponivel
 
 from .conftest import ClienteFalso
 
@@ -174,6 +177,28 @@ def test_T99c_nenhuma_url_interna_aparece_no_texto_da_resposta(
     assert "/webservice/" not in r.texto
 
 
+@pytest.mark.politica
+def test_T99d_nenhuma_url_interna_aparece_mesmo_quando_ha_recusa(
+    conteudo_bruto, disciplinas_brutas, tmp_path
+):
+    """T99c cobria só o caminho de SUCESSO. Achado da re-revisão: uma
+    resposta com `recusados` (o `Recusado` nasce de `str(exc)` de um erro do
+    cliente, que pode embutir endereço — é o caso de `FuncaoBloqueada`)
+    também precisa passar por esta asserção, não só o caminho feliz.
+
+    Usa o mesmo cenário REAL de T103b (não um dublê com mensagem
+    inventada): a allowlist de verdade de `cliente.baixar` é quem recusa.
+    """
+    bruto = _com_dicas_geral_apontando_para_host_estranho(conteudo_bruto)
+    cliente = _cliente_moodle_real(bruto, disciplinas_brutas)
+
+    r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
+
+    assert r.recusados, "cenário não produziu recusa — teste não alcança o caminho"
+    assert "pluginfile.php" not in r.texto
+    assert "/webservice/" not in r.texto
+
+
 # --- T88, T97, T98: plural e tetos -----------------------------------------
 
 @pytest.mark.contrato
@@ -291,8 +316,75 @@ def test_T103_plural_uma_falha_nao_derruba_o_lote(
     assert r.baixados[0].fileid == "9599833"  # o da seção AULA 6, que não falhou
     assert len(r.recusados) == 1
     assert r.recusados[0].nome == "Dicas para a Prova.pdf"
-    assert "fora do ar" in r.recusados[0].motivo
+    # O motivo é uma mensagem SANITIZADA por tipo de exceção, não `str(exc)`
+    # cru — ver `arquivo._motivo_seguro` e o teste T103b logo abaixo, que
+    # prova isso contra a mensagem REAL do cliente, não uma inventada aqui.
+    assert "não respondeu" in r.recusados[0].motivo
     assert r.recusados[0].nome in r.texto
+
+
+# --- achados da re-revisão: o motivo do Recusado não pode vazar endereço ---
+
+_TAMANHO_DICAS = 455725  # filesize real dos dois itens da colisão (T87/T88)
+
+
+def _download_falso_do_tamanho_certo(*, url, dados, teto_bytes):
+    """Transporte de download OFFLINE para um `ClienteMoodle` de verdade.
+
+    Só é chamado para o item LEGÍTIMO (AULA 6): o item malicioso (Geral) é
+    barrado por `cliente.baixar` — a allowlist real de T91 — ANTES de
+    qualquer I/O, então esta função nunca vê a URL estranha. O tamanho é
+    fixo porque as duas 'Dicas para a Prova.pdf' têm o MESMO filesize.
+    """
+    prefixo = b"%PDF-1.4 "
+    return "application/pdf", prefixo + b"x" * (_TAMANHO_DICAS - len(prefixo))
+
+
+def _cliente_moodle_real(conteudo_bruto, disciplinas_brutas):
+    """Um `ClienteMoodle` de verdade — não o `ClienteFalso` dos outros
+    testes — para que a allowlist REAL de `cliente.baixar` (T91/T91b) seja o
+    que dispara `FuncaoBloqueada`, e não uma mensagem escrita à mão pelo
+    teste. É a diferença entre provar o comportamento do sistema e provar
+    que o teste sabe escrever strings."""
+
+    def transporte(*, url, dados):
+        funcao = dados["wsfunction"]
+        if funcao == "core_webservice_get_site_info":
+            return {"userid": 1}
+        if funcao == "core_enrol_get_users_courses":
+            return disciplinas_brutas
+        if funcao == "core_course_get_contents":
+            return conteudo_bruto
+        raise AssertionError(f"chamada não prevista neste teste: {funcao}")
+
+    return ClienteMoodle(
+        token="TOKEN-SINTETICO-NAO-E-CREDENCIAL",
+        url="https://edisciplinas.usp.br",
+        transporte=transporte,
+        transporte_download=_download_falso_do_tamanho_certo,
+    )
+
+
+def _com_dicas_geral_apontando_para_host_estranho(conteudo_bruto):
+    """Deep copy do conteúdo de PSI3323 com o `fileurl` do item 'Geral' da
+    colisão real trocado por um host de fora — mas ainda com
+    'pluginfile.php/' no caminho, para que `_fileid` (material.py) o trate
+    como arquivo interno (tem fileid) em vez de link externo. É exatamente
+    o cenário do achado de segurança do finding 1: a URL PARECE interna, e
+    é a allowlist real de `cliente.baixar` que de fato barra."""
+    bruto = copy.deepcopy(conteudo_bruto)
+    for secao in bruto:
+        if secao.get("name") != "Geral":
+            continue
+        for modulo in secao.get("modules") or ():
+            for conteudo in modulo.get("contents") or ():
+                if conteudo.get("filename") == "Dicas para a Prova.pdf":
+                    conteudo["fileurl"] = (
+                        "https://evil.example.com/webservice/pluginfile.php/"
+                        "9599793/mod_resource/content/2/"
+                        "Dicas%20para%20a%20Prova.pdf?forcedownload=1"
+                    )
+    return bruto
 
 
 @pytest.mark.politica
@@ -303,23 +395,32 @@ def test_T103b_plural_recusa_de_seguranca_e_nomeada_no_lote(
     'pluginfile.php/' mas aponta para host ESTRANHO ainda parece interno (tem
     fileid) — `cliente.baixar` recusa com `FuncaoBloqueada`, e essa recusa É
     UM EVENTO DE SEGURANÇA que precisa chegar ao chamador legível, não como um
-    crash que engole o resto do lote."""
+    crash que engole o resto do lote.
 
-    def recusa(*_a, **_k):
-        raise FuncaoBloqueada(
-            "Download recusado: aponta para host fora da allowlist."
-        )
-
-    cliente = _cliente(
-        conteudo_bruto, disciplinas_brutas, arquivos={_URL_DICAS_GERAL: recusa}
-    )
+    Achado da RE-revisão: a mensagem real de `FuncaoBloqueada` embute a
+    `fileurl` recusada — ecoá-la (`motivo=str(exc)`) vazaria endereço de
+    webservice para o texto, violando T99c/T68b mesmo sem vazar credencial.
+    Por isso este teste usa um `ClienteMoodle` DE VERDADE (não um dublê que
+    inventa a mensagem): é a allowlist real quem levanta `FuncaoBloqueada`
+    com o texto real, e é esse texto real que `arquivo.py` tem de sanitizar.
+    """
+    bruto = _com_dicas_geral_apontando_para_host_estranho(conteudo_bruto)
+    cliente = _cliente_moodle_real(bruto, disciplinas_brutas)
 
     r = arq.baixar_arquivo(cliente, "PSI3323", "dicas", todos=True, raiz=tmp_path)
 
     assert len(r.baixados) == 1
+    assert r.baixados[0].fileid == "9599833"  # o item legítimo (AULA 6)
     assert len(r.recusados) == 1
+    assert r.recusados[0].nome == "Dicas para a Prova.pdf"
     assert "recusado" in r.recusados[0].motivo.lower()
     assert r.recusados[0].nome in r.texto
+    # A prova do achado da re-revisão: nada do endereço recusado (nem o
+    # host malicioso, nem o prefixo esperado do e-Disciplinas) chega ao
+    # texto que vai para o modelo.
+    assert "evil.example.com" not in r.texto
+    assert "pluginfile.php" not in r.texto
+    assert "/webservice/" not in r.texto
 
 
 @pytest.mark.contrato
