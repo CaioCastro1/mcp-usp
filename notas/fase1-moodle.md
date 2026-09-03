@@ -142,3 +142,71 @@ devolver a lista e deixar parecer completa.
 
 Linhas 5, 7, 8, 9, 10, 11 — `submission_status`, as duas visões de nota,
 `get_updates_since`, fóruns e o feed iCal.
+
+## Download de arquivo e texto de PDF — medido em 01/09/2026
+
+A Fase 1 registrou "o download com token anexado não foi verificado neste repo".
+Verificado agora, contra `edisciplinas.usp.br`, sem gastar chamada de
+`core_course_get_contents`: as `fileurl` da fixture higienizada são reais (a
+higienização mexe em nome/nota/`userid`, não em endereço de arquivo).
+
+### Como o `pluginfile.php` autentica
+
+| Tentativa | Resultado |
+|---|---|
+| GET sem token | **HTTP 200** + JSON `{"errorcode":"missingparam"}`, 136 B |
+| GET com `?token=…` | HTTP 200, `application/pdf`, 87.705 B, magic `%PDF-` |
+| GET com `Authorization: Bearer …` | **HTTP 200** + JSON `missingparam` — header é ignorado |
+| **POST com `token` no corpo** | **HTTP 200, `application/pdf`, 87.705 B** |
+| POST no corpo sem `forcedownload` | idem — o parâmetro não é necessário |
+
+Dois fatos que mudam desenho:
+
+1. **O token NÃO precisa ir na URL.** O repo assumia que baixar exigia colar o
+   segredo na query string (`material.py`, §9 de 31/08). Falso: o corpo do POST
+   serve. A credencial pode nunca entrar numa string de endereço — nem em log de
+   proxy, nem em histórico, nem no contexto do modelo.
+2. **Erro chega com HTTP 200.** Falha de credencial não vem como 4xx: vem 200
+   com `Content-Type: application/json` e `errorcode`. Quem checar só o status
+   entrega um JSON de erro achando que é PDF. O byte-magic (`%PDF-`) e o
+   content-type são a checagem que vale (Invariante 6).
+
+O `filesize` declarado em `contents` bateu exatamente com os bytes recebidos —
+serve para prever custo antes de baixar.
+
+### Custo do texto — os 19 PDFs internos de PSI3323, não uma amostra
+
+| | |
+|---|---|
+| PDFs baixados | 19 (15,9 MB, 181 páginas) |
+| Texto extraído somado | 203.675 B, **~50.900 tokens** |
+| Razão texto/arquivo | **1,28%** |
+| Média por PDF | 10.719 B, **~2.679 tokens** |
+| Maior | 25.258 B (~6,3k tok), "Circuito com diodos - Exp1" |
+| Menor | 1.700 B, "Dicas para a Prova" |
+| **Sem camada de texto (escaneado)** | **0 de 19** |
+
+Os 19, e não três, justamente porque três amostras não provam ausência — o erro
+que este repo já cometeu e registrou duas vezes. Nenhum PDF **desta disciplina**
+exigiu OCR.
+
+> **Ressalva escrita em 03/09/2026, e ela desmente a leitura fácil desta tabela.**
+> "Zero escaneados" vale para PSI3323 e **não** é fato do sistema. A primeira
+> disciplina nova refutou: `Lista 1.pdf` (16 páginas) e `Lista 2.pdf` (10 páginas)
+> de PTC3314 são resoluções **manuscritas e escaneadas**, com **0 B de texto por
+> página**. Dezenove de dezenove é uma amostra convincente e ainda assim não era
+> ausência. Ver §9 de 03/09 no `SPEC1.md` — e note que a ferramenta funciona
+> nesses arquivos justamente porque **não** extrai texto.
+
+**Um PDF cabe no contexto; a disciplina inteira não.** ~2,7k tokens de média
+contra ~50,9k para as 19. A segunda ferramenta é **um arquivo por vez**, como a
+primeira é uma disciplina por vez — e precisa declarar truncamento quando o
+texto passar do teto (Invariante 7), porque a variação vai de 1,7k a 25,3k bytes.
+
+Densidade separa dois tipos: texto corrido (~1.700 B/página: apostila, roteiro,
+regras) e transparência (~280–440 B/página: slide de aula). Não muda a ferramenta,
+muda a expectativa de quem lê a saída.
+
+Medido com `pypdf`, instalado só para a medição e **desinstalado depois**: seria
+a primeira dependência de runtime do projeto e isso é decisão de §9, não efeito
+colateral de uma medida.

@@ -220,3 +220,198 @@ def test_t82_o_timeout_cobre_a_chamada_mais_pesada_medida():
     assert mod_cliente._TIMEOUT_PADRAO_SEGUNDOS >= 45, (
         "timeout abaixo do medido: get_users_courses levou 14,7 s ao vivo"
     )
+
+
+# --- T91, T93, T94, T99: o download ---------------------------------------
+
+TOKEN_DE_TESTE = "TOKEN-SINTETICO-NAO-E-CREDENCIAL"
+URL_TESTE = "https://edisciplinas.usp.br"
+URL_ARQUIVO = f"{URL_TESTE}/webservice/pluginfile.php/9599792/mod_resource/content/26/a.pdf"
+
+
+class _DownloadFalso:
+    """Grava o que recebeu e devolve (content_type, bytes) combinados."""
+
+    def __init__(self, content_type="application/pdf", corpo=b"%PDF-1.4 conteudo"):
+        self.chamadas: list[dict] = []
+        self._content_type = content_type
+        self._corpo = corpo
+
+    def __call__(self, *, url, dados, teto_bytes):
+        self.chamadas.append({"url": url, "dados": dados, "teto_bytes": teto_bytes})
+        return self._content_type, self._corpo
+
+
+def _cliente_com(download):
+    return ClienteMoodle(
+        token=TOKEN_DE_TESTE,
+        url=URL_TESTE,
+        transporte=lambda **k: {},
+        transporte_download=download,
+    )
+
+
+@pytest.mark.politica
+def test_T91_url_de_outro_host_e_recusada_antes_de_qualquer_io():
+    """A credencial vai no CORPO do POST: outro host receberia o token."""
+    download = _DownloadFalso()
+    cliente = _cliente_com(download)
+
+    with pytest.raises(FuncaoBloqueada) as erro:
+        cliente.baixar("https://evil.example.com/webservice/pluginfile.php/1/x.pdf")
+
+    # O que prova a regra é o transporte NÃO ter sido chamado — não a mensagem.
+    assert download.chamadas == []
+    assert "evil.example.com" in str(erro.value)
+
+
+@pytest.mark.politica
+def test_T91b_url_no_host_certo_mas_fora_do_pluginfile_e_recusada():
+    download = _DownloadFalso()
+    cliente = _cliente_com(download)
+
+    with pytest.raises(FuncaoBloqueada):
+        cliente.baixar(f"{URL_TESTE}/login/token.php")
+
+    assert download.chamadas == []
+
+
+def test_T93_json_com_http_200_vira_erro_legivel():
+    """Falha de credencial no pluginfile.php NÃO vem como 4xx (§9, 01/09)."""
+    download = _DownloadFalso(
+        content_type="application/json; charset=utf-8",
+        corpo=b'{"errorcode":"invalidtoken","error":"Token invalido"}',
+    )
+    cliente = _cliente_com(download)
+
+    with pytest.raises(TokenInvalido):
+        cliente.baixar(URL_ARQUIVO)
+
+
+def test_T93b_json_de_erro_generico_preserva_o_errorcode():
+    download = _DownloadFalso(
+        content_type="application/json",
+        corpo=b'{"errorcode":"missingparam","error":"faltou"}',
+    )
+    cliente = _cliente_com(download)
+
+    with pytest.raises(ErroMoodle) as erro:
+        cliente.baixar(URL_ARQUIVO)
+
+    assert "missingparam" in str(erro.value)
+
+
+def test_T94_tamanho_divergente_do_esperado_vira_erro():
+    """Entregar arquivo truncado como bom é o pior resultado possível."""
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    with pytest.raises(ErroMoodle) as erro:
+        cliente.baixar(URL_ARQUIVO, tamanho_esperado=999)
+
+    assert "999" in str(erro.value) and "5" in str(erro.value)
+
+
+def test_T94b_tamanho_batendo_devolve_os_bytes():
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    assert cliente.baixar(URL_ARQUIVO, tamanho_esperado=5) == b"12345"
+
+
+class _RespostaHTTPFalsa:
+    """Simula o objeto que `urllib.request.urlopen` devolve, com corpo maior
+    que qualquer teto usado nos testes abaixo.
+
+    Existe para exercitar o transporte REAL (`_transporte_download_padrao`) e
+    não o dublê `_DownloadFalso` — só assim o `+ 1` de
+    `resp.read(teto_bytes + 1)` fica sob teste. Um arquivo interno sem
+    `filesize` utilizável não pode ser recusado por antecipação (não há como
+    saber o tamanho antes de ler); o byte extra é o que permite ao download
+    real notar que ultrapassou o teto, em vez de parar silenciosamente em
+    exatamente `teto_bytes` e devolver um arquivo truncado como se fosse bom.
+    """
+
+    def __init__(self, corpo: bytes, content_type: str = "application/pdf"):
+        self._corpo = corpo
+        self._content_type = content_type
+        self.pedidos_de_leitura: list[int] = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    @property
+    def headers(self):
+        return {"Content-Type": self._content_type}
+
+    def read(self, n):
+        self.pedidos_de_leitura.append(n)
+        return self._corpo[:n]
+
+
+def test_T94c_corpo_acima_do_teto_levanta_mesmo_sem_tamanho_esperado(monkeypatch):
+    """Caso real: arquivo sem `filesize` conhecido de antemão. A única forma
+    de saber que ele passa do teto é o byte extra que sobra na leitura.
+    """
+    resposta_falsa = _RespostaHTTPFalsa(b"x" * 20)
+    monkeypatch.setattr(
+        mod_cliente.urllib.request, "urlopen", lambda *a, **k: resposta_falsa
+    )
+    cliente = ClienteMoodle(
+        token=TOKEN_DE_TESTE, url=URL_TESTE, transporte=lambda **k: {}
+    )
+
+    with pytest.raises(ErroMoodle) as erro:
+        cliente.baixar(URL_ARQUIVO, teto_bytes=5)
+
+    assert "5" in str(erro.value)
+    # A prova de que o "+1" foi o que permitiu detectar: só 6 bytes foram
+    # pedidos ao transporte real — nunca os 20 disponíveis no corpo falso.
+    assert resposta_falsa.pedidos_de_leitura == [6]
+
+
+def test_T94d_corpo_exatamente_no_teto_nao_levanta_e_devolve_os_bytes():
+    """O que separa `>` de `>=`: no limite exato, o arquivo é bom e não pode
+    ser recusado."""
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    assert cliente.baixar(URL_ARQUIVO, teto_bytes=5) == b"12345"
+
+
+def test_T94e_o_teto_bytes_chega_ao_transporte_de_download():
+    """Asserte sobre o que foi ENVIADO: sem isso, o teto poderia ser ignorado
+    na leitura e o teste ainda passaria — o dublê devolve o que o teste
+    mandou, não o que a implementação de fato repassou."""
+    download = _DownloadFalso(corpo=b"12345")
+    cliente = _cliente_com(download)
+
+    cliente.baixar(URL_ARQUIVO, teto_bytes=999)
+
+    assert download.chamadas[0]["teto_bytes"] == 999
+
+
+def test_T99_o_token_vai_no_corpo_e_nunca_na_url():
+    download = _DownloadFalso()
+    cliente = _cliente_com(download)
+
+    cliente.baixar(URL_ARQUIVO)
+
+    enviado = download.chamadas[0]
+    assert enviado["dados"]["token"] == TOKEN_DE_TESTE
+    assert TOKEN_DE_TESTE not in enviado["url"]
+
+
+def test_T99b_o_token_nao_aparece_em_nenhuma_mensagem_de_erro():
+    download = _DownloadFalso(
+        content_type="application/json", corpo=b'{"errorcode":"invalidtoken"}'
+    )
+    cliente = _cliente_com(download)
+
+    with pytest.raises(ErroMoodle) as erro:
+        cliente.baixar(URL_ARQUIVO)
+
+    assert TOKEN_DE_TESTE not in str(erro.value)

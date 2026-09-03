@@ -14,8 +14,12 @@ outras.
 
 **A regra de segurança desta fronteira, e ela veio de medição.** Os 22 módulos
 `resource` apontam para `edisciplinas.usp.br/webservice/pluginfile.php`, e baixar
-de lá exige anexar o token na URL. Emitir essa URL põe a credencial a um passo do
-contexto do modelo e de todo log por onde a resposta passar (Invariante 3). Os 7
+de lá exige o token no request. Emitir uma URL com o token dentro põe a credencial
+a um passo do contexto do modelo e de todo log por onde a resposta passar
+(Invariante 3); emitir a URL sem o token entrega um endereço que não abre. Nos dois
+casos a saída fica pior, então o endereço não sai. **Medido em 01/09: o token não
+precisa ir na URL — o corpo do POST autentica igual** (§9), então quem baixa é o
+servidor, sem que uma URL com segredo dentro chegue a existir. Os 7
 módulos `url` apontam para fora (YouTube, Google Docs, sites de fabricante) e não
 têm esse problema: esses saem inteiros, porque recusar tudo seria esconder o que
 se sabe. O que identifica um arquivo interno — nome, tipo, tamanho, data — sai;
@@ -28,6 +32,7 @@ from datetime import datetime
 
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle
+from .texto import casa
 
 # Host + caminho que caracterizam arquivo servido pelo webservice do Moodle, e
 # que por isso exigiria o token para ser baixado.
@@ -50,6 +55,16 @@ class Item:
     tamanho: int | None
     modificado: datetime | None
     url_externa: str | None
+    # Campos para consumo INTERNO de `arquivo.py`, nunca impressos: T68b e T68c
+    # são os guardas disso. `fileurl_bruta` é a `fileurl` como o Moodle a
+    # devolveu — para um `resource` ela é a URL do webservice, para um `url` é o
+    # endereço externo. O nome diz "bruta" e não "interna" porque as duas coisas
+    # passam por aqui, e é `fileid` (ausente no link externo) que as separa.
+    fileurl_bruta: str | None = None
+    fileid: str | None = None
+    mimetype: str | None = None
+    secao: str = ""
+    modulo: str = ""
 
 
 @dataclass(frozen=True)
@@ -92,6 +107,18 @@ def _url_publica(bruto: str | None) -> str | None:
     return bruto
 
 
+def _fileid(bruto: str | None) -> str | None:
+    """O primeiro segmento depois de `pluginfile.php/` — o id do arquivo.
+
+    Não é segredo (a URL inteira é que exige credencial para servir de algo), e
+    é o que distingue dois arquivos de mesmo nome: em PSI3323, `Dicas para a
+    Prova.pdf` existe duas vezes, com ids 9599793 e 9599833.
+    """
+    if not bruto or "pluginfile.php/" not in bruto:
+        return None
+    return bruto.split("pluginfile.php/", 1)[1].split("/", 1)[0] or None
+
+
 def projetar_material(bruto) -> Conteudo:
     """Seções → módulos → conteúdos vira uma lista curta com o que identifica.
 
@@ -119,6 +146,11 @@ def projetar_material(bruto) -> Conteudo:
                         tamanho=conteudo.get("filesize") or None,
                         modificado=_data(conteudo.get("timemodified")),
                         url_externa=_url_publica(conteudo.get("fileurl")),
+                        fileurl_bruta=conteudo.get("fileurl"),
+                        fileid=_fileid(conteudo.get("fileurl")),
+                        mimetype=conteudo.get("mimetype"),
+                        secao=secao.get("name") or "",
+                        modulo=modulo.get("name") or "",
                     )
                 )
                 total += 1
@@ -190,12 +222,12 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
     )
 
     total = conteudo.total_itens
-    filtro = (busca or "").strip().lower()
+    filtro = (busca or "").strip()
 
     secoes = []
     mostrados = 0
     for secao in conteudo.secoes:
-        itens = [i for i in secao.itens if not filtro or filtro in i.nome.lower()]
+        itens = [i for i in secao.itens if casa(filtro, i.nome)]
         mostrados += len(itens)
         if itens:
             secoes.append((secao.nome, itens))
@@ -242,9 +274,12 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         linhas.extend(_formatar_item(i) for i in itens)
 
     avisos = [
-        "Link de arquivo interno do e-Disciplinas não é entregue aqui: baixá-lo "
-        "exige a sua credencial na URL, e ela não sai desta máquina (Invariante 3). "
-        "Abra pelo e-Disciplinas.",
+        "O link do arquivo interno do e-Disciplinas não é entregue aqui: um "
+        "endereço sem a credencial não abre, e um com ela poria a credencial "
+        "no seu contexto — por isso ele não sai desta máquina (Invariante 3), "
+        "mesmo sabendo que a requisição de download autentica pelo corpo do "
+        "pedido, sem precisar colar a credencial no endereço. Para baixar de "
+        "fato um destes arquivos, use a ferramenta `baixar_arquivo`.",
     ]
     if conteudo.sem_conteudo:
         avisos.append(
