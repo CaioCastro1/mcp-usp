@@ -8,16 +8,23 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 "está público" não equivale a "liberado para redistribuir" — ver Invariante 8 do
 `SPEC1.md`.
 
-## Estado — 31/08/2026
+## Estado — 09/09/2026
 
-**Três servidores MCP rodando, quatro ferramentas, todas verificadas contra a USP.**
+**Três servidores MCP rodando, cinco ferramentas, todas verificadas contra a USP.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
 | `usp-rucard` | `bandejao` | O que tem no bandejão hoje, e onde vale a pena comer |
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
 | `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina — regras, listas, provas antigas |
+| `usp-moodle` | `baixar_arquivo` | Baixa um desses arquivos e devolve o caminho dele no disco |
 | `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
+
+`baixar_arquivo` entrega o **caminho**, não o conteúdo: quem lê o PDF é o agente que
+chamou, com a ferramenta de leitura dele. Blob em base64 custaria ~302k tokens no PDF
+médio; extrair o texto no servidor perderia as figuras — e devolveria 9 bytes para uma
+lista manuscrita escaneada, chamando isso de sucesso (§9, 01/09 e 03/09). O arquivo cai
+em `~/.cache/usp-mcp/moodle/`, fora do repositório.
 
 O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter e o RUCard não
 usam credencial nenhuma e por isso seguem candidatos a servidor hospedado (§6 do
@@ -26,10 +33,12 @@ cada servidor de verdade — mais uma camada `live` atrás de `USP_MCP_LIVE=1` q
 a USP.
 
 **O que ainda não existe:** notas, "já entreguei?", aviso de professor — e nada de
-histórico de cardápio, saldo do cartão, horário, sala ou vagas. `material` diz o nome do
-arquivo mas **não** entrega o link de download do que é interno: baixá-lo exigiria a
-credencial do usuário na URL. Nenhuma ferramenta nasce por conveniência: o critério está
-no §5, e as questões abertas do §4 fecham com dado registrado no §9.
+histórico de cardápio, saldo do cartão, horário, sala ou vagas. `material` diz o nome, o
+tipo e o tamanho de cada arquivo, mas **não** emite a URL interna dele: endereço sem a
+credencial não abre, e é `baixar_arquivo` que resolve isso sem nunca pôr o token numa URL.
+Instalar continua sendo `git clone` + venv: empacotar como MCP Bundle (`.mcpb`) está
+pesquisado no §6.1 e **não** testado. Nenhuma ferramenta nasce por conveniência: o
+critério está no §5, e as questões abertas do §4 fecham com dado registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
@@ -49,7 +58,7 @@ python3 -m venv .venv
 ./scripts/gate.sh
 ```
 
-O `.mcp.json` versionado já registra os dois servidores, sem segredo. Abra um cliente
+O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
 MCP neste diretório e pergunte.
 
 ## Configuração
