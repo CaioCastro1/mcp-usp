@@ -1,24 +1,21 @@
 {
   "mcpServers": {
     "usp-moodle": {
-      "command": ".venv/bin/python",
+      "command": "scripts/servidor.sh",
       "args": [
-        "-m",
-        "usp_mcp.moodle.server"
+        "moodle"
       ]
     },
     "usp-jupiter": {
-      "command": ".venv/bin/python",
+      "command": "scripts/servidor.sh",
       "args": [
-        "-m",
-        "usp_mcp.jupiter.server"
+        "jupiter"
       ]
     },
     "usp-rucard": {
-      "command": ".venv/bin/python",
+      "command": "scripts/servidor.sh",
       "args": [
-        "-m",
-        "usp_mcp.rucard.server"
+        "rucard"
       ]
     }
   }
