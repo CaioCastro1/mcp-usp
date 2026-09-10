@@ -70,7 +70,7 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
 # Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
 .venv/bin/python -m pytest tests/handshake
 
-# Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
+# Gate antes de commit: .env presente, segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
 # Rodar TODOS os testes, inclusive a camada que fala com a USP de verdade
