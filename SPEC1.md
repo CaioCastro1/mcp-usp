@@ -1995,3 +1995,30 @@ navegador e ler clipboard. O resto — escrever `.env`, falar com o Moodle, cach
 
 **Descartado:** `login/token.php` com senha (§1.3, SSO — não insista), renovar token sem
 navegador (o `launch.php` autentica por sessão), e o `setup.sh` que faria tudo.
+
+**Adendo do mesmo dia — o passo 6 medido contra a USP, não contra o dublê.** Uma chamada
+com o token que já estava no `.env`, pela construção exata do script. Quatro coisas que
+eu tinha escrito defensivamente e agora são medida:
+
+- **`curl -K -` funciona contra o e-Disciplinas real**, não só contra o servidor local:
+  31.386 B / ~7.846 tokens de resposta, 447 funções expostas, `userid` idêntico ao
+  `.cache/userid`. A construção do passo 6 está verificada ponta a ponta.
+- **Os cinco campos que o passo 6 imprime existem na resposta real**: `sitename`,
+  `fullname`, `username`, `release`, `userid`. Eu tinha escrito o parser com `.get()` e
+  "(não informado)" justamente por não ter medido; a defesa fica, mas deixou de ser palpite.
+- **`site_info` não tem campo de expiração.** Nenhuma das 28 chaves do topo casa com
+  `expir`/`valid`/`until`. Eu tinha dito ao dono que o script imprimiria a expiração e
+  corrigi por leitura da API; agora está medido. Expiração e revogação só em
+  `managetoken.php`, que é onde o script aponta.
+- **`site_info` não devolve o próprio `wstoken`.** Verificado por asserção antes de
+  imprimir qualquer coisa: a resposta inteira foi varrida à procura do valor do token e
+  ele não está lá. Importa porque é a única chamada que o setup faz, e uma função de
+  diagnóstico que ecoasse a credencial poria ela no contexto de quem depurasse o script.
+
+**O que continua sem medida, e é o resto do fluxo:** os passos 2 a 5 (abrir o
+`launch.php` numa sessão logada, copiar o redirect, decodificar um payload real) exigem
+navegador autenticado na Senha Única. Eu não executo essa parte de propósito, e o motivo
+é o Invariante 3, não falta de acesso: ler o redirect é ler o base64, e o base64 é o
+`wstoken` mais o `privatetoken`. Fazer isso pela sessão de IA põe as duas credenciais no
+transcrito — permanentemente, e num lugar que ninguém audita depois. O `pbpaste |` do
+passo 4 existe exatamente para que a única parte que toca o valor seja a do dono.
