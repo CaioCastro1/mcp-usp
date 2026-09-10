@@ -78,8 +78,20 @@ class ClienteStdio:
     é o processo real, subido como o `.mcp.json` o sobe.
     """
 
-    def __init__(self, modulo: str):
+    def __init__(
+        self,
+        modulo: str,
+        comando: list[str] | None = None,
+        cwd: pathlib.Path | str | None = None,
+    ):
+        # `comando`/`cwd` existem para a suíte do lançador (L1/L2), que precisa
+        # subir o MESMO servidor por outro caminho e a partir de um cwd que não
+        # é a raiz — que é exatamente o que esta suíte aqui nunca exercita, e
+        # foi por isso que o `.mcp.json` relativo passou verde quebrado fora do
+        # Claude Code. O default é o comportamento de sempre.
         self._modulo = modulo
+        self._comando = comando or [sys.executable, "-m", modulo]
+        self._cwd = str(cwd) if cwd is not None else str(RAIZ)
         self._proc: subprocess.Popen | None = None
         self._id = 0
         self.info: dict = {}
@@ -89,8 +101,8 @@ class ClienteStdio:
 
     def __enter__(self) -> ClienteStdio:
         self._proc = subprocess.Popen(
-            [sys.executable, "-m", self._modulo],
-            cwd=RAIZ,
+            self._comando,
+            cwd=self._cwd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
