@@ -2022,3 +2022,74 @@ navegador autenticado na Senha Única. Eu não executo essa parte de propósito,
 `wstoken` mais o `privatetoken`. Fazer isso pela sessão de IA põe as duas credenciais no
 transcrito — permanentemente, e num lugar que ninguém audita depois. O `pbpaste |` do
 passo 4 existe exatamente para que a única parte que toca o valor seja a do dono.
+
+### 10/09/2026 — o passo manual morreu: o `urlscheme` do Moodle aceita um esquema nosso
+
+**O script da entrada anterior tinha um passo manual no meio, e o dono reclamou com
+razão.** "Abra o DevTools na aba Network e copie a linha bloqueada" não é instrução de
+setup — é instrução para quem já sabe. A pergunta era se dava para o script pegar o
+token sozinho. Dá.
+
+**O que a leitura do `admin/tool/mobile/launch.php` (5.0 STABLE) resolveu.** Fatos novos
+do §1.3, cada um com a linha:
+
+- **Linha 37:** `urlscheme` é validado com `^[a-zA-Z][a-zA-Z0-9-\+\.]*$`. Só caracteres de
+  esquema. **Um catcher em localhost é impossível** — não existe `urlscheme` que faça o
+  Moodle redirecionar para `http://127.0.0.1:PORTA/?token=…`. Era a minha primeira ideia e
+  ela está morta por construção, não por falta de tentativa.
+- **Linha 116:** `$location = "$urlscheme://token=$apptoken"` — o base64 sempre na posição
+  de host. É a mecânica exata do aviso do `urlscheme=http` que o §1.3 já registrava.
+- **O regex aceita um esquema NOSSO.** `uspmcp` passa. Um handler registrado para ele
+  recebe o redirect direto do navegador. É a única porta, e ela existe.
+- **Linhas 120-145:** com `confirmed=1` o Moodle **não** redireciona — renderiza uma página
+  com um link cujo `href` é o `moodlemobile://token=…`, mais um JS que clica nele. O token
+  fica **na página, como link**. Isso conserta o caminho manual: "botão direito no link →
+  copiar endereço" em vez de DevTools.
+- **Linha 89:** `generate_token_for_current_user` devolve o token **existente** se já houver
+  um para o serviço. **Corrige o que eu tinha dito ao dono:** rodar o fluxo não cunha um
+  segundo token a cada vez, e não há nada para revogar depois de testar.
+- **Linha 94:** o `privatetoken` só vem em login novo (`$SESSION->justloggedin`). O payload
+  costuma ter 2 partes, não 3 — o decodificador já aceitava `>= 2`, agora por fato e não
+  por sorte.
+- **Linha 111:** `forcedurlscheme`, se configurado no site, **sobrescreve** nosso esquema.
+  Não é observável de fora, e é o principal motivo de o fallback manual continuar existindo.
+
+**Três obstáculos que a leitura não previu e a medição achou.** Cada um matava a ideia em
+silêncio, com `open` devolvendo `kLSApplicationNotFoundErr` e nenhuma pista de qual dos
+três era:
+
+1. **`osacompile` não gera `CFBundleIdentifier`.** Sem ele o Launch Services registra o
+   bundle e nunca reivindica o esquema. O `PlistBuddy` precisa de `Add`, não `Set` — `Set`
+   numa chave ausente aborta a invocação inteira e as outras chaves não entram, que foi o
+   primeiro falso negativo.
+2. **App em `/private/tmp` não é reivindicado.** Em `~/Library/Caches` é: o dump do LS
+   passa a dizer `claimed schemes: uspmcp:`. O sinal de que a causa era localização veio de
+   comparar o dump nos dois lugares, não de teoria.
+3. **Nenhum diálogo aparece** — nem do macOS pelo Launch Services, nem do Chrome seguindo
+   um `302` para esquema desconhecido. Verificado nos dois caminhos, e era a incógnita que
+   decidia se a automação valia a pena.
+
+**O FIFO preserva o invariante no caminho novo.** O handler escreve num FIFO, que não tem
+armazenamento (`stat` confirma tamanho 0 e tipo `Fifo File`), então o base64 cru — que
+carrega o `privatetoken` — continua não existindo em arquivo. Se o handler escrevesse num
+arquivo temporário, a automação teria custado o §4 do desenho.
+
+**Uma lição de método, e ela é sobre verificação.** A primeira versão da limpeza conferia
+se o esquema tinha sido liberado casando a **mensagem de erro** do `open` (`grep 'No
+application'`). Numa máquina já limpa ela reportou "ainda atende" — porque `open` sem saída
+cai no `else`. Um verificador que não distingue "sujo" de "saída inesperada" não verifica
+nada, e assustou o dono com um problema inexistente. Hoje ele asserta a **condição**: a
+contagem de claims do esquema no dump do LS voltou a zero. É o §6 do `CONVENTIONS.md`
+aplicado ao próprio verificador.
+
+**Medido ponta a ponta**, contra um Moodle de mentira que emite o mesmo `302` da linha 149,
+com pty para o script ver um terminal: 151 bytes capturados idênticos ao que o servidor
+mandou, decodificados, verificados, gravados, `userid` cacheado, e limpeza fechando com
+zero claims e zero diretório. Mais o passo 6 contra a USP real, no adendo anterior.
+
+**O que continua sem medida:** `forcedurlscheme` no e-Disciplinas, que só uma rodada real
+diz, e a fórmula do passaporte. As duas fecham na primeira execução com token de verdade,
+sem custo extra — a rodada é a mesma.
+
+**Descartado:** o catcher em localhost (linha 37 proíbe), e um teste da captura na suíte do
+gate — registrar handler no Launch Services é mudar a máquina de quem commita.

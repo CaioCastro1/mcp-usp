@@ -48,8 +48,8 @@ distinção que o passo 5 do problema descreve.
 |---|---|---|
 | 1 | prepara o `.env` (copia do `.env.example` se faltar) e lê `MOODLE_URL` | quem clonou o repo não tem `.env`; falhar aqui é falhar no passo mais fácil de resolver |
 | 2 | gera um **passaporte aleatório** em vez do `1234` fixo do §8 | o passaporte compõe o `siteid` do payload; com um próprio, o script confere o eco |
-| 3 | abre a URL do `launch.php` **e imprime ela** | a pessoa pode precisar do navegador logado na Senha Única, não do padrão do sistema |
-| 4 | recebe o valor **sem ecoar**: clipboard primeiro, `read -rs` como fallback | a credencial não entra no scrollback do terminal |
+| 3 | **captura automática**: handler temporário para um esquema nosso recebe o redirect | ver §3.2 — sem DevTools, sem clipboard, sem colar |
+| 4 | fallback manual, se a automática não entregar: `confirmed=1` + colar sem ecoar | a credencial não entra no scrollback do terminal |
 | 5 | decodifica **em memória** e descarta o `privatetoken` | ver §4 |
 | 6 | grava só os 32 hex no `.env`, com confirmação se já havia token | ver §5 |
 | 7 | `core_webservice_get_site_info` e grava o `userid` da mesma resposta | uma chamada, não duas |
@@ -67,6 +67,44 @@ do que foi lembrado, e transformar memória em porta fechada é o jeito de repro
 setup legítimo por motivo errado. Quando alguém rodar isso com token real, o
 diagnóstico que o script imprime é o dado que fecha a questão — e aí a conferência
 pode virar bloqueio, com registro no §9.
+
+### 3.2 A captura automática, e por que ela é a única porta
+
+O pedido original virou um script com um passo manual no meio — "abra o DevTools na
+aba Network" não é instrução de setup. A leitura do `admin/tool/mobile/launch.php` da
+5.0 STABLE (mesma linha da 5.0.8+ do e-Disciplinas) mostrou o que é possível:
+
+- **Linha 37:** `urlscheme` é validado com `^[a-zA-Z][a-zA-Z0-9-\+\.]*$`. Só caracteres
+  de esquema — sem `:`, `/` nem `?`. **Um catcher em localhost é impossível:** não existe
+  `urlscheme` que faça o Moodle redirecionar para `http://127.0.0.1:PORTA/?token=…`.
+- **Linha 116:** `$location = "$urlscheme://token=$apptoken"`. O base64 sempre cai na
+  posição de host, que é a razão do `urlscheme=http` corromper (§1.3).
+- **Mas o regex aceita um esquema NOSSO.** `uspmcp` passa. Registrando um handler para
+  ele, o navegador entrega a URL direto ao script.
+- **Linhas 120-145:** com `confirmed=1` o Moodle **não** redireciona: renderiza uma
+  página com um link cujo `href` é o `moodlemobile://token=…`. Isso melhora o fallback
+  manual — "botão direito no link → copiar endereço" em vez de DevTools.
+- **Linha 89:** `generate_token_for_current_user` devolve o token **existente** se já
+  houver um para o serviço. Rodar o fluxo não cunha um segundo token a cada vez.
+- **Linha 111:** `forcedurlscheme`, se configurado no site, **sobrescreve** nosso
+  esquema — e aí o handler nunca dispara. É o principal motivo de o fallback existir.
+
+Três obstáculos foram achados por medição, não por leitura, e cada um matava a ideia:
+
+1. `osacompile` **não** gera `CFBundleIdentifier`, e sem ele o Launch Services registra
+   o bundle mas nunca reivindica o esquema (`open` devolve `-10814`).
+2. App em `/private/tmp` **também** não é reivindicado. Em `~/Library/Caches` é.
+3. Entregue por Launch Services **e por redirect de navegador de verdade**, nenhum
+   diálogo aparece — nem do macOS nem do Chrome.
+
+**O handler escreve num FIFO, não em arquivo.** Um FIFO não tem armazenamento (`stat`
+confirma tamanho 0), então o §4 abaixo continua valendo no caminho automático.
+
+**A limpeza asserta a condição, não a mensagem.** O `trap` desregistra e apaga, e depois
+confere que a contagem de claims do esquema voltou a zero. A primeira versão dessa
+verificação casava a string de erro do `open` e reportou "ainda atende" numa máquina
+limpa — um verificador que não distingue "sujo" de "saída inesperada" não verifica nada
+(§6 do `CONVENTIONS.md`).
 
 ## 4. O `privatetoken` não toca o disco
 
@@ -91,6 +129,12 @@ vivos na conta e nenhum registro de qual está em uso — e quem quiser revogar 
 antigo não tem como saber qual dos nomes de 16 caracteres da lista é ele.
 
 ## 6. Onde o código mora
+
+`scripts/_capturar_redirect.sh` — a captura automática: monta o handler, registra,
+abre o `launch.php`, espera no FIFO, desregistra no `trap`. Código de saída separa os
+três desfechos: `0` capturou, `1` timeout (provável `forcedurlscheme`), `2` indisponível
+nesta máquina. Falta de ferramenta e esquema já reivindicado por outro app dão `2` — não
+erro: a resposta certa é cair no manual, não abortar o setup.
 
 `scripts/_decodificar_token.py` — a decodificação sai de dentro do `fix-token.sh` e
 vira unidade própria: lê URL ou base64 no stdin, imprime `siteid` e `wstoken` (nunca
@@ -122,11 +166,17 @@ O que ela especifica:
 4. base64 minusculizado — a armadilha do Chrome do §1.3 — reprova, em vez de gravar
    token corrompido.
 
-O que ela **não** alcança, e o desenho diz em voz alta: os passos 3, 4, 6 e 7 do
-script. Abrir navegador, ler clipboard, escrever `.env` e falar com a USP não são
-testáveis offline, e a regra 11 do `CLAUDE.md` já cobrou o preço de confundir "a
-suíte está verde" com "o entrypoint funciona". A verificação desses quatro é rodar o
-script de verdade, uma vez, na máquina do dono.
+O que ela **não** alcança: a captura automática e o fallback para o manual. Registrar
+handler no Launch Services e abrir navegador não entram numa suíte que roda no gate —
+seria um teste que muda o estado da máquina de quem commita. A regra 11 do `CLAUDE.md`
+manda dizer isso em voz alta em vez de fingir cobertura, e o backlog registra a dívida.
+
+**A verificação que existe para esses é medição à mão, registrada no §9:** o fluxo
+inteiro rodou contra um Moodle de mentira em `127.0.0.1` que emite o mesmo `302` da
+linha 149 do `launch.php`, com pty para o script ver um terminal. Capturou 151 bytes
+idênticos ao que o servidor mandou, decodificou, verificou, gravou, cacheou o `userid`,
+e a limpeza fechou com zero claims e zero diretório. O passo 6 também foi medido contra
+a USP de verdade (§9, adendo de 10/09).
 
 ## 8. Documentação
 
