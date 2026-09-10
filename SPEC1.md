@@ -370,6 +370,11 @@ respondida com dado.
 
 ## 8. Anexo B — comandos que funcionaram
 
+> **Este fluxo tem chamador desde 10/09/2026: `./scripts/token.sh`.** Ele executa os
+> sete passos guiado, decodifica sem imprimir o valor, confirma o token contra a USP
+> em uma chamada e só então grava no `.env`. O que está escrito abaixo continua sendo
+> a fonte — é o que o script faz, e é o que consertar quando ele quebrar.
+
 Token do Moodle (no navegador logado, com DevTools → Network aberto):
 
 ```
@@ -1929,3 +1934,64 @@ servidor o que o modelo resolve melhor é forte porque parece "mais completo". O
 critério que separa os dois casos: **entregar dado que estava sendo descartado é
 sempre certo; decidir no lugar do modelo raramente é.** O rótulo do módulo era a
 primeira coisa; o casamento por palavras era a segunda.
+
+### 10/09/2026 — o token do Moodle ganhou chamador, e três vazamentos de credencial apareceram no caminho
+
+**O pedido era um README.** O §8 já tinha o fluxo inteiro em prosa; o que faltava era
+alguém executar por quem está fazendo o setup. Virou `scripts/token.sh`, sete passos
+guiados, com o desenho em `docs/superpowers/specs/2026-09-10-script-token-moodle-design.md`.
+
+**A decisão de escopo:** o script cobre o token e só o token. Um `setup.sh` que fizesse
+venv + pip + gate duplicaria três linhas do `README.md` num segundo lugar que envelhece
+separado. E ele **confirma o token contra a USP em uma chamada** — decisão do dono. O
+argumento contra era o §1.1 (chamada ao vivo é decisão de quem tem a credencial); o que
+venceu é que quem roda o script *é* quem acabou de colar a própria credencial de
+propósito. Sem a chamada, "gravei o token" não significa "o token funciona", e a pessoa
+descobre no primeiro uso, com `invalidtoken` cru.
+
+**O que mudou de desenho por causa de vazamento, e não por causa de conveniência.** Três
+achados, nenhum deles no pedido original:
+
+1. **O token não pode ir em `argv`.** `ps aux` é legível por qualquer processo do mesmo
+   usuário, então `curl --data-urlencode "wstoken=$T"` publica a credencial para a máquina
+   inteira enquanto o processo vive. Medido em 10/09 contra um servidor local: `curl -K -`
+   lê a opção do stdin e o campo chega no corpo do POST igual — `wstoken`, `wsfunction` e
+   `moodlewsrestformat` no corpo, nada em `argv`. O `token.sh` usa isso no passo 6 e
+   variável de ambiente no passo 7. **`scripts/ws.sh` continua com o furo** — está no
+   backlog, e consertar lá é mudar o script que toda a descoberta usa.
+2. **O base64 cru não pode tocar o disco.** O caminho curto de implementar era gravar o
+   valor colado no `.env` e chamar o `fix-token.sh` para normalizar depois. Esse caminho
+   escreve o `privatetoken` — terceira parte do payload, que habilita
+   `tool_mobile_get_autologin_key`, bloqueio permanente do §2.2 — num arquivo que ninguém
+   audita depois de existir. O script decodifica em memória e grava só os 32 hex.
+3. **Verificar antes de gravar, não depois.** Assim o `.env` nunca guarda token que não
+   autentica, e o caminho de erro não precisa desfazer escrita.
+
+**A ordem dos passos veio de um teste, não de estética.** O fluxo inteiro foi exercitado
+offline contra um Moodle de mentira em `127.0.0.1`, e o caminho ruim revelou um furo que
+a leitura não tinha pegado: a confirmação de sobrescrita lia de `/dev/tty`, que não
+existe no modo `pbpaste | ./scripts/token.sh`. Hoje sem terminal ele **reprova dizendo a
+cura** (`--sobrescrever`) em vez de estourar — Invariante 6. Quatro caminhos verificados:
+token que autentica, token que o Moodle recusa, forma errada no payload, e sobrescrita
+sem terminal. Nos três últimos o `.env` fica **intacto**, e isso é asserção, não intenção.
+
+**A conferência do passaporte avisa e não bloqueia, de propósito.** O `siteid` do payload
+é `md5(wwwroot + passport)`, então um passaporte gerado pelo script permite detectar
+payload colado de outra tentativa. Essa fórmula está **recordada, não medida** contra o
+e-Disciplinas (§1.4) — transformar memória em porta fechada é o jeito de reprovar um setup
+legítimo por motivo errado. O script imprime o diagnóstico e diz qual das duas leituras o
+passo 6 desempata. **Quem rodar isso com token real fecha a questão**, e aí a conferência
+pode virar bloqueio.
+
+**A extração que a suíte cobre, e a que ela não cobre.** A regra do formato saiu de dentro
+do `fix-token.sh` e virou `scripts/_decodificar_token.py`, importado pelos dois scripts —
+sem isso o `token.sh` nasceria com uma segunda cópia da mesma regra. 17 testes offline,
+sobre payload sintético (nenhum token real entra em teste, nem higienizado), incluindo a
+asserção de que o `privatetoken` **não aparece no stdout** e a de que `fix-token.sh` com
+forma errada deixa o `.env` byte a byte como estava. Duas sabotagens confirmaram que a
+suíte reprova quando deve. O que ela **não** alcança está dito no §7 do desenho: abrir
+navegador e ler clipboard. O resto — escrever `.env`, falar com o Moodle, cachear o
+`userid` — passou a ser alcançável justamente porque o Moodle de mentira substituiu a USP.
+
+**Descartado:** `login/token.php` com senha (§1.3, SSO — não insista), renovar token sem
+navegador (o `launch.php` autentica por sessão), e o `setup.sh` que faria tudo.

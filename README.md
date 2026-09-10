@@ -63,5 +63,19 @@ MCP neste diretório e pergunte.
 
 ## Configuração
 
-Copie `.env.example` para `.env`. O token do Moodle é pessoal e nunca sai da máquina de
-quem usa (Invariante 4).
+O RUCard e o Jupiter não pedem credencial nenhuma — copie `.env.example` para `.env` e
+eles já funcionam. Só o Moodle precisa de token, e ele é pessoal: nunca sai da máquina
+de quem usa (Invariante 4).
+
+```bash
+./scripts/token.sh
+```
+
+O script guia os sete passos do fluxo de `launch.php` (§8 do `SPEC1.md`), decodifica o
+payload sem nunca imprimir o valor, **confirma o token contra a USP em uma chamada** e
+só então grava no `.env` — um token que não autentica não chega ao arquivo. Se você já
+tinha editado o `.env` à mão e o valor ficou torto, `./scripts/fix-token.sh` conserta.
+
+O token expira e é revogável em `/user/managetoken.php` → Reconfigurar. Renovar é rodar
+o script de novo: não há caminho sem sessão de navegador, porque a conta autentica por
+Senha Única e o Moodle não tem senha local para comparar (§1.3).
