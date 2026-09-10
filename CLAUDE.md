@@ -37,7 +37,7 @@ quatro é este arquivo.
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
-| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) e o gate (`gate.sh`) |
+| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`), o normalizador de token (`fix-token.sh`) e o gate (`gate.sh`) |
 | `.env` / `.env.example` | Credenciais por env var; `.env` no gitignore |
 | `docs/` | Este scaffold: domínios, convenções, handoffs, backlog |
 
@@ -52,6 +52,10 @@ quatro é este arquivo.
 
 # Derivar o userid do token (cacheado em .cache/userid); --refresh força nova chamada
 ./scripts/userid.sh [--refresh]
+
+# Normalizar MOODLE_TOKEN no .env: aceita a URL crua do fluxo de launch (§8) e grava
+# só o wstoken de 32 hex. Idempotente, e nunca imprime o valor (Invariante 3).
+./scripts/fix-token.sh
 
 # Medir quanto de cada resposta é resposta e quanto é transporte
 python3 scripts/reduzir.py
