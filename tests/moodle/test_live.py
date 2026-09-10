@@ -15,7 +15,6 @@ import os
 import pytest
 
 from tests.moodle.conftest import ARQUIVO_ENV
-from usp_mcp.moodle import politica
 from usp_mcp.moodle.cliente import ClienteMoodle
 
 pytestmark = [pytest.mark.live, pytest.mark.contrato]
@@ -62,8 +61,9 @@ def test_a_forma_da_resposta_real_ainda_bate_com_a_fixture(cliente_real, eventos
         assert not faltando, f"campos sumiram da API desde 28/08/2026: {sorted(faltando)}"
 
 
-def test_a_camada_live_so_alcanca_a_allowlist():
-    """T51 — a Regra de Ouro guardada por asserção, não por boa intenção."""
-    assert politica.ALLOWLIST == frozenset(
-        {"core_calendar_get_action_events_by_timesort"}
-    )
+# T51 — a guarda da Regra de Ouro (§3.1) mudou de camada: virou P1-P5 em
+# `tests/moodle/test_politica.py`. Ela não podia ficar aqui: o `gate.sh` exclui
+# a camada live de propósito, então uma asserção neste arquivo não roda em
+# commit nenhum. Foi assim que esta apodreceu calada — congelou a `ALLOWLIST`
+# em um nome e não reprovou quando ela foi a quatro, em 31/08. Guarda que só
+# roda atrás de `USP_MCP_LIVE=1` é guarda que ninguém vê morrer.
