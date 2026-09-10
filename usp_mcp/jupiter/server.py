@@ -176,9 +176,17 @@ def main() -> None:
     que apareceu o schema mais pobre que o declarado. Foi este buraco que, na
     trilha do Moodle, escondeu um `main()` falando a API antiga do SDK com a
     suíte inteira verde.
+
+    **E por um terceiro desde 10/09/2026.** E1-E4
+    (`tests/jupiter/test_erro_no_fio.py`) olham a MENSAGEM DE ERRO no fio, que
+    nenhum dos dois alcançava: os dois exercitam o caminho feliz e o handshake,
+    e a fronteira ficou muda por uma versão inteira do SDK sem ninguém ver.
     """
     try:
         from mcp.server import MCPServer
+        # `ToolError` existe no 2.0.0 e no 2.2.0, e entra no MESMO try: sem o
+        # SDK, quem responde é a mensagem legível abaixo, não um traceback.
+        from mcp.server.mcpserver.exceptions import ToolError
     except ImportError as exc:
         raise SystemExit(
             "O SDK do MCP (pacote `mcp`) não está instalado. Rode "
@@ -194,10 +202,20 @@ def main() -> None:
     def _disciplina(sigla, codcur=None, codhab="0", ingles=False) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
-        return chamar_ferramenta(
-            descritor["name"],
-            {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
-        )
+        try:
+            return chamar_ferramenta(
+                descritor["name"],
+                {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
+            )
+        except ErroJupiter as exc:
+            # `ToolError` é o canal que o SDK define para "falha prevista, a
+            # mensagem é para o modelo ler" — sem isto, o 2.2.0 classifica
+            # `ErroJupiter` como crash e entrega 31 bytes de `Error executing
+            # tool disciplina` (medido em 10/09/2026), jogando fora justamente a
+            # frase que a `JupiterErro` extraiu dos 46 frames do Tomcat. Só
+            # `ErroJupiter` é traduzido: `except Exception` devolveria ao modelo
+            # o stack trace que aquela classe existe para descartar, 116x o custo.
+            raise ToolError(str(exc)) from exc
 
     # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026): sem
     # isto, o aviso de que sem `codcur` não há pré-requisito não chega ao modelo.

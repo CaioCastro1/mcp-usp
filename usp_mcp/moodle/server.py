@@ -231,9 +231,17 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     docstring dizia "sem teste automático de propósito", com a justificativa de
     que exercitá-lo testaria o SDK; as duas metades estavam erradas, e foi este
     buraco que escondeu um `main()` falando a API antiga com a suíte 99/99 verde.
+
+    **E por um terceiro desde 10/09/2026.** E1-E4
+    (`tests/moodle/test_erro_no_fio.py`) olham a MENSAGEM DE ERRO no fio, que
+    nenhum dos dois alcançava — os dois exercitam o caminho feliz e o handshake,
+    e a fronteira ficou muda por uma versão inteira do SDK sem ninguém ver.
     """
     try:
         from mcp.server import MCPServer
+        # `ToolError` existe no 2.0.0 e no 2.2.0, e entra no MESMO try: sem o
+        # SDK, quem responde é a mensagem legível abaixo, não um traceback.
+        from mcp.server.mcpserver.exceptions import ToolError
     except ImportError as exc:
         raise SystemExit(
             "O SDK do MCP (pacote `mcp`) não está instalado. Rode "
@@ -247,12 +255,32 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     descritor = porta_vence
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
+    def _chamar(nome: str, argumentos: dict) -> str:
+        """A tradução do erro do domínio para o canal que o modelo lê.
+
+        Um ponto só para as três ferramentas: repetir o `try` em cada closure
+        seria a terceira cópia da mesma regra, e a que alguém esquece de pôr na
+        quarta ferramenta. `ToolError` é o canal que o SDK define para "falha
+        prevista, a mensagem é para o modelo ler" — sem isto, o 2.2.0 classifica
+        `ErroMoodle` como crash e entrega 32 bytes de `Error executing tool
+        o_que_vence`, com a cura ("configure o MOODLE_TOKEN no .env") presa no
+        stderr (medido em 10/09/2026).
+
+        Só `ErroMoodle` é traduzido. `except Exception` aqui seria pior do que o
+        silêncio: este é o entrypoint com credencial pessoal (Invariante 4), e o
+        texto de uma exceção imprevista deste processo não tem por que viajar.
+        """
+        try:
+            return chamar_ferramenta(nome, argumentos)
+        except ErroMoodle as exc:
+            raise ToolError(str(exc)) from exc
+
     def _o_que_vence(dias=14, limite=None) -> str:
         # Assinatura explícita em vez de `**kwargs`: o SDK deriva o schema que
         # o modelo vê a partir dela, e um `**kwargs` produziria uma ferramenta
         # sem parâmetro nenhum. Mantida em sincronia com o `inputSchema` de
         # `listar_ferramentas` — `_auto_verificar` compara os dois.
-        return chamar_ferramenta(descritor["name"], {"dias": dias, "limite": limite})
+        return _chamar(descritor["name"], {"dias": dias, "limite": limite})
 
     # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
     # isto, "Padrão 14" e a explicação de `limite` não chegam ao modelo.
@@ -264,7 +292,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         # que torna o parâmetro obrigatório no fio, e o `inputSchema` a declara
         # em `required`. Com `=None` os dois divergiam e o modelo via uma
         # ferramenta que aceita ser chamada sem disciplina — H6 pegou.
-        return chamar_ferramenta(
+        return _chamar(
             porta_material["name"], {"disciplina": disciplina, "busca": busca}
         )
 
@@ -278,7 +306,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         # torna o parâmetro obrigatório no fio, e o `inputSchema` os declara em
         # `required`. Com `=None` os dois divergiriam — foi assim que H6 pegou
         # `material` em 31/08.
-        return chamar_ferramenta(
+        return _chamar(
             porta_arquivo["name"],
             {"disciplina": disciplina, "nome": nome, "todos": todos},
         )
