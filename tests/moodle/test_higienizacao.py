@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.git import esta_ignorado
 from tests.moodle.conftest import CRU_EVENTOS, RAIZ
 
 pytestmark = pytest.mark.contrato
@@ -51,11 +52,13 @@ def test_a_fixture_esta_no_git_e_o_cru_nao(caminho_fixture):
         )
         return r.returncode == 0
     assert rastreado(caminho_fixture), "fixture higienizada fora do git"
-    r = subprocess.run(
-        ["git", "check-ignore", "-q", "fixtures/moodle/raw/action_events.json"],
-        cwd=RAIZ, capture_output=True,
-    )
-    assert r.returncode == 0, "fixtures/moodle/raw/ deixou de ser ignorada"
+    # A chamada era relativa e por isso escapou do BUG-2 — mas passa pelo helper
+    # do mesmo jeito: a regra é UM lugar que sabe perguntar (G5), não "os que
+    # estavam errados". Sobrando um segundo lugar certo, o próximo call site
+    # copia dele e o absoluto volta.
+    assert esta_ignorado(
+        RAIZ / "fixtures" / "moodle" / "raw" / "action_events.json", RAIZ
+    ), "fixtures/moodle/raw/ deixou de ser ignorada"
 
 
 def test_higienizar_e_estavel(tmp_path):
