@@ -4,14 +4,20 @@
 # Uso:  ./scripts/token.sh              # guiado, interativo
 #       pbpaste | ./scripts/token.sh    # se voce ja copiou a URL do redirect
 #       ./scripts/token.sh --sobrescrever   # trocar token que ja funciona, sem perguntar
+#       ./scripts/token.sh --manual         # sem captura automatica: colar a mao
 #
 # Sete passos, na ordem em que estao no desenho de 10/09/2026
 # (docs/superpowers/specs/2026-09-10-script-token-moodle-design.md):
 #
 #   1. prepara o .env            5. decodifica EM MEMORIA
 #   2. gera um passaporte        6. confirma o token contra a USP (1 chamada)
-#   3. abre o launch.php         7. grava so os 32 hex no .env
-#   4. recebe sem ecoar
+#   3. pega o redirect           7. grava so os 32 hex no .env
+#   4. (automatico, ou manual)
+#
+# O passo 3 tenta a captura automatica de scripts/_capturar_redirect.sh: um
+# handler temporario para um esquema nosso recebe o redirect do navegador, sem
+# DevTools e sem colar. Se ela nao entregar, cai no manual — que tambem melhorou:
+# com `confirmed=1` o token vem como LINK na pagina, nao mais so no DevTools.
 #
 # Tres coisas que este script nao faz, de proposito:
 #
@@ -38,9 +44,12 @@ FN="core_webservice_get_site_info"
 # --sobrescrever: trocar um token que ja funciona sem a pergunta do passo 1.
 # Existe porque `pbpaste | ./scripts/token.sh` nao tem terminal para perguntar.
 sobrescrever=0
+# --manual: pular a captura automatica e colar a URL do redirect a mao.
+manual=0
 for arg in "$@"; do
   case "$arg" in
     --sobrescrever) sobrescrever=1 ;;
+    --manual) manual=1 ;;
     -h|--ajuda|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;
   esac
@@ -92,49 +101,72 @@ fi
 # tentativa ou de outra sessao aparece. Ver §3.1 do desenho — confere e avisa,
 # NAO bloqueia: a formula esta recordada, nao medida contra o e-Disciplinas.
 passaporte=$("$PY" -c 'import secrets; print(secrets.randbelow(9*10**9) + 10**9)')
-url="$MOODLE_URL/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=$passaporte&urlscheme=moodlemobile"
+base="$MOODLE_URL/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=$passaporte"
 
-# ------------------------------------------------------------ 3. abre o launch
-titulo "2/7  abra esta URL no navegador que esta LOGADO na Senha Unica"
-printf '\n   %s\n\n' "$url"
-nota "ANTES de abrir: DevTools (Cmd+Opt+I) -> aba Network, deixe aberta."
-nota "Ao abrir, o Moodle redireciona para 'moodlemobile://token=<base64>'."
-nota "Nenhum app atende esse esquema, entao o navegador bloqueia — e a linha"
-nota "bloqueada na aba Network e exatamente o que voce precisa copiar."
-nota ""
-nota "Nao troque por urlscheme=http: nessa forma o base64 cai na posicao de"
-nota "host da URL, o Chrome minusculiza host, e base64 e sensivel a caixa —"
-nota "o token chega corrompido com a forma certa (§1.3 do SPEC1.md)."
+# Duas URLs para os dois caminhos, e a diferenca esta no `urlscheme`:
+#   automatico: esquema NOSSO, que um handler temporario atende (ver
+#               scripts/_capturar_redirect.sh). O navegador entrega direto.
+#   manual:     `confirmed=1` faz o launch.php NAO redirecionar — ele renderiza
+#               uma pagina com o link cujo href E o `moodlemobile://token=…`
+#               (linhas 120-145 da 5.0 STABLE). Entao a instrucao vira "botao
+#               direito no link -> copiar endereco", em vez de abrir o DevTools.
+url_auto="$base&urlscheme=uspmcp"
+url_manual="$base&urlscheme=moodlemobile&confirmed=1"
 
-if [ -t 0 ]; then
-  printf '\n   Enter para eu abrir no navegador padrao (ou Ctrl+C para colar a mao): '
-  read -r _ < /dev/tty
-  if command -v open >/dev/null 2>&1; then open "$url"
-  elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$url"
-  else nota "sem 'open'/'xdg-open' — abra a URL acima a mao"
+# ------------------------------------- 3+4. pega o redirect: automatico ou manual
+titulo "2/7  pegar o redirect do launch.php"
+valor=""
+
+if [ "$manual" = "0" ] && [ -t 0 ]; then
+  nota "Tentando captura automatica. Como funciona: registro um handler temporario"
+  nota "para \`uspmcp://\`, abro o launch.php com esse esquema, e o navegador"
+  nota "entrega o redirect direto para o script — sem DevTools e sem colar nada."
+  nota "O handler e desregistrado no fim, inclusive se voce abortar com Ctrl+C."
+  nota ""
+  if valor=$(./scripts/_capturar_redirect.sh "$url_auto" uspmcp 120); then
+    titulo "3/7  recebido sem passar pelo terminal nem pelo clipboard"
+    nota "captura automatica OK — nada foi colado e nada ficou no scrollback."
+  else
+    valor=""
+    aviso "a captura automatica nao entregou; seguindo no caminho manual."
   fi
 fi
 
-# ------------------------------------------------------ 4. recebe sem ecoar
-titulo "3/7  cole a URL do redirect"
-valor=""
-if [ -t 0 ]; then
-  nota "Nada aparece na tela enquanto voce cola — o valor e a credencial e nao"
-  nota "deve ficar no scrollback do terminal."
-  printf '\n   Cole e aperte Enter (ou Enter direto para eu ler do clipboard): '
-  IFS= read -rs valor < /dev/tty || true
-  printf '\n'
-  if [ -z "$valor" ]; then
-    if command -v pbpaste >/dev/null 2>&1; then valor=$(pbpaste)
-    elif command -v wl-paste >/dev/null 2>&1; then valor=$(wl-paste)
-    elif command -v xclip >/dev/null 2>&1; then valor=$(xclip -selection clipboard -o)
-    else nota "sem pbpaste/wl-paste/xclip nesta maquina"
+if [ -z "$valor" ]; then
+  titulo "2/7  (manual) abra esta URL no navegador LOGADO na Senha Unica"
+  printf '\n   %s\n\n' "$url_manual"
+  nota "Com \`confirmed=1\` o Moodle nao redireciona: ele mostra uma pagina com um"
+  nota "link. O endereco DESSE link e o token. Clique nele com o botao direito e"
+  nota "escolha 'copiar endereco do link' — nao precisa de DevTools."
+  nota ""
+  nota "Se a pagina nao aparecer e o navegador tentar abrir um app, ai o caminho e"
+  nota "o DevTools (Cmd+Opt+I) -> aba Network -> a linha bloqueada para"
+  nota "\`moodlemobile://token=…\` e o que copiar."
+  nota ""
+  nota "Nao troque por urlscheme=http: nessa forma o base64 cai na posicao de host"
+  nota "da URL, o Chrome minusculiza host, e base64 e sensivel a caixa — o token"
+  nota "chega corrompido com a forma certa (§1.3 do SPEC1.md)."
+
+  titulo "3/7  cole a URL do link"
+  if [ -t 0 ]; then
+    if command -v open >/dev/null 2>&1; then open "$url_manual" 2>/dev/null || true; fi
+    nota "Nada aparece na tela enquanto voce cola — o valor e a credencial e nao"
+    nota "deve ficar no scrollback do terminal."
+    printf '\n   Cole e aperte Enter (ou Enter direto para eu ler do clipboard): '
+    IFS= read -rs valor < /dev/tty || true
+    printf '\n'
+    if [ -z "$valor" ]; then
+      if command -v pbpaste >/dev/null 2>&1; then valor=$(pbpaste)
+      elif command -v wl-paste >/dev/null 2>&1; then valor=$(wl-paste)
+      elif command -v xclip >/dev/null 2>&1; then valor=$(xclip -selection clipboard -o)
+      else nota "sem pbpaste/wl-paste/xclip nesta maquina"
+      fi
+      [ -n "$valor" ] && nota "li do clipboard ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
     fi
-    [ -n "$valor" ] && nota "li do clipboard ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
+  else
+    valor=$(cat)   # pbpaste | ./scripts/token.sh
+    nota "li do stdin ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
   fi
-else
-  valor=$(cat)   # pbpaste | ./scripts/token.sh
-  nota "li do stdin ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
 fi
 
 # ------------------------------------------------- 5. decodifica em memoria

@@ -71,10 +71,17 @@ de quem usa (Invariante 4).
 ./scripts/token.sh
 ```
 
-O script guia os sete passos do fluxo de `launch.php` (§8 do `SPEC1.md`), decodifica o
-payload sem nunca imprimir o valor, **confirma o token contra a USP em uma chamada** e
-só então grava no `.env` — um token que não autentica não chega ao arquivo. Se você já
-tinha editado o `.env` à mão e o valor ficou torto, `./scripts/fix-token.sh` conserta.
+No macOS ele resolve sozinho: registra um handler temporário para um esquema próprio,
+abre o `launch.php` no seu navegador, e **o redirect com o token vem direto para o
+script** — sem DevTools, sem copiar, sem colar. O handler é desregistrado no fim,
+inclusive se você abortar. Se isso não funcionar (o site pode forçar outro esquema),
+ele cai no caminho manual, onde o token aparece como link na página e basta copiar o
+endereço do link.
+
+Nos dois caminhos ele decodifica sem nunca imprimir o valor, **confirma o token contra a
+USP em uma chamada** e só então grava no `.env` — um token que não autentica não chega ao
+arquivo. Se você já tinha editado o `.env` à mão e o valor ficou torto,
+`./scripts/fix-token.sh` conserta.
 
 O token expira e é revogável em `/user/managetoken.php` → Reconfigurar. Renovar é rodar
 o script de novo: não há caminho sem sessão de navegador, porque a conta autentica por

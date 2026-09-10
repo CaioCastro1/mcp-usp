@@ -44,7 +44,8 @@ quatro é este arquivo.
 ## 3. Comandos
 
 ```bash
-# Obter o MOODLE_TOKEN e gravar no .env (guiado; confirma contra a USP em 1 chamada)
+# Obter o MOODLE_TOKEN e gravar no .env (captura o redirect sozinho no macOS;
+# confirma contra a USP em 1 chamada antes de gravar; --manual pula a automacao)
 ./scripts/token.sh
 
 # Chamada única ao web service do Moodle (uma função por invocação, escolhida à mão)
