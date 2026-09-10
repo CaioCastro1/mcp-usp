@@ -55,16 +55,25 @@ tomada, com o dado que a fechou e o que foi descartado.
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+cp .env.example .env
 ./scripts/gate.sh
 ```
+
+O `cp` vem **antes** do gate porque sem `.env` ele reprova: a hash do RUCard é o único
+valor que o gate precisa, e ela já vem preenchida no exemplo — é a chave embutida no
+app oficial, pública e compartilhada, não credencial de ninguém. O token do Moodle
+nasce vazio e **não** precisa ser preenchido para o gate passar: ele roda offline e não
+toca a USP. Para de fato usar o servidor do Moodle, veja *Configuração*.
 
 O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
 MCP neste diretório e pergunte.
 
 ## Configuração
 
-Copie `.env.example` para `.env`. O token do Moodle é pessoal e nunca sai da máquina de
-quem usa (Invariante 4).
+O `cp .env.example .env` da seção acima é o passo, e é um só. `RUCARD_HASH` já vem
+preenchida. `MOODLE_TOKEN` nasce vazio e é o único valor a colar à mão: é credencial
+pessoal, nunca sai da máquina de quem usa (Invariante 4), e o §8 do `SPEC1.md` diz
+como obtê-lo.
 
 ## Para quem acabou de ganhar acesso
 
