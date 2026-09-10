@@ -44,6 +44,9 @@ quatro é este arquivo.
 ## 3. Comandos
 
 ```bash
+# Obter o MOODLE_TOKEN e gravar no .env (guiado; confirma contra a USP em 1 chamada)
+./scripts/token.sh
+
 # Chamada única ao web service do Moodle (uma função por invocação, escolhida à mão)
 ./scripts/ws.sh <funcao> [param=valor ...]
 
