@@ -66,7 +66,41 @@ nasce vazio e **não** precisa ser preenchido para o gate passar: ele roda offli
 toca a USP. Para de fato usar o servidor do Moodle, veja *Configuração*.
 
 O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
-MCP neste diretório e pergunte.
+MCP neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e é
+o script que resolve a raiz do checkout — não o cliente.
+
+### Cliente que não faz `cd`
+
+O `.mcp.json` é relativo de propósito: ele é versionado e compartilhado, e caminho
+absoluto de máquina não entra em arquivo rastreado (Invariante 3 aplicado a caminho).
+Relativo funciona em cliente que roda o servidor com o diretório de trabalho na raiz do
+projeto — o Claude Code faz isso. **Claude Desktop e afins não fazem**, e lá o caminho
+relativo falha com `no such file or directory`.
+
+Para esses, aponte para o **caminho absoluto do lançador**. Ele é o único absoluto que
+aparece, e mora no arquivo de config da sua máquina, não aqui:
+
+```json
+{
+  "mcpServers": {
+    "usp-rucard": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["rucard"]
+    },
+    "usp-jupiter": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["jupiter"]
+    },
+    "usp-moodle": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["moodle"]
+    }
+  }
+}
+```
+
+Troque `<CAMINHO-DO-CHECKOUT>` pela saída de `pwd` neste diretório. O `cd` de dentro do
+script resolve o resto — inclusive achar o `.venv`, que é por diretório e não vem no git.
 
 ## Configuração
 
@@ -126,8 +160,10 @@ segredo nenhum: abra o Claude Code **nesta pasta** e pergunte. Para que valham e
 pasta, registre no escopo de usuário:
 
 ```bash
-R=$(pwd); for m in moodle jupiter rucard; do claude mcp add --scope user "usp-$m" -e PYTHONPATH=$R -- $R/.venv/bin/python -m usp_mcp.$m.server; done
+R=$(pwd); for m in moodle jupiter rucard; do claude mcp add --scope user "usp-$m" -- $R/scripts/servidor.sh $m; done
 ```
+
+O `-e PYTHONPATH=` que esta linha carregava saiu junto: ele existia porque o comando antigo rodava o interpretador de fora do checkout, e o lançador entra nele antes de subir o servidor.
 
 **Onde isso NÃO vai funcionar, e não é configuração:** sandbox em nuvem (a rede da USP não
 sai de lá, §1.1) e conector remoto (o token não pode viajar, Invariante 4 — e o
