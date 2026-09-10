@@ -5,10 +5,10 @@ fixture ausente deixa a suíte verde noutra máquina SEM TER TESTADO NADA.
 É o Invariante 6 aplicado à própria suíte.
 """
 import pathlib
-import subprocess
 
 import pytest
 
+from tests.git import esta_ignorado
 from tests.jupiter.conftest import FATIA, FIXTURES, RAIZ, caminho
 
 pytestmark = pytest.mark.politica
@@ -38,10 +38,7 @@ def test_t2_nenhum_caminho_absoluto_de_maquina():
 @pytest.mark.parametrize("chave", sorted(FATIA))
 def test_t3_fatia_nao_depende_de_arquivo_fora_do_git(chave):
     p = caminho(chave)
-    r = subprocess.run(
-        ["git", "check-ignore", "-q", str(p)], cwd=RAIZ, capture_output=True
-    )
-    assert r.returncode == 1, (
+    assert not esta_ignorado(p, RAIZ), (
         f"{p.name} está no .gitignore. A suíte não pode depender de arquivo que "
         "outra máquina não tem — é o caso de html-obterTurma-*.html, deixado "
         "fora da fatia de propósito (§2 do spec)."
