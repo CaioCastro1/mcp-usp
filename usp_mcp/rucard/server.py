@@ -175,9 +175,15 @@ def main() -> None:  # pragma: no cover — casca stdio
 
     Coberto por `tests/handshake/` desde 31/08/2026: aquele teste sobe este
     processo, aperta a mão e compara o que sai no fio com o que
-    `listar_ferramentas()` declara."""
+    `listar_ferramentas()` declara. E por E1-E4
+    (`tests/rucard/test_erro_no_fio.py`) desde 10/09/2026, que é onde a MENSAGEM
+    DE ERRO passou a ser verificada no fio — nenhum dos dois alcançava isso, e
+    por isso a fronteira ficou muda por uma versão inteira do SDK."""
     try:
         from mcp.server import MCPServer
+        # `ToolError` existe no 2.0.0 e no 2.2.0, e entra no MESMO try: sem o
+        # SDK, quem responde é a mensagem legível abaixo, não um traceback.
+        from mcp.server.mcpserver.exceptions import ToolError
     except ImportError as exc:
         raise SystemExit(
             "O SDK do MCP (pacote `mcp`) não está instalado. Rode "
@@ -202,10 +208,20 @@ def main() -> None:  # pragma: no cover — casca stdio
     def _bandejao(dia="hoje", refeicao="todas", restaurantes=None) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
-        return chamar_ferramenta(
-            descritor["name"],
-            {"dia": dia, "refeicao": refeicao, "restaurantes": restaurantes},
-        )
+        try:
+            return chamar_ferramenta(
+                descritor["name"],
+                {"dia": dia, "refeicao": refeicao, "restaurantes": restaurantes},
+            )
+        except ErroRucard as exc:
+            # `ToolError` é o canal que o SDK define para "falha prevista, a
+            # mensagem é para o modelo ler" — sem isto, o 2.2.0 classifica
+            # `ErroRucard` como crash e entrega 29 bytes de `Error executing
+            # tool bandejao`, com a mensagem em português presa no stderr
+            # (medido em 10/09/2026). Só `ErroRucard` é traduzido: um `KeyError`
+            # continua sendo crash, e continua com o texto retido — é o
+            # comportamento certo do SDK, não um efeito colateral.
+            raise ToolError(str(exc)) from exc
 
     # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
     # isto, o `enum` que ensina que só existem quatro RUs não chega ao modelo, e
