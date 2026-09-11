@@ -55,37 +55,121 @@ tomada, com o dado que a fechou e o que foi descartado.
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+cp .env.example .env
 ./scripts/gate.sh
 ```
 
+O `cp` vem **antes** do gate porque sem `.env` ele reprova: a hash do RUCard é o único
+valor que o gate precisa, e ela já vem preenchida no exemplo — é a chave embutida no
+app oficial, pública e compartilhada, não credencial de ninguém. O token do Moodle
+nasce vazio e **não** precisa ser preenchido para o gate passar: ele roda offline e não
+toca a USP. Para de fato usar o servidor do Moodle, veja *Configuração*.
+
 O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
-MCP neste diretório e pergunte.
+MCP neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e é
+o script que resolve a raiz do checkout — não o cliente.
+
+### Cliente que não faz `cd`
+
+O `.mcp.json` é relativo de propósito: ele é versionado e compartilhado, e caminho
+absoluto de máquina não entra em arquivo rastreado (Invariante 3 aplicado a caminho).
+Relativo funciona em cliente que roda o servidor com o diretório de trabalho na raiz do
+projeto — o Claude Code faz isso. **Claude Desktop e afins não fazem**, e lá o caminho
+relativo falha com `no such file or directory`.
+
+Para esses, aponte para o **caminho absoluto do lançador**. Ele é o único absoluto que
+aparece, e mora no arquivo de config da sua máquina, não aqui:
+
+```json
+{
+  "mcpServers": {
+    "usp-rucard": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["rucard"]
+    },
+    "usp-jupiter": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["jupiter"]
+    },
+    "usp-moodle": {
+      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
+      "args": ["moodle"]
+    }
+  }
+}
+```
+
+Troque `<CAMINHO-DO-CHECKOUT>` pela saída de `pwd` neste diretório. O `cd` de dentro do
+script resolve o resto — inclusive achar o `.venv`, que é por diretório e não vem no git.
 
 ## Configuração
 
-O RUCard e o Jupiter não pedem credencial nenhuma — copie `.env.example` para `.env` e
-eles já funcionam. Só o Moodle precisa de token, e ele é pessoal: nunca sai da máquina
-de quem usa (Invariante 4).
+O `cp .env.example .env` da seção acima é o passo, e é um só. `RUCARD_HASH` já vem
+preenchida. `MOODLE_TOKEN` nasce vazio e é o único valor a obter: é credencial pessoal,
+nunca sai da máquina de quem usa (Invariante 4), e quem busca ele é `./scripts/token.sh`.
+
+## Para quem acabou de ganhar acesso
+
+O token é **seu**, não de quem te convidou — cada pessoa traz o seu. Isso não é atrito
+acidental: é o Invariante 4, e é o que permite este projeto existir sem ninguém confiar
+credencial a ninguém.
+
+**1. Clone e monte o ambiente.** O `.venv` é por diretório e não vem no git.
+
+```bash
+git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+```
+
+**2. Pegue seu token do e-Disciplinas.** Um comando, com o navegador logado na Senha Única:
 
 ```bash
 ./scripts/token.sh
 ```
 
-Ele abre o `launch.php` no seu navegador. O Moodle mostra uma página com um link — o
-**endereço desse link é o token**. Botão direito nele, "copiar endereço do link", volta
-no terminal e aperta Enter: o script lê do clipboard. Sem DevTools. Leva uns 20 segundos,
-e é o caminho verificado contra o e-Disciplinas (§9 do `SPEC1.md`, 11/09/2026).
+Ele abre o `launch.php` para você. O Moodle mostra uma página com um link — o **endereço
+desse link é o token**. Botão direito nele, "copiar endereço do link", volta no terminal e
+aperta Enter: o script lê do clipboard. Sem DevTools, sem decodificar nada à mão. Uns 20
+segundos.
 
-Ele decodifica sem nunca imprimir o valor, **confirma o token contra a USP em uma
-chamada** e só então grava no `.env` — um token que não autentica não chega ao arquivo.
-Se você já tinha editado o `.env` à mão e o valor ficou torto, `./scripts/fix-token.sh`
-conserta.
+Daí ele decodifica, **confirma o token contra a USP em uma chamada** e só então grava no
+`.env` — um token que não autentica não chega ao arquivo, e o `userid` sai da mesma
+resposta. **Nunca imprime o valor do token**, só diagnóstico de forma (Invariante 3).
 
-Existe um `--auto` que tenta capturar o redirect sozinho, registrando um handler
-temporário para um esquema próprio. Ele funciona contra servidor de teste e **nunca
-entregou contra o e-Disciplinas**, então não é o padrão — está no `SPEC1.md` com o que
-falta medir.
+Se você já tinha colado a URL no `.env` à mão e ela ficou torta, `./scripts/fix-token.sh`
+normaliza — é idempotente e detecta quando já está nos 32 hex.
 
-O token expira e é revogável em `/user/managetoken.php` → Reconfigurar. Renovar é rodar
-o script de novo: não há caminho sem sessão de navegador, porque a conta autentica por
-Senha Única e o Moodle não tem senha local para comparar (§1.3).
+Existe um `--auto` que tenta capturar o redirect sozinho, com um handler temporário para
+um esquema próprio. Funciona contra servidor de teste e **nunca entregou contra o
+e-Disciplinas**, então não é o padrão (§9 do `SPEC1.md`, 11/09/2026).
+
+**3. Confira sem gastar chamada nenhuma da sua conta.**
+
+```bash
+./scripts/gate.sh
+.venv/bin/python -m usp_mcp.moodle.server --auto-verificar
+```
+
+O `--auto-verificar` diz se o `.env` foi achado, se o token está presente (sem mostrá-lo),
+se o SDK está instalado e se os schemas casam. **Nada disso toca a rede da USP.**
+
+**4. Ligue num cliente MCP.** O `.mcp.json` versionado já registra os três servidores sem
+segredo nenhum: abra o Claude Code **nesta pasta** e pergunte. Para que valham em qualquer
+pasta, registre no escopo de usuário:
+
+```bash
+R=$(pwd); for m in moodle jupiter rucard; do claude mcp add --scope user "usp-$m" -- $R/scripts/servidor.sh $m; done
+```
+
+O `-e PYTHONPATH=` que esta linha carregava saiu junto: ele existia porque o comando antigo rodava o interpretador de fora do checkout, e o lançador entra nele antes de subir o servidor.
+
+**Onde isso NÃO vai funcionar, e não é configuração:** sandbox em nuvem (a rede da USP não
+sai de lá, §1.1) e conector remoto (o token não pode viajar, Invariante 4 — e o
+e-Disciplinas não oferece OAuth). Moodle é local, por desenho. RUCard e Jupiter não usam
+credencial e poderiam ser hospedados; não estão (§6).
+
+**Seu token expira e é revogável** em `edisciplinas.usp.br` → gerenciar tokens. Se algo
+parar de responder com `invalidtoken`, é isso — rode `./scripts/token.sh` de novo. Não há
+caminho sem sessão de navegador: a conta autentica por Senha Única e o Moodle não tem
+senha local para comparar (§1.3).
