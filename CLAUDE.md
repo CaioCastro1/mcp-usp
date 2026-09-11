@@ -37,13 +37,18 @@ quatro é este arquivo.
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
-| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`), o normalizador de token (`fix-token.sh`) e o gate (`gate.sh`) |
+| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`), o obtentor de token (`token.sh`, com `fix-token.sh` para normalizar) e o gate (`gate.sh`) |
 | `.env` / `.env.example` | Credenciais por env var; `.env` no gitignore |
 | `docs/` | Este scaffold: domínios, convenções, handoffs, backlog |
 
 ## 3. Comandos
 
 ```bash
+# Obter o MOODLE_TOKEN e gravar no .env. Manual por padrao (copiar o endereco do
+# link da pagina do launch.php) e confirma contra a USP antes de gravar. `--auto`
+# tenta capturar o redirect sozinho — funciona contra duble, nao contra a USP.
+./scripts/token.sh
+
 # Chamada única ao web service do Moodle (uma função por invocação, escolhida à mão)
 ./scripts/ws.sh <funcao> [param=valor ...]
 

@@ -370,6 +370,11 @@ respondida com dado.
 
 ## 8. Anexo B — comandos que funcionaram
 
+> **Este fluxo tem chamador desde 10/09/2026: `./scripts/token.sh`.** Ele executa os
+> sete passos guiado, decodifica sem imprimir o valor, confirma o token contra a USP
+> em uma chamada e só então grava no `.env`. O que está escrito abaixo continua sendo
+> a fonte — é o que o script faz, e é o que consertar quando ele quebrar.
+
 Token do Moodle (no navegador logado, com DevTools → Network aberto):
 
 ```
@@ -1929,3 +1934,230 @@ servidor o que o modelo resolve melhor é forte porque parece "mais completo". O
 critério que separa os dois casos: **entregar dado que estava sendo descartado é
 sempre certo; decidir no lugar do modelo raramente é.** O rótulo do módulo era a
 primeira coisa; o casamento por palavras era a segunda.
+
+### 10/09/2026 — o token do Moodle ganhou chamador, e três vazamentos de credencial apareceram no caminho
+
+**O pedido era um README.** O §8 já tinha o fluxo inteiro em prosa; o que faltava era
+alguém executar por quem está fazendo o setup. Virou `scripts/token.sh`, sete passos
+guiados, com o desenho em `docs/superpowers/specs/2026-09-10-script-token-moodle-design.md`.
+
+**A decisão de escopo:** o script cobre o token e só o token. Um `setup.sh` que fizesse
+venv + pip + gate duplicaria três linhas do `README.md` num segundo lugar que envelhece
+separado. E ele **confirma o token contra a USP em uma chamada** — decisão do dono. O
+argumento contra era o §1.1 (chamada ao vivo é decisão de quem tem a credencial); o que
+venceu é que quem roda o script *é* quem acabou de colar a própria credencial de
+propósito. Sem a chamada, "gravei o token" não significa "o token funciona", e a pessoa
+descobre no primeiro uso, com `invalidtoken` cru.
+
+**O que mudou de desenho por causa de vazamento, e não por causa de conveniência.** Três
+achados, nenhum deles no pedido original:
+
+1. **O token não pode ir em `argv`.** `ps aux` é legível por qualquer processo do mesmo
+   usuário, então `curl --data-urlencode "wstoken=$T"` publica a credencial para a máquina
+   inteira enquanto o processo vive. Medido em 10/09 contra um servidor local: `curl -K -`
+   lê a opção do stdin e o campo chega no corpo do POST igual — `wstoken`, `wsfunction` e
+   `moodlewsrestformat` no corpo, nada em `argv`. O `token.sh` usa isso no passo 6 e
+   variável de ambiente no passo 7. **`scripts/ws.sh` continua com o furo** — está no
+   backlog, e consertar lá é mudar o script que toda a descoberta usa.
+2. **O base64 cru não pode tocar o disco.** O caminho curto de implementar era gravar o
+   valor colado no `.env` e chamar o `fix-token.sh` para normalizar depois. Esse caminho
+   escreve o `privatetoken` — terceira parte do payload, que habilita
+   `tool_mobile_get_autologin_key`, bloqueio permanente do §2.2 — num arquivo que ninguém
+   audita depois de existir. O script decodifica em memória e grava só os 32 hex.
+3. **Verificar antes de gravar, não depois.** Assim o `.env` nunca guarda token que não
+   autentica, e o caminho de erro não precisa desfazer escrita.
+
+**A ordem dos passos veio de um teste, não de estética.** O fluxo inteiro foi exercitado
+offline contra um Moodle de mentira em `127.0.0.1`, e o caminho ruim revelou um furo que
+a leitura não tinha pegado: a confirmação de sobrescrita lia de `/dev/tty`, que não
+existe no modo `pbpaste | ./scripts/token.sh`. Hoje sem terminal ele **reprova dizendo a
+cura** (`--sobrescrever`) em vez de estourar — Invariante 6. Quatro caminhos verificados:
+token que autentica, token que o Moodle recusa, forma errada no payload, e sobrescrita
+sem terminal. Nos três últimos o `.env` fica **intacto**, e isso é asserção, não intenção.
+
+**A conferência do passaporte avisa e não bloqueia, de propósito.** O `siteid` do payload
+é `md5(wwwroot + passport)`, então um passaporte gerado pelo script permite detectar
+payload colado de outra tentativa. Essa fórmula está **recordada, não medida** contra o
+e-Disciplinas (§1.4) — transformar memória em porta fechada é o jeito de reprovar um setup
+legítimo por motivo errado. O script imprime o diagnóstico e diz qual das duas leituras o
+passo 6 desempata. **Quem rodar isso com token real fecha a questão**, e aí a conferência
+pode virar bloqueio.
+
+**A extração que a suíte cobre, e a que ela não cobre.** A regra do formato saiu de dentro
+do `fix-token.sh` e virou `scripts/_decodificar_token.py`, importado pelos dois scripts —
+sem isso o `token.sh` nasceria com uma segunda cópia da mesma regra. 17 testes offline,
+sobre payload sintético (nenhum token real entra em teste, nem higienizado), incluindo a
+asserção de que o `privatetoken` **não aparece no stdout** e a de que `fix-token.sh` com
+forma errada deixa o `.env` byte a byte como estava. Duas sabotagens confirmaram que a
+suíte reprova quando deve. O que ela **não** alcança está dito no §7 do desenho: abrir
+navegador e ler clipboard. O resto — escrever `.env`, falar com o Moodle, cachear o
+`userid` — passou a ser alcançável justamente porque o Moodle de mentira substituiu a USP.
+
+**Descartado:** `login/token.php` com senha (§1.3, SSO — não insista), renovar token sem
+navegador (o `launch.php` autentica por sessão), e o `setup.sh` que faria tudo.
+
+**Adendo do mesmo dia — o passo 6 medido contra a USP, não contra o dublê.** Uma chamada
+com o token que já estava no `.env`, pela construção exata do script. Quatro coisas que
+eu tinha escrito defensivamente e agora são medida:
+
+- **`curl -K -` funciona contra o e-Disciplinas real**, não só contra o servidor local:
+  31.386 B / ~7.846 tokens de resposta, 447 funções expostas, `userid` idêntico ao
+  `.cache/userid`. A construção do passo 6 está verificada ponta a ponta.
+- **Os cinco campos que o passo 6 imprime existem na resposta real**: `sitename`,
+  `fullname`, `username`, `release`, `userid`. Eu tinha escrito o parser com `.get()` e
+  "(não informado)" justamente por não ter medido; a defesa fica, mas deixou de ser palpite.
+- **`site_info` não tem campo de expiração.** Nenhuma das 28 chaves do topo casa com
+  `expir`/`valid`/`until`. Eu tinha dito ao dono que o script imprimiria a expiração e
+  corrigi por leitura da API; agora está medido. Expiração e revogação só em
+  `managetoken.php`, que é onde o script aponta.
+- **`site_info` não devolve o próprio `wstoken`.** Verificado por asserção antes de
+  imprimir qualquer coisa: a resposta inteira foi varrida à procura do valor do token e
+  ele não está lá. Importa porque é a única chamada que o setup faz, e uma função de
+  diagnóstico que ecoasse a credencial poria ela no contexto de quem depurasse o script.
+
+**O que continua sem medida, e é o resto do fluxo:** os passos 2 a 5 (abrir o
+`launch.php` numa sessão logada, copiar o redirect, decodificar um payload real) exigem
+navegador autenticado na Senha Única. Eu não executo essa parte de propósito, e o motivo
+é o Invariante 3, não falta de acesso: ler o redirect é ler o base64, e o base64 é o
+`wstoken` mais o `privatetoken`. Fazer isso pela sessão de IA põe as duas credenciais no
+transcrito — permanentemente, e num lugar que ninguém audita depois. O `pbpaste |` do
+passo 4 existe exatamente para que a única parte que toca o valor seja a do dono.
+
+### 10/09/2026 — o passo manual morreu: o `urlscheme` do Moodle aceita um esquema nosso
+
+**O script da entrada anterior tinha um passo manual no meio, e o dono reclamou com
+razão.** "Abra o DevTools na aba Network e copie a linha bloqueada" não é instrução de
+setup — é instrução para quem já sabe. A pergunta era se dava para o script pegar o
+token sozinho. Dá.
+
+**O que a leitura do `admin/tool/mobile/launch.php` (5.0 STABLE) resolveu.** Fatos novos
+do §1.3, cada um com a linha:
+
+- **Linha 37:** `urlscheme` é validado com `^[a-zA-Z][a-zA-Z0-9-\+\.]*$`. Só caracteres de
+  esquema. **Um catcher em localhost é impossível** — não existe `urlscheme` que faça o
+  Moodle redirecionar para `http://127.0.0.1:PORTA/?token=…`. Era a minha primeira ideia e
+  ela está morta por construção, não por falta de tentativa.
+- **Linha 116:** `$location = "$urlscheme://token=$apptoken"` — o base64 sempre na posição
+  de host. É a mecânica exata do aviso do `urlscheme=http` que o §1.3 já registrava.
+- **O regex aceita um esquema NOSSO.** `uspmcp` passa. Um handler registrado para ele
+  recebe o redirect direto do navegador. É a única porta, e ela existe.
+- **Linhas 120-145:** com `confirmed=1` o Moodle **não** redireciona — renderiza uma página
+  com um link cujo `href` é o `moodlemobile://token=…`, mais um JS que clica nele. O token
+  fica **na página, como link**. Isso conserta o caminho manual: "botão direito no link →
+  copiar endereço" em vez de DevTools.
+- **Linha 89:** `generate_token_for_current_user` devolve o token **existente** se já houver
+  um para o serviço. **Corrige o que eu tinha dito ao dono:** rodar o fluxo não cunha um
+  segundo token a cada vez, e não há nada para revogar depois de testar.
+- **Linha 94:** o `privatetoken` só vem em login novo (`$SESSION->justloggedin`). O payload
+  costuma ter 2 partes, não 3 — o decodificador já aceitava `>= 2`, agora por fato e não
+  por sorte.
+- **Linha 111:** `forcedurlscheme`, se configurado no site, **sobrescreve** nosso esquema.
+  Não é observável de fora, e é o principal motivo de o fallback manual continuar existindo.
+
+**Três obstáculos que a leitura não previu e a medição achou.** Cada um matava a ideia em
+silêncio, com `open` devolvendo `kLSApplicationNotFoundErr` e nenhuma pista de qual dos
+três era:
+
+1. **`osacompile` não gera `CFBundleIdentifier`.** Sem ele o Launch Services registra o
+   bundle e nunca reivindica o esquema. O `PlistBuddy` precisa de `Add`, não `Set` — `Set`
+   numa chave ausente aborta a invocação inteira e as outras chaves não entram, que foi o
+   primeiro falso negativo.
+2. **App em `/private/tmp` não é reivindicado.** Em `~/Library/Caches` é: o dump do LS
+   passa a dizer `claimed schemes: uspmcp:`. O sinal de que a causa era localização veio de
+   comparar o dump nos dois lugares, não de teoria.
+3. **Nenhum diálogo aparece** — nem do macOS pelo Launch Services, nem do Chrome seguindo
+   um `302` para esquema desconhecido. Verificado nos dois caminhos, e era a incógnita que
+   decidia se a automação valia a pena.
+
+**O FIFO preserva o invariante no caminho novo.** O handler escreve num FIFO, que não tem
+armazenamento (`stat` confirma tamanho 0 e tipo `Fifo File`), então o base64 cru — que
+carrega o `privatetoken` — continua não existindo em arquivo. Se o handler escrevesse num
+arquivo temporário, a automação teria custado o §4 do desenho.
+
+**Uma lição de método, e ela é sobre verificação.** A primeira versão da limpeza conferia
+se o esquema tinha sido liberado casando a **mensagem de erro** do `open` (`grep 'No
+application'`). Numa máquina já limpa ela reportou "ainda atende" — porque `open` sem saída
+cai no `else`. Um verificador que não distingue "sujo" de "saída inesperada" não verifica
+nada, e assustou o dono com um problema inexistente. Hoje ele asserta a **condição**: a
+contagem de claims do esquema no dump do LS voltou a zero. É o §6 do `CONVENTIONS.md`
+aplicado ao próprio verificador.
+
+**Medido ponta a ponta**, contra um Moodle de mentira que emite o mesmo `302` da linha 149,
+com pty para o script ver um terminal: 151 bytes capturados idênticos ao que o servidor
+mandou, decodificados, verificados, gravados, `userid` cacheado, e limpeza fechando com
+zero claims e zero diretório. Mais o passo 6 contra a USP real, no adendo anterior.
+
+**O que continua sem medida:** `forcedurlscheme` no e-Disciplinas, que só uma rodada real
+diz, e a fórmula do passaporte. As duas fecham na primeira execução com token de verdade,
+sem custo extra — a rodada é a mesma.
+
+**Descartado:** o catcher em localhost (linha 37 proíbe), e um teste da captura na suíte do
+gate — registrar handler no Launch Services é mudar a máquina de quem commita.
+
+### 11/09/2026 — o token obtido pelo script, contra o e-Disciplinas de verdade
+
+**Primeira ponta a ponta real.** `./scripts/token.sh --manual --sobrescrever` com o
+payload vindo do clipboard: decodificou, autenticou, gravou. `core_webservice_get_site_info`
+devolveu `Moodle USP: e-Disciplinas`, a conta do dono e `5.0.8+ (Build: 20260722)` — a
+mesma versão que o §1.3 registrava. O `userid` saiu da própria resposta e foi para
+`.cache/userid`; nenhum valor de token apareceu em tela em nenhum momento.
+
+**O caminho que funcionou é o manual com `confirmed=1`,** e ele é o que o §9 de 10/09
+descreveu a partir das linhas 120-145: o Moodle renderiza uma página com um link cujo
+`href` é o `moodlemobile://token=…`, e "botão direito → copiar endereço do link" substitui
+o DevTools. O clipboard chegou com 113 bytes na forma exata (`moodlemobile://token=` mais
+92 caracteres de base64), e o modo `pbpaste | ./scripts/token.sh` consumiu direto.
+
+**Três fatos do `launch.php` confirmados por medição, não mais por leitura:**
+
+1. **Linha 89 — `generate_token_for_current_user` devolve o token EXISTENTE.** O valor
+   gravado veio **byte a byte igual** ao que já estava no `.env` (comparado por hash, sem
+   imprimir nenhum dos dois). Não se cunha token novo a cada rodada, e **não há nada para
+   revogar depois de testar**. Isso corrige em definitivo o aviso que este documento e o
+   próprio script davam em 10/09, e a mensagem de sobrescrita foi reescrita.
+2. **Linha 94 — o `privatetoken` só vem em login novo.** O payload tinha **2 partes**, não
+   3. O decodificador aceita `>= 2` desde o começo; agora isso é fato e não tolerância.
+3. **O `.env` sobreviveu linha por linha** — só a linha do token mudou.
+
+**A conferência do passaporte é mais fraca do que o desenho supunha, e a rodada mostrou
+por quê.** Ela avisou "não confere", e estava certa: o payload veio de uma URL de
+`launch.php` aberta numa tentativa anterior (passaporte `8141678839`), enquanto o script
+tinha acabado de gerar outro (`2694381761`). Um payload de outra invocação **da mesma
+conta** é perfeitamente válido — o Moodle devolve o mesmo token — e não confere por
+construção. Ou seja: **no caminho manual a conferência quase sempre vai avisar, e o aviso
+não significa nada**, porque nada obriga a pessoa a abrir exatamente a URL que o script
+imprimiu. Ela só carrega informação no caminho automático, onde é o próprio script que
+abre a URL que gerou. A mensagem foi reescrita para dizer isso em vez de assustar.
+
+**O que continua sem medida, e é só uma coisa:** a captura automática contra o
+e-Disciplinas. Três tentativas reais, três falhas antes de o navegador entregar o
+redirect — a primeira na guarda de claim obsoleto (corrigida), a segunda no `open` travado
+por modal (corrigida), a terceira sem causa identificada porque ela mora na tela do dono.
+Com ela morre junto a questão do `forcedurlscheme`, que **não é observável de fora**:
+`tool_mobile_get_public_config` custou uma chamada e não expõe a chave (36 chaves, nenhuma
+com `forced`).
+
+**Descartado nesta rodada:** o Chrome como navegador da captura — medido com payload falso
+e servidor local, ele não entrega `uspmcp://` sem um clique de confirmação, enquanto o
+padrão do sistema entrega em segundos e calado. E o navegador embutido do Claude, que não
+alcança `127.0.0.1` e é webview sandboxada.
+
+### 11/09/2026 — o manual vira o padrão, e o automático vira `--auto`
+
+**Decisão do dono, depois da rodada que funcionou.** O `token.sh` passa a fazer o caminho
+manual por padrão; a captura automática fica atrás de `--auto`.
+
+O critério é o de sempre neste projeto: **o que está medido ganha do que é elegante.** O
+manual está verificado contra o e-Disciplinas e leva ~20 s. O automático funciona contra
+dublê e nunca entregou contra a USP — três tentativas reais, três falhas antes de o
+navegador seguir o redirect. Deixá-lo como padrão custaria **120 s de espera em toda
+execução** num caminho que pode nem existir neste site: o `forcedurlscheme` (linha 111) não
+é observável de fora, e `tool_mobile_get_public_config` não expõe a chave.
+
+Isso não é abandonar o automático — ele fica no repositório, testado offline, com o que
+falta medir escrito no backlog. É recusar prometer no padrão o que não foi verificado. Se
+alguém rodar `--auto` e a captura entregar, a decisão se inverte com uma linha aqui.
+
+**O que a troca custa:** um clique direito e uma colagem, por instalação. O que ela evita:
+dois minutos de espera silenciosa, e um `README.md` afirmando uma automação que pode não
+funcionar na máquina de quem leu.

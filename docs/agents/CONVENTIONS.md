@@ -38,7 +38,12 @@ da pergunta.
 
 - `.env` no gitignore, `.env.example` é forma e nunca conteúdo.
 - Nenhum script imprime o valor de um token — só diagnóstico de forma
-  (`fix-token.sh` é o modelo: valida 32 hex, nunca ecoa).
+  (`fix-token.sh` é o modelo: valida 32 hex, nunca ecoa). Três corolários que o
+  `token.sh` de 10/09 tornou explícitos: o valor **não passa por `argv`** (`ps aux`
+  é legível por qualquer processo do usuário — use `curl -K -`, que lê do stdin, ou
+  variável de ambiente), o base64 cru do fluxo de launch **não toca o disco** (ele
+  carrega o `privatetoken`, que habilita autologin — decodifique antes de escrever),
+  e a regra do formato mora em `scripts/_decodificar_token.py`, em um lugar só.
 - Valor derivável não se configura à mão: `MOODLE_USERID` sai do próprio token via
   `core_webservice_get_site_info`, porque um userid errado devolve `[]` com HTTP 200
   e nenhum erro — o falso "não tem nada" que o Invariante 6 proíbe.

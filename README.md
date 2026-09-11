@@ -105,9 +105,8 @@ script resolve o resto — inclusive achar o `.venv`, que é por diretório e n�
 ## Configuração
 
 O `cp .env.example .env` da seção acima é o passo, e é um só. `RUCARD_HASH` já vem
-preenchida. `MOODLE_TOKEN` nasce vazio e é o único valor a colar à mão: é credencial
-pessoal, nunca sai da máquina de quem usa (Invariante 4), e o §8 do `SPEC1.md` diz
-como obtê-lo.
+preenchida. `MOODLE_TOKEN` nasce vazio e é o único valor a obter: é credencial pessoal,
+nunca sai da máquina de quem usa (Invariante 4), e quem busca ele é `./scripts/token.sh`.
 
 ## Para quem acabou de ganhar acesso
 
@@ -123,29 +122,29 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
 ```
 
-**2. Pegue seu token do e-Disciplinas.** Logado no navegador, com DevTools → Network
-aberto, acesse:
-
-```
-https://edisciplinas.usp.br/admin/tool/mobile/launch.php?service=moodle_mobile_app&passport=1234&urlscheme=moodlemobile
-```
-
-A página tenta abrir o app do Moodle. O que interessa é a URL da linha `token=…` no
-Network — copie ela inteira, sem tentar decodificar na mão.
-
-**3. Cole no `.env` e normalize.**
+**2. Pegue seu token do e-Disciplinas.** Um comando, com o navegador logado na Senha Única:
 
 ```bash
-cp .env.example .env
-# cole a URL inteira em MOODLE_TOKEN= e rode:
-./scripts/fix-token.sh
+./scripts/token.sh
 ```
 
-O script decodifica a URL e grava só o `wstoken` de 32 hex, e é idempotente — rodar duas
-vezes não estraga nada. Ele **nunca imprime o valor do token**, só diagnóstico de forma
-(Invariante 3). Se você já tiver os 32 hex, pule: ele detecta e não mexe.
+Ele abre o `launch.php` para você. O Moodle mostra uma página com um link — o **endereço
+desse link é o token**. Botão direito nele, "copiar endereço do link", volta no terminal e
+aperta Enter: o script lê do clipboard. Sem DevTools, sem decodificar nada à mão. Uns 20
+segundos.
 
-**4. Confira sem gastar chamada nenhuma da sua conta.**
+Daí ele decodifica, **confirma o token contra a USP em uma chamada** e só então grava no
+`.env` — um token que não autentica não chega ao arquivo, e o `userid` sai da mesma
+resposta. **Nunca imprime o valor do token**, só diagnóstico de forma (Invariante 3).
+
+Se você já tinha colado a URL no `.env` à mão e ela ficou torta, `./scripts/fix-token.sh`
+normaliza — é idempotente e detecta quando já está nos 32 hex.
+
+Existe um `--auto` que tenta capturar o redirect sozinho, com um handler temporário para
+um esquema próprio. Funciona contra servidor de teste e **nunca entregou contra o
+e-Disciplinas**, então não é o padrão (§9 do `SPEC1.md`, 11/09/2026).
+
+**3. Confira sem gastar chamada nenhuma da sua conta.**
 
 ```bash
 ./scripts/gate.sh
@@ -155,7 +154,7 @@ vezes não estraga nada. Ele **nunca imprime o valor do token**, só diagnóstic
 O `--auto-verificar` diz se o `.env` foi achado, se o token está presente (sem mostrá-lo),
 se o SDK está instalado e se os schemas casam. **Nada disso toca a rede da USP.**
 
-**5. Ligue num cliente MCP.** O `.mcp.json` versionado já registra os três servidores sem
+**4. Ligue num cliente MCP.** O `.mcp.json` versionado já registra os três servidores sem
 segredo nenhum: abra o Claude Code **nesta pasta** e pergunte. Para que valham em qualquer
 pasta, registre no escopo de usuário:
 
@@ -171,4 +170,6 @@ e-Disciplinas não oferece OAuth). Moodle é local, por desenho. RUCard e Jupite
 credencial e poderiam ser hospedados; não estão (§6).
 
 **Seu token expira e é revogável** em `edisciplinas.usp.br` → gerenciar tokens. Se algo
-parar de responder com `invalidtoken`, é isso — refaça o passo 2.
+parar de responder com `invalidtoken`, é isso — rode `./scripts/token.sh` de novo. Não há
+caminho sem sessão de navegador: a conta autentica por Senha Única e o Moodle não tem
+senha local para comparar (§1.3).
