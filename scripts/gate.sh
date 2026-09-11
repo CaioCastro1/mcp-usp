@@ -3,8 +3,19 @@
 #
 # Uso:  ./scripts/gate.sh
 #
-# Três checagens, nesta ordem, porque a mais barata que pode reprovar vem antes:
+# Quatro checagens, nesta ordem, porque a mais barata que pode reprovar vem antes:
 #
+#   0. O .env existe e tem RUCARD_HASH com valor. Custa um `test -f` e um grep,
+#      e é a única falha do gate com cura de uma linha — por isso ela é dita com
+#      o COMANDO, e não com o nome da variável que faltou. Vem antes da 1 porque
+#      sem .env nenhuma das outras tem o que fazer: a 1 reprovava com "sem .env
+#      em lugar nenhum" (verdade, e não é cura) e a 3 reprovava depois de 364
+#      testes falando de RUCARD_HASH, que é consequência e não causa. Num clone
+#      limpo, seguindo o README de cima para baixo, era esse o primeiro
+#      resultado que alguém novo via. Aborta o gate em vez de somar ao placar:
+#      as outras três só repetiriam o mesmo diagnóstico, mais caro e pior dito.
+#      NÃO exige MOODLE_TOKEN — este gate roda offline, e credencial pessoal não
+#      é pré-requisito para commitar (Invariante 4).
 #   1. Nenhum segredo do .env em arquivo rastreado (Invariante 3). Roda primeiro
 #      porque é a única falha aqui que, se passar, é irreversível — commit
 #      empurrado com segredo não se desfaz apagando o commit.
@@ -28,6 +39,40 @@ ok()    { echo "OK"; }
 erro()  { echo "FALHOU"; falhou=1; }
 
 echo "gate: $(pwd)"
+
+# ------------------------------------------------------------------- 0. o env
+# `CHAVE=` seguido de pelo menos um caractere que não seja espaço nem aspa: um
+# RUCARD_HASH declarado e vazio é o mesmo que ausente para quem vai usá-lo, e
+# reprovar sem ter verificado nada é justamente o que esta checagem existe para
+# não deixar acontecer. Tolera `export ` porque o .env é feito para ser sourceado.
+PADRAO_HASH="^[[:space:]]*(export[[:space:]]+)?RUCARD_HASH[[:space:]]*=[[:space:]]*[^[:space:]\"']"
+
+passo "0. .env existe e tem RUCARD_HASH"
+# Pergunta ao usp_mcp.env onde o .env esta, como as checagens 1 e 3 ja fazem. `-f .env`
+# olhava so o diretorio atual, e o .env e gitignorado: `git worktree add` nao o copia,
+# entao o gate REPROVAVA em todo worktree por um .env que existe no checkout. E o mesmo
+# defeito que a primeira versao deste gate teve na checagem de segredos (§4 do
+# CONVENTIONS.md) e que o token.sh teve em 11/09 — terceira vez, mesmo molde.
+ENV_GATE=$(PYTHONPATH="$(pwd)" "$PY" -c \
+  'from usp_mcp.env import achar_env; a = achar_env(); print(a or "")' 2>/dev/null || true)
+if [ -n "$ENV_GATE" ] && grep -Eq "$PADRAO_HASH" "$ENV_GATE"; then ok; else
+  erro
+  # A saída é o produto desta checagem: quem chega aqui é quem acabou de clonar.
+  cat <<'FIM' | sed 's/^/       /'
+falta o .env, ou o RUCARD_HASH nele está vazio. Procurei na raiz e, se ela for
+um worktree, no checkout que tem o .git — é onde o usp_mcp.env procura. Cura, na
+raiz do CHECKOUT (não a do worktree, que não deve ter .env próprio):
+
+    cp .env.example .env
+
+A hash do RUCard já vem preenchida no exemplo — é a chave embutida no app
+oficial, pública e compartilhada, não credencial de ninguém. O MOODLE_TOKEN
+pode continuar vazio: este gate roda offline (Invariante 4).
+FIM
+  echo
+  echo "gate: REPROVOU. Nao commite."
+  exit 1
+fi
 
 # ---------------------------------------------------------------- 1. segredos
 passo "1. nenhum segredo do .env rastreado"

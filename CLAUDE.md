@@ -37,7 +37,7 @@ quatro é este arquivo.
 | `notas/` | Análise por sistema, com custo medido em bytes e tokens |
 | `fixtures/rucard/`, `fixtures/jupiter/` | Respostas cruas versionadas (dado público) |
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
-| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`) e o gate (`gate.sh`) |
+| `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`), o obtentor de token (`token.sh`, com `fix-token.sh` para normalizar) e o gate (`gate.sh`) |
 | `.env` / `.env.example` | Credenciais por env var; `.env` no gitignore |
 | `docs/` | Este scaffold: domínios, convenções, handoffs, backlog |
 
@@ -58,6 +58,10 @@ quatro é este arquivo.
 # Derivar o userid do token (cacheado em .cache/userid); --refresh força nova chamada
 ./scripts/userid.sh [--refresh]
 
+# Normalizar MOODLE_TOKEN no .env: aceita a URL crua do fluxo de launch (§8) e grava
+# só o wstoken de 32 hex. Idempotente, e nunca imprime o valor (Invariante 3).
+./scripts/fix-token.sh
+
 # Medir quanto de cada resposta é resposta e quanto é transporte
 python3 scripts/reduzir.py
 
@@ -71,7 +75,7 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
 # Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
 .venv/bin/python -m pytest tests/handshake
 
-# Gate antes de commit: segredo no git, cru ignorado, suíte offline. Não toca a rede.
+# Gate antes de commit: .env presente, segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
 # Rodar TODOS os testes, inclusive a camada que fala com a USP de verdade

@@ -6,10 +6,10 @@ aplicado à própria suíte.
 """
 import datetime
 import pathlib
-import subprocess
 
 import pytest
 
+from tests.git import esta_ignorado
 from tests.rucard.conftest import (
     FATIA,
     FIXTURES,
@@ -47,10 +47,7 @@ def test_r2_nenhum_caminho_absoluto_de_maquina():
 @pytest.mark.parametrize("chave", sorted(FATIA))
 def test_r3_fatia_nao_depende_de_arquivo_fora_do_git(chave):
     p = caminho(chave)
-    r = subprocess.run(
-        ["git", "check-ignore", "-q", str(p)], cwd=RAIZ, capture_output=True
-    )
-    assert r.returncode == 1, (
+    assert not esta_ignorado(p, RAIZ), (
         f"{p.name} está no .gitignore. A suíte não pode depender de arquivo que "
         "outra máquina não tem. (O cardápio é dado público: nada aqui precisa "
         "de higienização, ao contrário do Moodle.)"
