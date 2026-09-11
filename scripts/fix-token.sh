@@ -15,14 +15,21 @@ cd "$(dirname "$0")/.."
 PY=".venv/bin/python"
 [ -x "$PY" ] || PY="python3"
 
-[ -f .env ] || { echo "sem .env — copie o .env.example ou rode ./scripts/token.sh" >&2; exit 1; }
-
-"$PY" - <<'PY'
+PYTHONPATH="$(pwd)" "$PY" - <<'PY'
 import re, sys
 sys.path.insert(0, "scripts")
 from _decodificar_token import RE_32HEX, decodificar
+from usp_mcp.env import achar_env
 
-linhas = open(".env", encoding="utf-8").read().splitlines(keepends=True)
+# Mesmo motivo do token.sh: num worktree o ./.env nao existe e o de verdade esta
+# no checkout principal. Consertar o arquivo errado seria nao consertar nada.
+alvo = achar_env()
+if alvo is None:
+    sys.stderr.write("sem .env em lugar nenhum — rode ./scripts/token.sh\n")
+    raise SystemExit(1)
+print(f"arquivo: {alvo}")
+
+linhas = open(alvo, encoding="utf-8").read().splitlines(keepends=True)
 saida, mudou, diag = [], False, []
 
 for l in linhas:
@@ -41,6 +48,6 @@ for l in linhas:
     diag.append(f"(o base64 trazia {partes} partes; siteid e privatetoken descartados)")
 
 if mudou:
-    open(".env", "w", encoding="utf-8").writelines(saida)
+    open(alvo, "w", encoding="utf-8").writelines(saida)
 print("\n".join(diag) or "MOODLE_TOKEN nao encontrado no .env")
 PY

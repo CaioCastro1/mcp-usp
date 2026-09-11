@@ -61,22 +61,39 @@ aviso()  { printf '   \033[33m! %s\033[0m\n' "$1"; }
 
 # ------------------------------------------------------------- 1. prepara o .env
 titulo "1/7  .env"
-if [ ! -f .env ]; then
-  [ -f .env.example ] || { echo "sem .env e sem .env.example — repo incompleto" >&2; exit 1; }
-  cp .env.example .env
-  nota "criei .env a partir do .env.example (ele esta no gitignore)"
-else
-  nota ".env ja existe"
+# NAO basta olhar ./.env. O `.env` e gitignorado, entao `git worktree add` nao o
+# copia e um worktree novo nao tem o dele — mas o lado Python acha o do checkout
+# principal subindo os diretorios (usp_mcp.env.achar_env). Se este script criasse
+# um ./.env no worktree, ele SOMBREARIA o de verdade: o token iria para um arquivo
+# que some com o worktree, e o `.env` que o projeto usa ficaria sem nada. E o mesmo
+# defeito que a primeira versao do gate teve (§4 do CONVENTIONS.md).
+# Engolir a falha aqui daria o pior desfecho: ENV_FILE vazio, um .env novo criado
+# no lugar errado, e a aparencia de sucesso. Se nao da para localizar, pare.
+if ! ENV_FILE=$(PYTHONPATH="$(pwd)" "$PY" -c \
+     'from usp_mcp.env import achar_env; a = achar_env(); print(a or "")' 2>&1); then
+  echo "nao consegui localizar o .env — usp_mcp.env nao importou:" >&2
+  printf '%s\n' "$ENV_FILE" | sed 's/^/  /' >&2
+  exit 1
 fi
 
-set -a; . ./.env; set +a
+if [ -z "$ENV_FILE" ]; then
+  [ -f .env.example ] || { echo "sem .env e sem .env.example — repo incompleto" >&2; exit 1; }
+  cp .env.example .env
+  ENV_FILE="$(pwd)/.env"
+  nota "nenhum .env encontrado; criei a partir do .env.example (esta no gitignore)"
+else
+  nota "gravando no .env que o projeto ja enxerga:"
+  nota "  $ENV_FILE"
+fi
+
+set -a; . "$ENV_FILE"; set +a
 : "${MOODLE_URL:=https://edisciplinas.usp.br}"
 nota "MOODLE_URL=$MOODLE_URL"
 
 # Um token que ja funciona nao se sobrescreve calado: o antigo CONTINUA ativo em
 # managetoken.php, e trocar sem avisar deixa dois vivos na conta e nenhum
 # registro de qual esta em uso. A lista de la mostra o NOME (16 chars), nao o valor.
-if grep -qE '^MOODLE_TOKEN=[a-f0-9]{32}$' .env; then
+if grep -qE '^MOODLE_TOKEN=[a-f0-9]{32}$' "$ENV_FILE"; then
   aviso "o .env ja tem um MOODLE_TOKEN com forma valida."
   nota "O token antigo NAO e revogado por isto — revogue em:"
   nota "  $MOODLE_URL/user/managetoken.php  ->  Reconfigurar"
@@ -243,10 +260,11 @@ nota "userid derivado do proprio token (nunca configurado a mao — §2 do CONVE
 # -------------------------------------------------------- 7. grava so os 32 hex
 titulo "7/7  grava no .env"
 # O token vai por env var, nao por argv, pelo mesmo motivo do passo 6.
-WSTOKEN="$wstoken" "$PY" - <<'PYW'
+WSTOKEN="$wstoken" ENV_FILE="$ENV_FILE" "$PY" - <<'PYW'
 import os, re
 tok = os.environ["WSTOKEN"]
-linhas = open(".env", encoding="utf-8").read().splitlines(keepends=True)
+alvo = os.environ["ENV_FILE"]
+linhas = open(alvo, encoding="utf-8").read().splitlines(keepends=True)
 saida, achou = [], False
 for l in linhas:
     if re.match(r"^\s*MOODLE_TOKEN\s*=", l):
@@ -257,13 +275,15 @@ if not achou:
     if saida and not saida[-1].endswith("\n"):
         saida.append("\n")
     saida.append(f"MOODLE_TOKEN={tok}\n")
-open(".env", "w", encoding="utf-8").writelines(saida)
+open(alvo, "w", encoding="utf-8").writelines(saida)
 print("   MOODLE_TOKEN gravado" + ("" if achou else " (linha nova)") + ". Valor nao impresso.")
 PYW
 
-mkdir -p .cache
-printf '%s\n' "$userid" > .cache/userid
-nota ".cache/userid preenchido — scripts/userid.sh ja acha o cache pronto"
+# O cache mora junto do .env, pelo mesmo motivo: e o checkout que o projeto usa.
+CACHE_DIR="$(dirname "$ENV_FILE")/.cache"
+mkdir -p "$CACHE_DIR"
+printf '%s\n' "$userid" > "$CACHE_DIR/userid"
+nota "$CACHE_DIR/userid preenchido — scripts/userid.sh ja acha o cache pronto"
 
 titulo "pronto"
 nota "Confira com uma chamada sua:  ./scripts/ws.sh $FN | head -c 300"
