@@ -51,11 +51,29 @@ done
 
 claims() { "$LSREG" -dump 2>/dev/null | grep -c "claimed schemes:.*$ESQUEMA:" || true; }
 
-# Se algo JA atende o esquema, nao sequestramos: outro app pode ser o dono
-# legitimo (o app oficial do Moodle e dono de `moodlemobile`).
-if [ "$(claims)" -gt 0 ]; then
-  diag "algo ja reivindica \`$ESQUEMA://\` nesta maquina — nao vou sobrepor"
+# QUEM reivindica o esquema, por identificador de bundle, um por linha. No dump do
+# LS o `identifier:` vem antes do `claimed schemes:` do mesmo registro.
+donos() {
+  "$LSREG" -dump 2>/dev/null | awk -v esq="$ESQUEMA" '
+    /^[ \t]*identifier:/ { id = $2 }
+    $0 ~ ("claimed schemes:.*" esq ":") { if (id != "") print id }
+  ' | sort -u
+}
+
+# Se algo JA atende o esquema, nao sequestramos — MAS e preciso saber quem.
+# Contar claims sem olhar o identificador confunde "outro app e o dono legitimo"
+# (o app oficial do Moodle e dono de `moodlemobile`) com "sobrou registro nosso de
+# uma execucao anterior". O segundo caso e comum: o Launch Services demora a podar
+# a entrada depois que o .app some do disco, e recusar por causa dele trava o
+# script por um lixo que e nosso. Medido em 11/09/2026, numa rodada de verdade.
+alheios=$(donos | grep -v "^$BUNDLE_ID$" || true)
+if [ -n "$alheios" ]; then
+  diag "outro app ja reivindica \`$ESQUEMA://\` — nao vou sobrepor:"
+  printf '%s\n' "$alheios" | sed 's/^/     /' >&2
   exit 2
+fi
+if [ "$(claims)" -gt 0 ]; then
+  diag "havia registro obsoleto do nosso proprio handler; vou sobrepor com um novo"
 fi
 
 limpar() {
@@ -111,8 +129,17 @@ diag "handler pronto: o navegador vai entregar o redirect direto para o script"
 # fd 3 em read-write: nao bloqueia na abertura e garante um leitor para o handler,
 # que senao travaria no `>` do FIFO.
 exec 3<> "$FIFO"
-open "$URL" >/dev/null 2>&1 || { diag "nao consegui abrir a URL no navegador"; exit 2; }
+# `open` EM SEGUNDO PLANO, de proposito. Medido em 11/09/2026 numa rodada real:
+# com um dialogo modal aberto no Safari (um "cannot open the page" de uma tentativa
+# anterior), o `open` NAO retorna — e o script ficou presO 6 minutos sem nunca
+# chegar no `read`, cujo timeout e quem deveria governar a espera. Em primeiro
+# plano, um modal esquecido na tela trava o setup inteiro sem dizer por que.
+# O preco e perder o codigo de saida do `open`: a falha passa a aparecer como
+# timeout, e a mensagem la embaixo cita as duas causas.
+open "$URL" >/dev/null 2>&1 &
 diag "abri o launch.php no navegador. Se ele perguntar se pode abrir o handler, aceite."
+diag "Se houver um dialogo modal esquecido no navegador, feche-o: enquanto ele"
+diag "estiver aberto, o navegador nao processa URL nova."
 diag "esperando o redirect (ate ${ESPERA}s)..."
 
 if IFS= read -t "$ESPERA" -r capturado <&3; then
@@ -122,7 +149,9 @@ if IFS= read -t "$ESPERA" -r capturado <&3; then
   exit 0
 fi
 exec 3>&-
-diag "nada chegou em ${ESPERA}s."
-diag "A causa mais provavel e \`forcedurlscheme\` ligado no site (linha 111 do"
-diag "launch.php): ele sobrescreve o nosso esquema e o handler nunca dispara."
+diag "nada chegou em ${ESPERA}s. Duas causas, nesta ordem de probabilidade:"
+diag "  1. o navegador nao chegou a seguir o redirect — sessao expirada e parou"
+diag "     na Senha Unica, ou um dialogo modal esquecido bloqueando a janela;"
+diag "  2. \`forcedurlscheme\` ligado no site (linha 111 do launch.php): ele"
+diag "     sobrescreve o nosso esquema e o handler nunca dispara."
 exit 1
