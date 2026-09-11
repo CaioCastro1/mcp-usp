@@ -2161,3 +2161,27 @@ alguém rodar `--auto` e a captura entregar, a decisão se inverte com uma linha
 **O que a troca custa:** um clique direito e uma colagem, por instalação. O que ela evita:
 dois minutos de espera silenciosa, e um `README.md` afirmando uma automação que pode não
 funcionar na máquina de quem leu.
+
+### 11/09/2026 — o gate rodava a suíte dentro de um clone que continha o teste do gate
+
+`tests/test_gate.py::D5` clona o repositório e roda o `gate.sh` no clone. A checagem 3
+roda a suíte, e a suíte do clone contém `test_gate.py` — que clona de novo. **Recursão**,
+com cada nível custando mais que o timeout do nível acima.
+
+**Ficou latente por um dia.** Enquanto o `test_gate.py` só existia na `main`, o clone que
+D5 faz (do HEAD da branch em trabalho) não o continha. O merge de 11/09 pôs o arquivo no
+HEAD, e D5 passou a estourar os próprios 300 s. Medido: **326 s com um vermelho**, contra
+**40,8 s verde** depois da correção. O sintoma apareceu como "o gate pendurou", que é o
+disfarce mais caro possível.
+
+**A cura é uma quebra explícita e barulhenta**, não um `skip`: `USP_MCP_GATE_SEM_SUITE=1`
+faz a checagem 3 não rodar, e `_rodar_gate` do teste passa essa variável. O pulo **grita**
+— a linha diz `PULADA`, o rodapé diz `A SUITE NAO RODOU — isto nao e um gate verde`, e o
+código de saída não vira 0 por causa dele. Um gate que pula a checagem 3 calado é pior que
+a recursão: devolve verde sem ter verificado código nenhum (Invariante 7). D5 passou a
+**assertar que o aviso aparece**, para o pulo nunca virar silencioso.
+
+**A lição de método:** um teste que executa a ferramenta que roda o teste precisa de uma
+quebra de ciclo declarada no desenho. Aqui ela não existia, e o ciclo só se fechou quando
+o arquivo chegou ao HEAD — ou seja, **o teste ficou verde exatamente enquanto não podia
+falhar**, e ficou vermelho no primeiro momento em que passou a valer.

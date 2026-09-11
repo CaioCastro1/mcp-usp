@@ -86,6 +86,12 @@ def _rodar_gate(raiz: pathlib.Path) -> subprocess.CompletedProcess:
     que promete.
     """
     ambiente = {k: v for k, v in os.environ.items() if k not in ("RUCARD_HASH", "MOODLE_TOKEN")}
+    # Sem isto o gate do clone roda a suite DO CLONE — que contem este arquivo,
+    # que clona de novo. A recursao ficou latente ate 11/09, quando o merge poz
+    # test_gate.py no HEAD que o clone copia, e D5 passou a estourar 300 s.
+    # Nenhum teste daqui assere sobre a checagem 3, entao pular nao afrouxa nada;
+    # e D5 passa a assertar que o pulo APARECE, para ele nunca virar silencioso.
+    ambiente["USP_MCP_GATE_SEM_SUITE"] = "1"
     return subprocess.run(
         ["./scripts/gate.sh"],
         cwd=raiz,
@@ -178,4 +184,11 @@ def test_d5_o_gate_nao_exige_token_do_moodle(tmp_path):
     assert CURA not in r.stdout, (
         f"o gate citou {CURA!r} com o `.env` já no lugar. A cura só pode "
         f"aparecer quando é de fato a cura, senão vira ruído. Saída:\n{r.stdout}"
+    )
+    # O pulo da suíte é o que impede este teste de recorrer sobre si mesmo, e ele
+    # precisa ser barulhento: um gate que pula a checagem 3 calado é pior que a
+    # recursão, porque devolve verde sem ter verificado código nenhum.
+    assert "PULADA" in r.stdout and "SUITE NAO RODOU" in r.stdout, (
+        "o gate pulou a suíte sem dizer. Invariante 7: sem limite silencioso — "
+        f"quem lê a saída tem de saber que a checagem 3 não rodou. Saída:\n{r.stdout}"
     )
