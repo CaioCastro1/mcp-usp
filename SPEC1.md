@@ -2093,3 +2093,51 @@ sem custo extra — a rodada é a mesma.
 
 **Descartado:** o catcher em localhost (linha 37 proíbe), e um teste da captura na suíte do
 gate — registrar handler no Launch Services é mudar a máquina de quem commita.
+
+### 11/09/2026 — o token obtido pelo script, contra o e-Disciplinas de verdade
+
+**Primeira ponta a ponta real.** `./scripts/token.sh --manual --sobrescrever` com o
+payload vindo do clipboard: decodificou, autenticou, gravou. `core_webservice_get_site_info`
+devolveu `Moodle USP: e-Disciplinas`, a conta do dono e `5.0.8+ (Build: 20260722)` — a
+mesma versão que o §1.3 registrava. O `userid` saiu da própria resposta e foi para
+`.cache/userid`; nenhum valor de token apareceu em tela em nenhum momento.
+
+**O caminho que funcionou é o manual com `confirmed=1`,** e ele é o que o §9 de 10/09
+descreveu a partir das linhas 120-145: o Moodle renderiza uma página com um link cujo
+`href` é o `moodlemobile://token=…`, e "botão direito → copiar endereço do link" substitui
+o DevTools. O clipboard chegou com 113 bytes na forma exata (`moodlemobile://token=` mais
+92 caracteres de base64), e o modo `pbpaste | ./scripts/token.sh` consumiu direto.
+
+**Três fatos do `launch.php` confirmados por medição, não mais por leitura:**
+
+1. **Linha 89 — `generate_token_for_current_user` devolve o token EXISTENTE.** O valor
+   gravado veio **byte a byte igual** ao que já estava no `.env` (comparado por hash, sem
+   imprimir nenhum dos dois). Não se cunha token novo a cada rodada, e **não há nada para
+   revogar depois de testar**. Isso corrige em definitivo o aviso que este documento e o
+   próprio script davam em 10/09, e a mensagem de sobrescrita foi reescrita.
+2. **Linha 94 — o `privatetoken` só vem em login novo.** O payload tinha **2 partes**, não
+   3. O decodificador aceita `>= 2` desde o começo; agora isso é fato e não tolerância.
+3. **O `.env` sobreviveu linha por linha** — só a linha do token mudou.
+
+**A conferência do passaporte é mais fraca do que o desenho supunha, e a rodada mostrou
+por quê.** Ela avisou "não confere", e estava certa: o payload veio de uma URL de
+`launch.php` aberta numa tentativa anterior (passaporte `8141678839`), enquanto o script
+tinha acabado de gerar outro (`2694381761`). Um payload de outra invocação **da mesma
+conta** é perfeitamente válido — o Moodle devolve o mesmo token — e não confere por
+construção. Ou seja: **no caminho manual a conferência quase sempre vai avisar, e o aviso
+não significa nada**, porque nada obriga a pessoa a abrir exatamente a URL que o script
+imprimiu. Ela só carrega informação no caminho automático, onde é o próprio script que
+abre a URL que gerou. A mensagem foi reescrita para dizer isso em vez de assustar.
+
+**O que continua sem medida, e é só uma coisa:** a captura automática contra o
+e-Disciplinas. Três tentativas reais, três falhas antes de o navegador entregar o
+redirect — a primeira na guarda de claim obsoleto (corrigida), a segunda no `open` travado
+por modal (corrigida), a terceira sem causa identificada porque ela mora na tela do dono.
+Com ela morre junto a questão do `forcedurlscheme`, que **não é observável de fora**:
+`tool_mobile_get_public_config` custou uma chamada e não expõe a chave (36 chaves, nenhuma
+com `forced`).
+
+**Descartado nesta rodada:** o Chrome como navegador da captura — medido com payload falso
+e servidor local, ele não entrega `uspmcp://` sem um clique de confirmação, enquanto o
+padrão do sistema entrega em segundos e calado. E o navegador embutido do Claude, que não
+alcança `127.0.0.1` e é webview sandboxada.
