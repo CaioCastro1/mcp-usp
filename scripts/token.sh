@@ -100,7 +100,12 @@ nota "MOODLE_URL=$MOODLE_URL"
 # registro de qual esta em uso. A lista de la mostra o NOME (16 chars), nao o valor.
 if grep -qE '^MOODLE_TOKEN=[a-f0-9]{32}$' "$ENV_FILE"; then
   aviso "o .env ja tem um MOODLE_TOKEN com forma valida."
-  nota "O token antigo NAO e revogado por isto — revogue em:"
+  nota "Na pratica isto costuma ser troca por si mesmo: a linha 89 do launch.php"
+  nota "chama generate_token_for_current_user, que devolve o token EXISTENTE do"
+  nota "servico em vez de cunhar um novo. Medido em 11/09/2026 numa rodada real —"
+  nota "o valor gravado veio byte a byte igual ao que ja estava aqui."
+  nota "Token novo so nasce se a conta ainda nao tiver um para este servico; nesse"
+  nota "caso o antigo continua ativo e se revoga em:"
   nota "  $MOODLE_URL/user/managetoken.php  ->  Reconfigurar"
   if [ "$sobrescrever" = "1" ]; then
     nota "--sobrescrever passado: seguindo."
@@ -214,11 +219,15 @@ if [ "$siteid" = "$esperado" ]; then
   nota "confere: o payload responde a ESTA invocacao."
 else
   aviso "nao confere com md5(wwwroot+passaporte)."
-  nota "Isto e AVISO, nao bloqueio: a formula esta recordada e nao medida contra"
-  nota "o e-Disciplinas (§1.4). Duas leituras possiveis, e o passo 6 desempata:"
-  nota "  - se o passo 6 autenticar, o token esta bom e a formula e que esta"
-  nota "    errada aqui (wwwroot com/sem barra, com/sem www). Registre no §9."
-  nota "  - se o passo 6 falhar, voce colou um payload de outra tentativa."
+  nota "Isto e AVISO, nao bloqueio. E ELE SO CARREGA INFORMACAO se a URL que voce"
+  nota "abriu foi a que ESTE script acabou de imprimir: o passaporte e por"
+  nota "invocacao, entao um payload vindo de outra rodada — sua, da mesma conta,"
+  nota "perfeitamente valida — nao confere e esta tudo certo. Aconteceu em"
+  nota "11/09/2026, e o token autenticou no passo 6."
+  nota "Se a URL foi a deste script, sobram duas leituras e o passo 6 desempata:"
+  nota "  - autenticou: a formula e que esta errada aqui (wwwroot com/sem barra,"
+  nota "    com/sem www). Registre no §9."
+  nota "  - falhou: o payload nao e desta conta."
 fi
 
 # --------------------------------------------- 6. confirma contra a USP (1 chamada)
