@@ -4,8 +4,8 @@
 # Uso:  ./scripts/token.sh              # guiado, interativo
 #       pbpaste | ./scripts/token.sh    # se voce ja copiou a URL do redirect
 #       ./scripts/token.sh --sobrescrever   # trocar token que ja funciona, sem perguntar
-#       ./scripts/token.sh --manual         # sem captura automatica: colar a mao
-#       ./scripts/token.sh --navegador="Google Chrome"   # em vez do padrao do sistema
+#       ./scripts/token.sh --auto           # tenta capturar o redirect sozinho (ver abaixo)
+#       ./scripts/token.sh --navegador="Google Chrome"   # so com --auto
 #
 # Sete passos, na ordem em que estao no desenho de 10/09/2026
 # (docs/superpowers/specs/2026-09-10-script-token-moodle-design.md):
@@ -13,12 +13,17 @@
 #   1. prepara o .env            5. decodifica EM MEMORIA
 #   2. gera um passaporte        6. confirma o token contra a USP (1 chamada)
 #   3. pega o redirect           7. grava so os 32 hex no .env
-#   4. (automatico, ou manual)
+#   4. (manual por padrao)
 #
-# O passo 3 tenta a captura automatica de scripts/_capturar_redirect.sh: um
-# handler temporario para um esquema nosso recebe o redirect do navegador, sem
-# DevTools e sem colar. Se ela nao entregar, cai no manual — que tambem melhorou:
-# com `confirmed=1` o token vem como LINK na pagina, nao mais so no DevTools.
+# O PADRAO e o caminho manual, e ele esta MEDIDO contra o e-Disciplinas (§9,
+# 11/09/2026): com `confirmed=1` o Moodle nao redireciona, mostra uma pagina com
+# um link, e o endereco DESSE link e o token — "botao direito -> copiar endereco"
+# no lugar do DevTools. Leva ~20 s.
+#
+# `--auto` tenta antes a captura de scripts/_capturar_redirect.sh, que registra um
+# handler para um esquema nosso e recebe o redirect direto do navegador. Ela
+# funciona contra duble e NUNCA entregou contra a USP — por isso nao e o padrao.
+# Se nao entregar em 120 s, cai no manual sozinha.
 #
 # Tres coisas que este script nao faz, de proposito:
 #
@@ -46,14 +51,21 @@ FN="core_webservice_get_site_info"
 # Existe porque `pbpaste | ./scripts/token.sh` nao tem terminal para perguntar.
 sobrescrever=0
 # --manual: pular a captura automatica e colar a URL do redirect a mao.
-manual=0
-# --navegador="Google Chrome": abrir num navegador especifico. O padrao do sistema
-# pode nao ser o que entrega esquema externo direito.
+# O PADRAO E O MANUAL, por decisao de 11/09/2026 (§9). A captura automatica
+# funciona contra duble e NUNCA foi verificada contra o e-Disciplinas: tres
+# tentativas reais, tres falhas antes de o navegador entregar o redirect. Deixa-la
+# ligada por padrao custaria 120 s de espera em toda execucao, num caminho que
+# pode nem existir neste site (`forcedurlscheme`, linha 111, nao e observavel de
+# fora). O manual leva ~20 s e esta medido. `--auto` tenta a captura primeiro.
+manual=1
+# --navegador="Google Chrome": abrir num navegador especifico. Vale so com --auto.
+# Medido: o Chrome pede confirmacao e o padrao do sistema nao.
 navegador=""
 for arg in "$@"; do
   case "$arg" in
     --sobrescrever) sobrescrever=1 ;;
     --manual) manual=1 ;;
+    --auto) manual=0 ;;
     --navegador=*) navegador="${arg#--navegador=}" ;;
     -h|--ajuda|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;

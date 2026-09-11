@@ -2141,3 +2141,23 @@ com `forced`).
 e servidor local, ele não entrega `uspmcp://` sem um clique de confirmação, enquanto o
 padrão do sistema entrega em segundos e calado. E o navegador embutido do Claude, que não
 alcança `127.0.0.1` e é webview sandboxada.
+
+### 11/09/2026 — o manual vira o padrão, e o automático vira `--auto`
+
+**Decisão do dono, depois da rodada que funcionou.** O `token.sh` passa a fazer o caminho
+manual por padrão; a captura automática fica atrás de `--auto`.
+
+O critério é o de sempre neste projeto: **o que está medido ganha do que é elegante.** O
+manual está verificado contra o e-Disciplinas e leva ~20 s. O automático funciona contra
+dublê e nunca entregou contra a USP — três tentativas reais, três falhas antes de o
+navegador seguir o redirect. Deixá-lo como padrão custaria **120 s de espera em toda
+execução** num caminho que pode nem existir neste site: o `forcedurlscheme` (linha 111) não
+é observável de fora, e `tool_mobile_get_public_config` não expõe a chave.
+
+Isso não é abandonar o automático — ele fica no repositório, testado offline, com o que
+falta medir escrito no backlog. É recusar prometer no padrão o que não foi verificado. Se
+alguém rodar `--auto` e a captura entregar, a decisão se inverte com uma linha aqui.
+
+**O que a troca custa:** um clique direito e uma colagem, por instalação. O que ela evita:
+dois minutos de espera silenciosa, e um `README.md` afirmando uma automação que pode não
+funcionar na máquina de quem leu.
