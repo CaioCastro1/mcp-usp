@@ -48,11 +48,20 @@ echo "gate: $(pwd)"
 PADRAO_HASH="^[[:space:]]*(export[[:space:]]+)?RUCARD_HASH[[:space:]]*=[[:space:]]*[^[:space:]\"']"
 
 passo "0. .env existe e tem RUCARD_HASH"
-if [ -f .env ] && grep -Eq "$PADRAO_HASH" .env; then ok; else
+# Pergunta ao usp_mcp.env onde o .env esta, como as checagens 1 e 3 ja fazem. `-f .env`
+# olhava so o diretorio atual, e o .env e gitignorado: `git worktree add` nao o copia,
+# entao o gate REPROVAVA em todo worktree por um .env que existe no checkout. E o mesmo
+# defeito que a primeira versao deste gate teve na checagem de segredos (§4 do
+# CONVENTIONS.md) e que o token.sh teve em 11/09 — terceira vez, mesmo molde.
+ENV_GATE=$(PYTHONPATH="$(pwd)" "$PY" -c \
+  'from usp_mcp.env import achar_env; a = achar_env(); print(a or "")' 2>/dev/null || true)
+if [ -n "$ENV_GATE" ] && grep -Eq "$PADRAO_HASH" "$ENV_GATE"; then ok; else
   erro
   # A saída é o produto desta checagem: quem chega aqui é quem acabou de clonar.
   cat <<'FIM' | sed 's/^/       /'
-falta o .env, ou o RUCARD_HASH nele está vazio. Cura, na raiz do repo:
+falta o .env, ou o RUCARD_HASH nele está vazio. Procurei na raiz e, se ela for
+um worktree, no checkout que tem o .git — é onde o usp_mcp.env procura. Cura, na
+raiz do CHECKOUT (não a do worktree, que não deve ter .env próprio):
 
     cp .env.example .env
 
