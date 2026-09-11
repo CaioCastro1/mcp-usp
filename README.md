@@ -71,17 +71,20 @@ de quem usa (Invariante 4).
 ./scripts/token.sh
 ```
 
-No macOS ele resolve sozinho: registra um handler temporário para um esquema próprio,
-abre o `launch.php` no seu navegador, e **o redirect com o token vem direto para o
-script** — sem DevTools, sem copiar, sem colar. O handler é desregistrado no fim,
-inclusive se você abortar. Se isso não funcionar (o site pode forçar outro esquema),
-ele cai no caminho manual, onde o token aparece como link na página e basta copiar o
-endereço do link.
+Ele abre o `launch.php` no seu navegador. O Moodle mostra uma página com um link — o
+**endereço desse link é o token**. Botão direito nele, "copiar endereço do link", volta
+no terminal e aperta Enter: o script lê do clipboard. Sem DevTools. Leva uns 20 segundos,
+e é o caminho verificado contra o e-Disciplinas (§9 do `SPEC1.md`, 11/09/2026).
 
-Nos dois caminhos ele decodifica sem nunca imprimir o valor, **confirma o token contra a
-USP em uma chamada** e só então grava no `.env` — um token que não autentica não chega ao
-arquivo. Se você já tinha editado o `.env` à mão e o valor ficou torto,
-`./scripts/fix-token.sh` conserta.
+Ele decodifica sem nunca imprimir o valor, **confirma o token contra a USP em uma
+chamada** e só então grava no `.env` — um token que não autentica não chega ao arquivo.
+Se você já tinha editado o `.env` à mão e o valor ficou torto, `./scripts/fix-token.sh`
+conserta.
+
+Existe um `--auto` que tenta capturar o redirect sozinho, registrando um handler
+temporário para um esquema próprio. Ele funciona contra servidor de teste e **nunca
+entregou contra o e-Disciplinas**, então não é o padrão — está no `SPEC1.md` com o que
+falta medir.
 
 O token expira e é revogável em `/user/managetoken.php` → Reconfigurar. Renovar é rodar
 o script de novo: não há caminho sem sessão de navegador, porque a conta autentica por
