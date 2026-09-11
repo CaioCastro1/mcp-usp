@@ -163,12 +163,23 @@ def test_nunca_ecoa_a_entrada_inteira_no_erro():
 
 @pytest.fixture
 def raiz_falsa(tmp_path):
-    """Uma raiz com scripts/ e .env proprios — os scripts fazem cd para ca."""
+    """Uma raiz com scripts/, usp_mcp/ e .env proprios — os scripts fazem cd para ca.
+
+    O `usp_mcp/env.py` vem junto de proposito: desde 11/09 o `fix-token.sh`
+    localiza o `.env` por `achar_env`, e nao por `./.env`. Um fake sem ele
+    testaria um script diferente do que esta no repo.
+
+    `tmp_path` nao tem `.git` em pai nenhum, entao `achar_env` fica na raiz
+    falsa e nunca alcanca o `.env` de verdade de quem roda a suite.
+    """
     (tmp_path / "scripts").mkdir()
     for nome in ("fix-token.sh", "_decodificar_token.py"):
         destino = tmp_path / "scripts" / nome
         destino.write_bytes((RAIZ / "scripts" / nome).read_bytes())
         destino.chmod(0o755)
+    (tmp_path / "usp_mcp").mkdir()
+    for nome in ("__init__.py", "env.py"):
+        (tmp_path / "usp_mcp" / nome).write_bytes((RAIZ / "usp_mcp" / nome).read_bytes())
     return tmp_path
 
 
@@ -225,3 +236,45 @@ def test_fix_token_sem_env_diz_o_que_fazer(raiz_falsa):
     r = fix_token(raiz_falsa)
     assert r.returncode != 0
     assert "token.sh" in r.stderr or ".env.example" in r.stderr
+
+
+def test_fix_token_acha_o_env_do_checkout_e_nao_o_do_worktree(tmp_path):
+    """T-tok-14 — o `.env` do checkout principal, visto de dentro de um worktree.
+
+    O `.env` e gitignorado, entao `git worktree add` nao o copia: um worktree
+    novo nao tem o dele, e o de verdade esta no checkout que tem o `.git`
+    diretorio. Um script que so olhasse `./.env` consertaria o arquivo errado —
+    ou, pior, CRIARIA um `./.env` no worktree, que `achar_env` passaria a
+    preferir, sombreando o verdadeiro em silencio. Mesmo defeito que a primeira
+    versao do gate teve (§4 do CONVENTIONS.md).
+
+    A montagem imita a real: `.git` DIRETORIO no principal (num worktree o
+    `.git` e arquivo, e e assim que `achar_env` distingue os dois).
+    """
+    principal = tmp_path / "principal"
+    (principal / ".git").mkdir(parents=True)
+    env_verdadeiro = principal / ".env"
+    env_verdadeiro.write_text(
+        f"MOODLE_TOKEN=moodlemobile://token={payload(SITEID, WSTOKEN, PRIVATE)}\nOUTRA=1\n",
+        encoding="utf-8",
+    )
+
+    wt = principal / ".claude" / "worktrees" / "algum"
+    (wt / "scripts").mkdir(parents=True)
+    (wt / "usp_mcp").mkdir()
+    for nome in ("fix-token.sh", "_decodificar_token.py"):
+        d = wt / "scripts" / nome
+        d.write_bytes((RAIZ / "scripts" / nome).read_bytes())
+        d.chmod(0o755)
+    for nome in ("__init__.py", "env.py"):
+        (wt / "usp_mcp" / nome).write_bytes((RAIZ / "usp_mcp" / nome).read_bytes())
+    assert not (wt / ".env").exists(), "montagem errada: o worktree nao pode ter .env"
+
+    r = subprocess.run(
+        ["bash", str(wt / "scripts" / "fix-token.sh")],
+        capture_output=True, text=True, cwd=wt,
+    )
+    assert r.returncode == 0, r.stderr
+    assert env_verdadeiro.read_text(encoding="utf-8") == f"MOODLE_TOKEN={WSTOKEN}\nOUTRA=1\n"
+    assert not (wt / ".env").exists(), "criou um .env no worktree, sombreando o verdadeiro"
+    assert WSTOKEN not in r.stdout + r.stderr, "ecoou o token"
