@@ -34,6 +34,17 @@ URL="${1:?uso: $0 <url-do-launch> [esquema] [segundos]}"
 ESQUEMA="${2:-uspmcp}"
 ESPERA="${3:-120}"
 
+# USP_MCP_NAO_ABRIR=1: registra o handler e espera, sem abrir navegador nenhum.
+# Serve para quem quer abrir a URL num navegador ESPECIFICO — o `open` manda para
+# o padrao do sistema, e nem todo navegador entrega esquema externo do mesmo jeito.
+# A URL e impressa no stderr para ser aberta a mao.
+NAO_ABRIR="${USP_MCP_NAO_ABRIR:-0}"
+
+# USP_MCP_NAVEGADOR="Google Chrome": abre num navegador ESPECIFICO em vez do padrao
+# do sistema. Existe porque navegador nao trata esquema externo do mesmo jeito, e
+# porque o padrao do sistema pode ser justamente o que nao funciona aqui.
+NAVEGADOR="${USP_MCP_NAVEGADOR:-}"
+
 LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 DIR="$HOME/Library/Caches/usp-mcp-token"   # NAO mude para /tmp: ver medicao 2
 APP="$DIR/UspMcpToken.app"
@@ -136,10 +147,20 @@ exec 3<> "$FIFO"
 # plano, um modal esquecido na tela trava o setup inteiro sem dizer por que.
 # O preco e perder o codigo de saida do `open`: a falha passa a aparecer como
 # timeout, e a mensagem la embaixo cita as duas causas.
-open "$URL" >/dev/null 2>&1 &
-diag "abri o launch.php no navegador. Se ele perguntar se pode abrir o handler, aceite."
-diag "Se houver um dialogo modal esquecido no navegador, feche-o: enquanto ele"
-diag "estiver aberto, o navegador nao processa URL nova."
+if [ "$NAO_ABRIR" = "1" ]; then
+  diag "NAO vou abrir o navegador (USP_MCP_NAO_ABRIR=1). Abra esta URL a mao:"
+  printf '\n%s\n\n' "$URL" >&2
+else
+  if [ -n "$NAVEGADOR" ]; then
+    open -a "$NAVEGADOR" "$URL" >/dev/null 2>&1 &
+    diag "abri o launch.php no $NAVEGADOR. Se ele perguntar se pode abrir o handler, aceite."
+  else
+    open "$URL" >/dev/null 2>&1 &
+    diag "abri o launch.php no navegador padrao. Se ele perguntar se pode abrir o handler, aceite."
+  fi
+  diag "Se houver um dialogo modal esquecido no navegador, feche-o: enquanto ele"
+  diag "estiver aberto, o navegador nao processa URL nova."
+fi
 diag "esperando o redirect (ate ${ESPERA}s)..."
 
 if IFS= read -t "$ESPERA" -r capturado <&3; then
