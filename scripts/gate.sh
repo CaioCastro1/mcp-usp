@@ -89,6 +89,30 @@ if git check-ignore -q fixtures/moodle/raw/action_events.json; then ok; else
 fi
 
 # --------------------------------------------------------------- 3. os testes
+# QUEBRA DE RECURSAO. `tests/test_gate.py` roda este script dentro de um clone do
+# repo; a checagem 3 rodaria a suite DO CLONE, que contem test_gate.py, que clona
+# de novo. Cada nivel custa mais que o timeout do nivel acima, e o teste estoura.
+# Ficou latente ate o merge de 11/09, quando o clone passou a ter test_gate.py.
+#
+# O pulo e BARULHENTO de proposito (Invariante 7: sem limite silencioso). Quem
+# pula a suite nao pode achar que passou por ela: a linha diz PULADA, o rodape diz
+# que a suite nao rodou, e o codigo de saida NAO vira 0 por causa disto.
+if [ "${USP_MCP_GATE_SEM_SUITE:-0}" = "1" ]; then
+  passo "3. suite offline"
+  echo "PULADA"
+  echo "       USP_MCP_GATE_SEM_SUITE=1 — a suite NAO foi executada."
+  echo "       Isto existe para tests/test_gate.py nao recorrer sobre si mesmo."
+  echo "       Numa maquina de gente, NAO use: o gate sem a checagem 3 nao"
+  echo "       verifica o codigo, so o .env e o cru ignorado."
+  echo
+  if [ "$falhou" -eq 0 ]; then
+    echo "gate: checagens 0-2 passaram. A SUITE NAO RODOU — isto nao e um gate verde."
+  else
+    echo "gate: REPROVOU. Nao commite."
+  fi
+  exit "$falhou"
+fi
+
 passo "3. suite offline"
 # Sem -q extra: o pytest.ini já traz um, e o segundo engole a linha de resumo.
 if saida=$(USP_MCP_LIVE= "$PY" -m pytest 2>&1); then
