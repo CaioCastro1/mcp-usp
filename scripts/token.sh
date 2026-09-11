@@ -5,6 +5,7 @@
 #       pbpaste | ./scripts/token.sh    # se voce ja copiou a URL do redirect
 #       ./scripts/token.sh --sobrescrever   # trocar token que ja funciona, sem perguntar
 #       ./scripts/token.sh --manual         # sem captura automatica: colar a mao
+#       ./scripts/token.sh --navegador="Google Chrome"   # em vez do padrao do sistema
 #
 # Sete passos, na ordem em que estao no desenho de 10/09/2026
 # (docs/superpowers/specs/2026-09-10-script-token-moodle-design.md):
@@ -46,10 +47,14 @@ FN="core_webservice_get_site_info"
 sobrescrever=0
 # --manual: pular a captura automatica e colar a URL do redirect a mao.
 manual=0
+# --navegador="Google Chrome": abrir num navegador especifico. O padrao do sistema
+# pode nao ser o que entrega esquema externo direito.
+navegador=""
 for arg in "$@"; do
   case "$arg" in
     --sobrescrever) sobrescrever=1 ;;
     --manual) manual=1 ;;
+    --navegador=*) navegador="${arg#--navegador=}" ;;
     -h|--ajuda|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;
   esac
@@ -140,7 +145,7 @@ if [ "$manual" = "0" ] && [ -t 0 ]; then
   nota "entrega o redirect direto para o script — sem DevTools e sem colar nada."
   nota "O handler e desregistrado no fim, inclusive se voce abortar com Ctrl+C."
   nota ""
-  if valor=$(./scripts/_capturar_redirect.sh "$url_auto" uspmcp 120); then
+  if valor=$(USP_MCP_NAVEGADOR="$navegador" ./scripts/_capturar_redirect.sh "$url_auto" uspmcp 120); then
     titulo "3/7  recebido sem passar pelo terminal nem pelo clipboard"
     nota "captura automatica OK — nada foi colado e nada ficou no scrollback."
   else
