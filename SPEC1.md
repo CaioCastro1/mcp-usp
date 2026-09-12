@@ -2286,3 +2286,60 @@ opaco — `EP1-2026.pdf` para o "EC-1", `PSI3481_exercicio_com_nota_2024_IP3.pdf
 imprime e o filtro não olha. O fluxo desenhado funciona (listar, ler o rótulo, pedir pelo
 nome exato), mas custa uma ida a mais sempre que alguém pede pelo nome da atividade. Está no
 backlog; mudar o campo do casamento é decisão de §9, não conserto de passagem.
+
+### 12/09/2026 — o `ws.sh` era o último `[ -f .env ]`, e duas linhas do backlog não tinham dívida nenhuma
+
+Sessão de auditoria ("quais pendências temos"). Saíram duas coisas, e uma delas é sobre o
+próprio backlog.
+
+**O `ws.sh`, medido em vez de estimado.** Deste worktree, com o `.env` preenchido no
+checkout principal e chamando o script **sem argumento**:
+
+| versão | código de saída | o que diz |
+|---|---:|---|
+| a de `HEAD` | 1 | `MOODLE_TOKEN vazio. Copie .env.example para .env e preencha.` |
+| depois | 2 | `uso: scripts/ws.sh <funcao> [param=valor ...]` |
+
+Sem argumento de propósito: aí o script morre no `$# -lt 1`, que fica **depois** da
+checagem do token e **antes** do `curl`. O código de saída separa "o token chegou" (2) de
+"não chegou" (1) sem gastar chamada da conta nem tocar a USP — e é condição, não mensagem,
+que é o corolário que a linha 62 do backlog pediu.
+
+O erro antigo não era só inconveniente, era a **cura errada**: quem seguisse a mensagem
+criaria um `.env` no worktree, e ele sombrearia o de verdade — exatamente o estrago que o
+`token.sh` documenta na própria linha 81 e evita desde 11/09.
+
+**Terceira repetição do mesmo defeito, então a cura virou frase.** Procurar o `.env` só no
+diretório atual já mordeu a checagem de segredos do gate, o `token.sh`/`fix-token.sh` e
+agora o `ws.sh`. O §4 do `CONVENTIONS.md` passa a dizer que **nenhum script procura o
+`.env` com `[ -f .env ]`** — a porta é `usp_mcp.env.achar_env`, e é única. Verificado:
+depois deste commit não sobrou nenhum em `scripts/` (o de `token.sh:97` é `.env.example`,
+outra coisa).
+
+**Descartado:** manter o `[ -f .env ]` como atalho rápido antes de perguntar ao Python.
+Economiza uns 40 ms e cria um quarto lugar para o mesmo defeito morar. E descartado
+também engolir a falha de import com `2>/dev/null`: sem poder perguntar, seguir em frente
+devolveria a cura errada de novo, calada (Invariante 6). Hoje ela imprime o traceback
+indentado e para, como o `token.sh` faz.
+
+**Consertar o chão consertou três scripts.** `capture.sh` e `userid.sh` não têm `.env`
+próprio: chamam `./scripts/ws.sh`. A linha 72 do backlog afirmava que o `capture.sh` tinha
+o seu — não tinha.
+
+**W1 e W2, e por que os dois.** W1 monta um checkout falso (`.git`, `.env`) com um worktree
+pendurado nele e prova que o `.env` do principal é achado de lá. W2 monta o mesmo sem
+`.env` nenhum e prova que a recusa legível continua de pé. Sozinho, W1 ficaria verde para
+uma "cura" que inventasse um token. Cópia e não symlink no `usp_mcp/` do worktree falso,
+porque `achar_env` faz `Path(__file__).resolve()` — um symlink acharia o `.env` de verdade
+e o teste passaria sem exercitar nada. Gate: 432 passed, 6 skipped.
+
+**O backlog também envelhece, e ninguém o remedia.** Duas linhas foram fechadas sem
+trabalho nenhum, porque a dívida já não existia: a de `chamar_ferramenta` não aceitar
+`cliente` injetável (marcada **alta** desde 31/08, e o `server.py:169` aceita desde o T80,
+o que a linha 17 da mesma tabela já registrava) e a do comentário sobre o sandbox em
+`server.py` (o texto não existe mais no arquivo). É o mesmo modo de falha que o §9 de
+31/08 registrou para o `CLAUDE.md`, em outro arquivo: **estado escrito uma vez e nunca
+mais conferido vira mapa errado**. O custo aqui foi menor porque o backlog não é lido no
+começo de toda sessão — mas ele é o que responde "o que atacar primeiro", e ele apontava
+para duas ruas sem dívida. Não há cura estrutural registrada; fica o hábito de conferir a
+linha contra o código antes de agir sobre ela.
