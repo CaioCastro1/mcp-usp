@@ -8,9 +8,19 @@
     "fix-trino-query": "off",
     "anthropic-skills:lais-copywriter": "off",
     "anthropic-skills:lastro-briefing-closers": "off",
-    "anthropic-skills:fix-trino-query": "off"
+    "anthropic-skills:fix-trino-query": "off",
+    "lastro-overview-closers": "off",
+    "anthropic-skills:lastro-overview-closers": "off"
   },
   "enabledPlugins": {
-    "lais-brand-studio": false
+    "lais-brand-studio": false,
+    "lais-brand-studio@inline": false,
+    "vercel@claude-plugins-official": false
+  },
+  "enableAllProjectMcpServers": false,
+  "permissions": {
+    "deny": [
+      "mcp__mcp-trino"
+    ]
   }
 }
