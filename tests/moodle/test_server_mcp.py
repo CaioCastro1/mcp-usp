@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pytest
 
+from tests.moodle.conftest import ENTREGAS_PSI3323_SEM_ANEXO
 from usp_mcp.moodle import server
 
 pytestmark = pytest.mark.contrato
@@ -68,6 +69,7 @@ def test_T101_chamar_ferramenta_roteia_baixar_arquivo_com_cliente_injetado(
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         }
     )
 

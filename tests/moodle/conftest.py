@@ -30,6 +30,8 @@ FIXTURE_ERRO_PARAM = RAIZ / "fixtures" / "moodle" / "erro_invalidparameter.json"
 FIXTURE_ERRO_LIMITE = RAIZ / "fixtures" / "moodle" / "erro_limite_fora_da_faixa.json"
 FIXTURE_CONTEUDO = RAIZ / "fixtures" / "moodle" / "course_contents_psi3323.json"
 FIXTURE_DISCIPLINAS = RAIZ / "fixtures" / "moodle" / "users_courses.json"
+FIXTURE_CONTEUDO_PTC3314 = RAIZ / "fixtures" / "moodle" / "course_contents_ptc3314.json"
+FIXTURE_ENTREGAS_PTC3314 = RAIZ / "fixtures" / "moodle" / "assign_ptc3314.json"
 
 
 # O carregador mora em usp_mcp/env.py, não aqui: o entrypoint stdio do Moodle
@@ -215,3 +217,51 @@ class ClienteFalso:
             if nome == funcao:
                 return params
         raise AssertionError(f"{funcao!r} nunca foi chamada. Chamadas: {[c[0] for c in self.chamadas]}")
+
+# A fixture de PSI3323 tem UM módulo `assign` (`Entrega de Relatório -
+# Sexta-Feira`, cmid 6372196), e desde 12/09 quem pede material dela também
+# pergunta pelos anexos das entregas. Esta é a resposta que o Moodle dá para uma
+# entrega SEM anexo — forma real, lista vazia — e é o insumo dos testes que não
+# são sobre anexo nenhum. Escrita à mão, e não capturada, de propósito: a
+# fixture de conteúdo é de 31/08 e a disciplina já mudou desde então (§9), então
+# uma captura de hoje não formaria par com ela.
+ENTREGAS_PSI3323_SEM_ANEXO = {
+    "courses": [
+        {
+            "id": 142033,
+            "assignments": [
+                {
+                    "id": 1,
+                    "cmid": 6372196,
+                    "name": "Entrega de Relatório - Sexta-Feira",
+                    "introattachments": [],
+                }
+            ],
+        }
+    ],
+    "warnings": [],
+}
+
+
+@pytest.fixture(scope="session")
+def conteudo_ptc3314() -> list:
+    """`core_course_get_contents` de PTC3314 (courseid 142036), 12/09/2026.
+
+    Existe para formar PAR com `entregas_ptc3314`: as duas respostas são da
+    MESMA disciplina, capturadas na mesma sessão, e o `cmid` que liga uma à
+    outra é real. Um par sintético provaria só que o teste sabe somar dois
+    dicionários que ele mesmo escreveu.
+    """
+    return _obrigatoria(FIXTURE_CONTEUDO_PTC3314, "course_contents_142036.json")
+
+
+@pytest.fixture(scope="session")
+def entregas_ptc3314() -> dict:
+    """`mod_assign_get_assignments` de PTC3314, 12/09/2026: 8.623 B crus.
+
+    É a resposta que contém `EP1-2026.pdf` e `EP2-2026.pdf` — os dois enunciados
+    que `core_course_get_contents` não mostra, porque os 4 módulos `assign` da
+    disciplina chegam lá com `contents` VAZIO. Traz também dois `warnings` de
+    "sem direito de acesso", que é o que o Invariante 7 proíbe engolir.
+    """
+    return _obrigatoria(FIXTURE_ENTREGAS_PTC3314, "assign_ptc3314.json")
