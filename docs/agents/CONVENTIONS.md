@@ -97,6 +97,12 @@ devem (§9, 31/08/2026). A primeira versão dele passava sem ter verificado nada
 procurava o `.env` só no diretório atual e um worktree não tem o dele; hoje usa
 `usp_mcp.env.achar_env` e **reprova** se não achar `.env` nenhum, em vez de reportar OK.
 
+**Nenhum script procura o `.env` com `[ -f .env ]`** — a porta é a mesma,
+`usp_mcp.env.achar_env`. A regra é frase e não conserto porque o defeito apareceu
+três vezes: no gate, no `token.sh`/`fix-token.sh` e no `ws.sh` (§9, 12/09/2026). O
+estrago dele não é falhar — é apontar a cura errada, mandando "copie `.env.example`"
+para quem já tem o `.env` preenchido no checkout principal.
+
 **Um teste que falha por erro de coleta, erro de setup ou fixture ausente não está
 vermelho, está quebrado** — conserte antes de commitar. Os três casos que já morderam:
 módulo ausente aborta a coleta inteira e some com os verdes; construir o objeto sob teste
