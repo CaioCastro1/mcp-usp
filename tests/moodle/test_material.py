@@ -24,7 +24,12 @@ import json
 
 import pytest
 
-from tests.moodle.conftest import FIXTURE_CONTEUDO, FIXTURE_DISCIPLINAS, ClienteFalso
+from tests.moodle.conftest import (
+    ENTREGAS_PSI3323_SEM_ANEXO,
+    FIXTURE_CONTEUDO,
+    FIXTURE_DISCIPLINAS,
+    ClienteFalso,
+)
 from usp_mcp.moodle import disciplinas as disc
 from usp_mcp.moodle import erros, material as mat, politica
 
@@ -262,6 +267,7 @@ def _cliente_completo(disciplinas_brutas, conteudo_bruto):
         "core_webservice_get_site_info": {"userid": 999},
         "core_enrol_get_users_courses": disciplinas_brutas,
         "core_course_get_contents": conteudo_bruto,
+        "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
     })
 
 
@@ -341,17 +347,19 @@ def test_sigla_desconhecida_nao_chega_a_pedir_conteudo(disciplinas_brutas, conte
 
 @pytest.mark.politica
 def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
-    """T77 — a superfície passou de 1 para 4 funções (§9, 31/08).
+    """T77 — a superfície passou de 1 para 4 (§9, 31/08) e de 4 para 5 (12/09).
 
     O teste continua travando o conjunto INTEIRO, que é o que impede a próxima
-    sessão de acrescentar "só mais uma". As três novas são leitura; nenhuma
-    escreve, e nenhuma está no bloqueio permanente do §2.2.
+    sessão de acrescentar "só mais uma". Todas são leitura; nenhuma escreve, e
+    nenhuma está no bloqueio permanente do §2.2 — o que importa dizer da quinta,
+    porque ela é vizinha de nome de quatro funções que estão.
     """
     assert politica.ALLOWLIST == frozenset({
         "core_calendar_get_action_events_by_timesort",
         "core_webservice_get_site_info",
         "core_enrol_get_users_courses",
         "core_course_get_contents",
+        "mod_assign_get_assignments",
     })
     assert not (politica.ALLOWLIST & politica.BLOQUEIO_PERMANENTE)
     for funcao in politica.ALLOWLIST:
@@ -400,6 +408,7 @@ def test_T68b_o_texto_entregue_ao_modelo_nunca_contem_url_interna(
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         }
     )
     disc.limpar_cache()
@@ -431,6 +440,7 @@ def test_T102_busca_por_nome_ignora_acento(conteudo_bruto, disciplinas_brutas):
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         }
     )
     disc.limpar_cache()
@@ -491,6 +501,7 @@ def test_T106_o_nome_do_modulo_sai_quando_diz_algo_que_o_arquivo_nao_diz(
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         }
     )
     disc.limpar_cache()
@@ -511,6 +522,7 @@ def test_T107_o_nome_do_modulo_e_omitido_quando_repete_o_do_arquivo(
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         }
     )
     disc.limpar_cache()

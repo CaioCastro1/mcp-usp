@@ -22,7 +22,7 @@ from . import deposito
 from .cliente import TETO_ARQUIVO_BYTES as _TETO_CLIENTE
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle, FuncaoBloqueada, MoodleIndisponivel, RespostaIlegivel, TokenInvalido
-from .material import projetar_material
+from .material import acervo
 from .texto import casa
 
 # Rebatizado como nome DESTE módulo de propósito: o cliente guarda o teto do
@@ -152,9 +152,10 @@ def baixar_arquivo(
         raise ErroMoodle(resolucao.motivo)
 
     alvo = resolucao.disciplina
-    conteudo = projetar_material(
-        cliente.chamar("core_course_get_contents", courseid=alvo.courseid)
-    )
+    # `acervo` e não `get_contents` cru: é ele que traz também os anexos das
+    # entregas (§9, 12/09). Sem isto esta ferramenta continuaria cega para o
+    # enunciado do EC-1 mesmo depois de `material` aprender a listá-lo.
+    conteudo = acervo(cliente, alvo.courseid)
     itens = [i for s in conteudo.secoes for i in s.itens]
     # Casamento por nome de arquivo, e só. O trabalho semântico — "qual destes
     # é a lista sobre carta de Smith" — é do modelo que leu a listagem, não de

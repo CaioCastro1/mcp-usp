@@ -20,7 +20,7 @@ import sys
 
 import pytest
 
-from tests.moodle.conftest import ClienteFalso
+from tests.moodle.conftest import ENTREGAS_PSI3323_SEM_ANEXO, ClienteFalso
 from usp_mcp.moodle import disciplinas as disc
 from usp_mcp.moodle import server
 
@@ -101,6 +101,7 @@ def test_t80_call_tool_de_material_atravessa_ate_a_fixture(
         "core_webservice_get_site_info": {"userid": 999},
         "core_enrol_get_users_courses": disciplinas_brutas,
         "core_course_get_contents": conteudo_bruto,
+        "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
     })
     monkeypatch.setattr(server, "ClienteMoodle", lambda **kw: falso)
 

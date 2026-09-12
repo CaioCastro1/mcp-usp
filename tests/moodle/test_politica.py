@@ -39,6 +39,11 @@ PREFIXOS_DE_LEITURA = (
     "core_webservice_get_",
     "core_enrol_get_",
     "core_course_get_",
+    # 12/09/2026: a família `mod_assign_` tem leitura E escrita, e é a primeira
+    # da allowlist em que isso acontece. O prefixo inclui o `get_` justamente
+    # por isso — `mod_assign_` sozinho abriria a porta para `save_submission` e
+    # `submit_for_grading`, que são as quatro vizinhas no bloqueio do §2.2.
+    "mod_assign_get_",
 )
 
 # P4 vigia estes três nomes. Escrito à mão, e não derivado do módulo, porque
@@ -168,8 +173,12 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
 
     Cresceu de 1 para 4 em 31/08, por decisão registrada no §9: `material`
     precisa traduzir sigla em `courseid`, e isso custa duas funções além da que
-    responde. O teste segue travando o conjunto INTEIRO — é o que impede a
-    próxima sessão de acrescentar "só mais uma" sem passar pelo §9.
+    responde. E de 4 para 5 em 12/09, também no §9: o enunciado do EC-1 é um PDF
+    que `core_course_get_contents` não devolve — os módulos `assign` chegam lá
+    com `contents` vazio, e o arquivo só existe em `mod_assign_get_assignments`.
+
+    O teste segue travando o conjunto INTEIRO — é o que impede a próxima sessão
+    de acrescentar "só mais uma" sem passar pelo §9.
     """
     assert politica.ALLOWLIST == frozenset(
         {
@@ -177,6 +186,7 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "core_webservice_get_site_info",
             "core_enrol_get_users_courses",
             "core_course_get_contents",
+            "mod_assign_get_assignments",
         }
     )
 

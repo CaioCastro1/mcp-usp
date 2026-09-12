@@ -24,6 +24,14 @@ módulos `url` apontam para fora (YouTube, Google Docs, sites de fabricante) e n
 têm esse problema: esses saem inteiros, porque recusar tudo seria esconder o que
 se sabe. O que identifica um arquivo interno — nome, tipo, tamanho, data — sai;
 o endereço dele, não.
+
+**O acervo não cabe numa chamada só, e isso é medição de 12/09/2026** (§9). Os
+módulos `assign` chegam em `core_course_get_contents` com `contents` VAZIO: em
+PTC3314 são 4, e dentro deles moram os enunciados dos exercícios computacionais —
+`EP1-2026.pdf`, 218 kB. O `description` do módulo não ajuda (529 B de datas, zero
+`href`). Quem tem o arquivo é `mod_assign_get_assignments`, e é por isso que
+`acervo` faz DUAS chamadas — a segunda só quando a primeira encontra entrega, o
+que mantém o Invariante 5 de pé para as disciplinas que não têm nenhuma.
 """
 from __future__ import annotations
 
@@ -38,10 +46,21 @@ from .texto import casa, normalizar
 # que por isso exigiria o token para ser baixado.
 _MARCAS_INTERNAS = ("/webservice/", "pluginfile.php")
 
+# Quantas entregas sem anexo o rodapé nomeia antes de virar contagem. Três é o
+# que cabe numa linha e ainda deixa reconhecer o padrão do nome; o resto vira
+# "e mais N", nunca silêncio.
+_TETO_NOMES_NO_RODAPE = 3
+
 _TIPOS = {
     "application/pdf": "PDF",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "documento",
     "application/msword": "documento",
+    # O acervo de PTC3314 publica o mesmo enunciado em PDF e em ODT (12/09).
+    # Sem esta linha o ODT saía como "arquivo", escondendo que é a mesma coisa
+    # em outro formato — e nenhum `resource` da amostra de PSI3323 era ODT, que
+    # é por que isto só apareceu quando as entregas entraram na lista.
+    "application/vnd.oasis.opendocument.text": "documento",
+    "application/vnd.oasis.opendocument.spreadsheet": "planilha",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "planilha",
     "image/jpeg": "imagem",
     "image/png": "imagem",
@@ -74,10 +93,33 @@ class Secao:
 
 
 @dataclass(frozen=True)
+class Entrega:
+    """Um módulo `assign` do espaço, como `get_contents` o descreve.
+
+    Existe porque `get_contents` descreve a entrega mas **não** os arquivos dela:
+    medido em 12/09/2026, os 4 `assign` de PTC3314 chegam com `contents` vazio e
+    `description` sem link nenhum. O que sobra de útil é o `cmid` — é por ele que
+    o anexo devolvido por `mod_assign_get_assignments` acha a seção onde aparecer.
+    """
+
+    cmid: int
+    nome: str
+    secao: str
+
+
+@dataclass(frozen=True)
+class AnexosDeEntrega:
+    itens: tuple[Item, ...]
+    avisos: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Conteudo:
     secoes: tuple[Secao, ...]
     total_itens: int
     sem_conteudo: tuple[str, ...]
+    entregas: tuple[Entrega, ...] = ()
+    avisos: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -129,9 +171,22 @@ def projetar_material(bruto) -> Conteudo:
     total = 0
     sem_conteudo: set[str] = set()
 
+    entregas: list[Entrega] = []
+
     for secao in bruto or ():
         itens: list[Item] = []
         for modulo in secao.get("modules") or ():
+            if modulo.get("modname") == "assign":
+                # Registrada mesmo sem `contents`, e é o registro que decide se
+                # a segunda chamada vale a pena: sem `assign` nenhum, perguntar
+                # por anexo de entrega só pode devolver vazio (Invariante 5).
+                entregas.append(
+                    Entrega(
+                        cmid=modulo.get("id"),
+                        nome=modulo.get("name") or "",
+                        secao=secao.get("name") or "",
+                    )
+                )
             conteudos = modulo.get("contents") or ()
             if not conteudos:
                 # Invariante 7: fórum e entrega não têm `contents`. Sumir com
@@ -140,15 +195,9 @@ def projetar_material(bruto) -> Conteudo:
                 continue
             for conteudo in conteudos:
                 itens.append(
-                    Item(
-                        nome=conteudo.get("filename") or modulo.get("name") or "",
-                        tipo=_tipo_de(modulo.get("modname") or "", conteudo.get("mimetype")),
-                        tamanho=conteudo.get("filesize") or None,
-                        modificado=_data(conteudo.get("timemodified")),
-                        url_externa=_url_publica(conteudo.get("fileurl")),
-                        fileurl_bruta=conteudo.get("fileurl"),
-                        fileid=_fileid(conteudo.get("fileurl")),
-                        mimetype=conteudo.get("mimetype"),
+                    _item_de(
+                        conteudo,
+                        modname=modulo.get("modname") or "",
                         secao=secao.get("name") or "",
                         modulo=modulo.get("name") or "",
                     )
@@ -160,7 +209,125 @@ def projetar_material(bruto) -> Conteudo:
         secoes=tuple(secoes),
         total_itens=total,
         sem_conteudo=tuple(sorted(sem_conteudo)),
+        entregas=tuple(entregas),
     )
+
+
+def _item_de(conteudo: dict, *, modname: str, secao: str, modulo: str) -> Item:
+    """Um `contents` do Moodle vira `Item`. UMA função, e é o que permite os anexos.
+
+    O anexo de entrega chega de outra função do web service
+    (`mod_assign_get_assignments`) com **os mesmos nomes de campo** — `filename`,
+    `filesize`, `mimetype`, `timemodified`, `fileurl` — medido em 12/09/2026. Com
+    a construção num lugar só, o anexo entra no acervo sem caso especial, e
+    `baixar_arquivo` o acha sem saber que ele veio de outro endpoint.
+    """
+    return Item(
+        nome=conteudo.get("filename") or modulo or "",
+        tipo=_tipo_de(modname, conteudo.get("mimetype")),
+        tamanho=conteudo.get("filesize") or None,
+        modificado=_data(conteudo.get("timemodified")),
+        url_externa=_url_publica(conteudo.get("fileurl")),
+        fileurl_bruta=conteudo.get("fileurl"),
+        fileid=_fileid(conteudo.get("fileurl")),
+        mimetype=conteudo.get("mimetype"),
+        secao=secao,
+        modulo=modulo,
+    )
+
+
+def projetar_anexos_de_entrega(bruto, entregas) -> AnexosDeEntrega:
+    """Os `introattachments` de cada entrega viram itens do acervo.
+
+    O rótulo de cada anexo é o nome da ENTREGA, não o do arquivo: `EP1-2026.pdf`
+    não diz nada, `EC-1 - Transitórios em LT` diz tudo — e é esse campo que
+    `rotulo_do_modulo` imprime junto do arquivo.
+
+    `warnings` vira aviso em vez de sumir (Invariante 7). Na captura de 12/09 são
+    dois módulos com `No access rights in module context`: uma lista sem eles
+    pareceria completa sem ser.
+    """
+    por_cmid = {e.cmid: e for e in entregas}
+    itens: list[Item] = []
+
+    for curso in (bruto or {}).get("courses") or ():
+        for entrega in curso.get("assignments") or ():
+            local = por_cmid.get(entrega.get("cmid"))
+            nome_modulo = local.nome if local else (entrega.get("name") or "")
+            secao = local.secao if local else ""
+            for anexo in entrega.get("introattachments") or ():
+                itens.append(
+                    _item_de(anexo, modname="assign", secao=secao, modulo=nome_modulo)
+                )
+
+    avisos: list[str] = []
+    if quantos := len((bruto or {}).get("warnings") or ()):
+        avisos.append(
+            f"{quantos} atividade(s) desta disciplina não puderam ser lidas com "
+            "esta credencial — se houver arquivo nelas, ele não está acima."
+        )
+
+    return AnexosDeEntrega(itens=tuple(itens), avisos=tuple(avisos))
+
+
+def _com_anexos(conteudo: Conteudo, anexos: AnexosDeEntrega) -> Conteudo:
+    """Devolve o conteúdo com os anexos dentro da seção de cada entrega.
+
+    Anexo cuja seção não existe na projeção (não deve acontecer: o `cmid` vem da
+    mesma captura) entra numa seção própria em vez de sumir — Invariante 7 vale
+    também para o caso que "não acontece".
+    """
+    if not anexos.itens:
+        return conteudo
+
+    por_secao: dict[str, list[Item]] = {}
+    for item in anexos.itens:
+        por_secao.setdefault(item.secao, []).append(item)
+
+    secoes = [
+        Secao(nome=s.nome, itens=s.itens + tuple(por_secao.pop(s.nome, ())))
+        for s in conteudo.secoes
+    ]
+    secoes += [Secao(nome=nome, itens=tuple(itens)) for nome, itens in por_secao.items()]
+
+    # `assign` sai de `sem_conteudo` porque deixou de ser verdade que a entrega
+    # está fora da lista: ela aparece, pelos arquivos anexados a ela. As que não
+    # têm anexo ganham aviso próprio em `material`, com a contagem.
+    return Conteudo(
+        secoes=tuple(secoes),
+        total_itens=conteudo.total_itens + len(anexos.itens),
+        sem_conteudo=tuple(n for n in conteudo.sem_conteudo if n != "assign"),
+        entregas=conteudo.entregas,
+        avisos=conteudo.avisos + anexos.avisos,
+    )
+
+
+def acervo(cliente, courseid: int) -> Conteudo:
+    """Tudo que é arquivo no espaço da disciplina — de UMA ou de DUAS chamadas.
+
+    A segunda só sai se a primeira disser que existe `assign`. É a diferença
+    entre custo sob demanda e martelar a USP por uma resposta que já se sabe
+    vazia (Invariante 5), e ela é medível: PTC3314 paga +8.651 B sobre os
+    106.121 B de `get_contents` (8%); uma disciplina sem entrega paga zero.
+
+    O escopo `courseids[0]` não é otimização: **sem ele** a função devolve as 74
+    matrículas, 1 MB, ~251k tokens (§9, 28/08).
+
+    Ponto único das duas ferramentas de propósito: `material` e `baixar_arquivo`
+    faziam o mesmo par de linhas em duplicata, e a segunda ficaria cega para os
+    anexos se só a primeira aprendesse a pedi-los.
+    """
+    conteudo = projetar_material(
+        cliente.chamar("core_course_get_contents", courseid=courseid)
+    )
+    if not conteudo.entregas:
+        return conteudo
+
+    anexos = projetar_anexos_de_entrega(
+        cliente.chamar("mod_assign_get_assignments", **{"courseids[0]": courseid}),
+        conteudo.entregas,
+    )
+    return _com_anexos(conteudo, anexos)
 
 
 def _data(carimbo) -> datetime | None:
@@ -230,6 +397,18 @@ def _formatar_item(item: Item) -> str:
     return linha
 
 
+def _entregas_sem_anexo(conteudo: Conteudo) -> tuple[str, ...]:
+    """As entregas que nenhum item do acervo cita como módulo de origem.
+
+    Em PTC3314 são 2 de 4: as duas provas presenciais, que o professor criou
+    como `assign` só para ter data. Nomeá-las é mais honesto do que o rodapé
+    antigo, que declarava `assign` inteiro fora da lista mesmo quando metade
+    dele estava dentro.
+    """
+    com_arquivo = {i.modulo for s in conteudo.secoes for i in s.itens}
+    return tuple(e.nome for e in conteudo.entregas if e.nome not in com_arquivo)
+
+
 def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> RespostaMaterial:
     """Uma pergunta, uma disciplina. Resolve a sigla antes de gastar chamada.
 
@@ -243,9 +422,7 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         raise ErroMoodle(resolucao.motivo)
 
     alvo = resolucao.disciplina
-    conteudo = projetar_material(
-        cliente.chamar("core_course_get_contents", courseid=alvo.courseid)
-    )
+    conteudo = acervo(cliente, alvo.courseid)
 
     total = conteudo.total_itens
     filtro = (busca or "").strip()
@@ -313,6 +490,27 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
             + ", ".join(conteudo.sem_conteudo)
             + " — são atividades, não arquivos, e têm consulta própria."
         )
+    if mudas := _entregas_sem_anexo(conteudo):
+        # Invariante 7 aplicado ao que a segunda chamada NÃO achou: a entrega
+        # sem arquivo anexado continua fora da lista, e dizer quais são é o que
+        # separa "o professor não anexou nada" de "a ferramenta não olhou".
+        #
+        # Com teto, porque medir doeu: PSI3472 tem 10 das 11 entregas sem anexo
+        # ("Lição aulas 1 e 2", "Lição aulas 3 e 4", …), e nomear as 10 produziu
+        # um rodapé que enterrava os outros três avisos. O que o Invariante 7
+        # exige é que o corte seja DITO — a contagem fica, os nomes é que são
+        # amostra, e "e mais N" é o que impede a amostra de passar por lista.
+        nomeadas = ", ".join(mudas[:_TETO_NOMES_NO_RODAPE])
+        if sobra := len(mudas) - _TETO_NOMES_NO_RODAPE:
+            nomeadas += f", e mais {sobra}"
+        avisos.append(
+            f"{len(mudas)} de {len(conteudo.entregas)} entregas não têm arquivo "
+            f"anexado ao enunciado e por isso não aparecem acima: {nomeadas}. "
+            "O texto do enunciado, o prazo e a sua nota não são material — "
+            "use `o_que_vence` para o prazo."
+        )
+    if conteudo.avisos:
+        avisos.extend(conteudo.avisos)
 
     linhas.extend(f"\n⚠ {a}" for a in avisos)
 
