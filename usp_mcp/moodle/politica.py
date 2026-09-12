@@ -17,17 +17,31 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Duas ferramentas, quatro funções. Crescer isso é decisão de §9, não
+# Cinco funções, todas de leitura. Crescer isso é decisão de §9, não
 # conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
-# novas existem porque `material` precisa traduzir sigla em `courseid`:
+# então novas existem porque `material` precisa traduzir sigla em `courseid`:
 # site_info dá o userid a partir do token, users_courses dá a lista, e
-# get_contents é a resposta. Todas de leitura.
+# get_contents é a resposta.
+#
+# A quinta entrou em 12/09/2026, e a medição que a justifica está no §9: os 4
+# módulos `assign` de PTC3314 chegam em `core_course_get_contents` com
+# `contents` VAZIO, e o `description` deles não tem link nenhum. O enunciado do
+# EC-1 — um PDF de 218 kB — só existe em `mod_assign_get_assignments`, como
+# `introattachments`. Sem ela, `material` lista 53 itens e jura que é o acervo
+# inteiro, que é o falso "não tem nada" do Invariante 7.
+#
+# Note a vizinhança de nome: `mod_assign_save_submission`,
+# `mod_assign_submit_for_grading`, `mod_assign_start_submission` e
+# `mod_assign_remove_submission` seguem no bloqueio permanente do §2.2. É
+# igualdade exata de nome que libera, nunca prefixo — por isso a proximidade
+# não as arrasta junto.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
         "core_webservice_get_site_info",
         "core_enrol_get_users_courses",
         "core_course_get_contents",
+        "mod_assign_get_assignments",
     }
 )
 

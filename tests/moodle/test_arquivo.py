@@ -14,7 +14,7 @@ from usp_mcp.moodle import disciplinas as dis
 from usp_mcp.moodle.cliente import ClienteMoodle
 from usp_mcp.moodle.erros import ErroMoodle, MoodleIndisponivel
 
-from .conftest import ClienteFalso
+from .conftest import ENTREGAS_PSI3323_SEM_ANEXO, ClienteFalso
 
 
 @pytest.fixture(autouse=True)
@@ -32,6 +32,7 @@ def _cliente(conteudo_bruto, disciplinas_brutas, **extra):
             "core_webservice_get_site_info": {"userid": 1},
             "core_enrol_get_users_courses": disciplinas_brutas,
             "core_course_get_contents": conteudo_bruto,
+            "mod_assign_get_assignments": ENTREGAS_PSI3323_SEM_ANEXO,
         },
         **extra,
     )
@@ -355,6 +356,8 @@ def _cliente_moodle_real(conteudo_bruto, disciplinas_brutas):
             return disciplinas_brutas
         if funcao == "core_course_get_contents":
             return conteudo_bruto
+        if funcao == "mod_assign_get_assignments":
+            return ENTREGAS_PSI3323_SEM_ANEXO
         raise AssertionError(f"chamada não prevista neste teste: {funcao}")
 
     return ClienteMoodle(
