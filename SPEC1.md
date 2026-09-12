@@ -2254,3 +2254,35 @@ nenhum teste perguntou o que havia dentro dele.
 O que fecha o buraco não é mais cobertura do caminho que existe, é a pergunta invertida —
 **"esta resposta é tudo?"** — feita contra dado, não contra a memória de quem escreveu a
 ferramenta. Custou uma mensagem de quem usou; pela suíte não ia aparecer nunca.
+
+### 12/09/2026 — a cobertura dos anexos, medida nas 19 disciplinas, e um rodapé que precisou de teto
+
+Verificação de largura logo depois da entrada acima, porque "funcionou em PTC3314" não é
+"funciona". **Uma chamada** de `mod_assign_get_assignments` com as 19 matrículas de 2026
+como escopo (52.454 B, ~13.113 tokens) — o escopo é o que evita 1 MB.
+
+| disciplina | entregas | com anexo |
+|---|---:|---:|
+| PTC3314 | 4 | 2 (os dois ECs, 4 arquivos) |
+| PSI3481 | 2 | 1 (`PSI3481_exercicio_com_nota_2024_IP3.pdf` + `.docx`) |
+| PSI3472 | 11 | 1 (`Projeto_PlanejamentoVoosNacionais.pdf`) |
+| PTC3312 | 6 | 0 |
+| as outras 15 | 0 | — |
+
+**7 arquivos no semestre inteiro, em 3 disciplinas.** Pouco em volume, e exatamente os que
+importam: são os enunciados de exercício-programa e projeto. Os dois casos novos foram
+conferidos ponta a ponta, e o casamento por `cmid` acertou a seção nos dois.
+
+**O que a largura pegou, e a amostra de uma disciplina não pegaria:** PSI3472 tem **10 das
+11** entregas sem anexo (as "Lição aulas N e N+1"), e o rodapé que eu tinha escrito nomeava
+as dez. Quatro linhas de nomes enterrando os outros três avisos. O Invariante 7 exige que o
+corte seja **dito**, não que não exista: ficaram a contagem (`10 de 11`), três nomes de
+amostra e `e mais 7`. T122 trava a contagem e o teto juntos.
+
+**O que a largura NÃO conserta, e vale registrar como limite conhecido:** o casamento de
+`baixar_arquivo` é por nome de ARQUIVO (decisão de 03/09), e o nome do enunciado costuma ser
+opaco — `EP1-2026.pdf` para o "EC-1", `PSI3481_exercicio_com_nota_2024_IP3.pdf` para o
+"exercício de cascata de amplificadores". O assunto está no nome do MÓDULO, que `material`
+imprime e o filtro não olha. O fluxo desenhado funciona (listar, ler o rótulo, pedir pelo
+nome exato), mas custa uma ida a mais sempre que alguém pede pelo nome da atividade. Está no
+backlog; mudar o campo do casamento é decisão de §9, não conserto de passagem.
