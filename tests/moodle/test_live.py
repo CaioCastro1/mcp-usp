@@ -67,3 +67,39 @@ def test_a_forma_da_resposta_real_ainda_bate_com_a_fixture(cliente_real, eventos
 # commit nenhum. Foi assim que esta apodreceu calada — congelou a `ALLOWLIST`
 # em um nome e não reprovou quando ela foi a quatro, em 31/08. Guarda que só
 # roda atrás de `USP_MCP_LIVE=1` é guarda que ninguém vê morrer.
+
+
+def test_o_anexo_da_entrega_ainda_chega_com_os_campos_que_o_acervo_usa(
+    cliente_real, entregas_ptc3314
+):
+    """T120 — o segundo canário, e ele guarda a quinta função da allowlist.
+
+    A fixture de `mod_assign_get_assignments` é de 12/09/2026 e congela. O que
+    importa não é o conteúdo — o professor troca o enunciado, e um teste que
+    falhe por isso vira ruído — mas os cinco campos que `_item_de` lê do anexo:
+    sem `fileurl` o arquivo some do acervo, e sem `filesize` o download perde a
+    conferência de tamanho que detecta corte no meio.
+
+    UMA chamada, com escopo de UMA disciplina (§3.1). Sem `courseids` esta
+    função devolve as 74 matrículas, 1 MB (§9, 28/08).
+    """
+    vivo = cliente_real.chamar(
+        "mod_assign_get_assignments", **{"courseids[0]": 142036}
+    )
+
+    assert set(vivo) == set(entregas_ptc3314)
+    anexos = [
+        anexo
+        for curso in vivo.get("courses") or ()
+        for entrega in curso.get("assignments") or ()
+        for anexo in entrega.get("introattachments") or ()
+    ]
+    assert anexos, (
+        "PTC3314 não tem mais nenhum anexo de entrega. Se o professor tirou os "
+        "enunciados, troque a disciplina deste canário; se a API mudou de campo, "
+        "é o acervo que quebrou."
+    )
+    faltando = {"filename", "filesize", "mimetype", "timemodified", "fileurl"} - set(
+        anexos[0]
+    )
+    assert not faltando, f"campos sumiram da API desde 12/09/2026: {sorted(faltando)}"

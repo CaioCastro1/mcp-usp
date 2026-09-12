@@ -271,7 +271,7 @@ Fechar com dado da Fase 1. Nenhuma delas deve ser respondida agora.
 
 **Sobre custo e forma**
 
-- `get_contents` é suficiente para achar material, ou exige N chamadas por módulo?
+- ~~`get_contents` é suficiente para achar material, ou exige N chamadas por módulo?~~ **Fechada em 28/08 e completada em 12/09** (§9): basta para `resource` e `url`, e **não** para `assign` — o anexo do enunciado só existe em `mod_assign_get_assignments`. São duas chamadas por disciplina, e a segunda só sai quando a primeira acha um módulo de entrega.
 - `submission_status` é por assign? Quantos assigns por semestre? Isso define se "já
   entreguei" é uma chamada ou trinta.
 - Qual das duas visões de nota é estável e legível o suficiente para virar texto curto?
@@ -2185,3 +2185,104 @@ a recursão: devolve verde sem ter verificado código nenhum (Invariante 7). D5 
 quebra de ciclo declarada no desenho. Aqui ela não existia, e o ciclo só se fechou quando
 o arquivo chegou ao HEAD — ou seja, **o teste ficou verde exatamente enquanto não podia
 falhar**, e ficou vermelho no primeiro momento em que passou a valer.
+
+### 12/09/2026 — os PDFs presos dentro das entregas: `get_contents` descreve o assign e esconde o arquivo dele
+
+**Veio do uso, não da suíte.** Um agente com o conector plugado pediu o enunciado do EC-1
+de PTC3314, leu os 53 itens que `material` devolveu, não achou, e concluiu — corretamente,
+a partir do que via — que era *feature faltando*. Era, e a suíte estava 100% verde.
+
+**Medido, e as três linhas juntas é que decidem o desenho:**
+
+| chamada | o que traz sobre o EC-1 | custo |
+|---|---|---:|
+| `core_course_get_contents` (142036) | o módulo `assign`, com `contents` **vazio** — nos 4 | 106.121 B |
+| `description` do módulo | 529 B de datas de abertura e vencimento, **zero `href`** | — |
+| `mod_assign_get_assignments` (`courseids[0]`) | `EP1-2026.pdf` (218.344 B), `EP1-2026.odt`, `EP2-2026.pdf`, `EP2-2026.odt` | 8.651 B / ~2.162 tokens |
+
+A segunda linha é a que evita o desenho errado: a tentação era raspar `href` do
+`description` e não gastar chamada nenhuma. Não há `href` nenhum lá — o campo traz as
+datas que o Moodle renderiza, não o enunciado.
+
+**O achado que fez a mudança ser pequena:** cada anexo chega com `filename`, `filesize`,
+`mimetype`, `timemodified` e `fileurl` — **os mesmos nomes de campo** que `contents` usa. A
+construção do `Item` virou uma função só (`_item_de`), e a partir daí o anexo entra no
+acervo sem caso especial. `baixar_arquivo` passou a achá-lo **sem uma linha de mudança na
+lógica dela**: a `fileurl` é `…/pluginfile.php/<contextid>/mod_assign/introattachment/0/…`,
+que já passa pela allowlist de download do cliente e pelo `_fileid` existente.
+
+**A allowlist foi a 5, e o prefixo de leitura do P5 também.** `mod_assign_get_assignments`
+é a primeira entrada de uma família que tem escrita: `save_submission`,
+`submit_for_grading`, `start_submission` e `remove_submission` são vizinhas de nome e estão
+no bloqueio permanente do §2.2. Por isso o prefixo novo do P5 é `mod_assign_get_`, com o
+`get_` dentro — `mod_assign_` sozinho abriria a porta para as quatro.
+
+**Duas chamadas, e só quando a primeira diz que vale.** `get_contents` já lista os módulos:
+sem `assign`, a segunda chamada não sai. É a diferença entre custo sob demanda e martelar a
+USP por uma resposta que já se sabe vazia (Invariante 5). O escopo `courseids[0]` não é
+otimização: **sem ele** a função devolve as 74 matrículas, 1 MB, ~251k tokens (§9, 28/08).
+
+**O que ficou de fora, por decisão do dono:** o `intro` do assign — o enunciado em texto,
+498 B no EC-1. `material` é lista de arquivos; enunciado, prazo, "já entreguei" e nota são
+outra pergunta, e o §5 pede que ferramenta nasça de pergunta registrada, não do que a
+resposta da API por acaso contém. Está no `BACKLOG-correcoes.md` como candidata própria.
+
+**Dois avisos nasceram junto, os dois do Invariante 7.** A resposta real traz
+`warnings: [{warningcode: "1", message: "No access rights in module context"}, …]` para
+dois módulos — engolir isso entregaria uma lista com cara de completa. E das 4 entregas de
+PTC3314, **2 não têm anexo** (as provas presenciais, que o professor criou como `assign` só
+para ter data): o rodapé as nomeia, em vez de repetir o texto antigo, que declarava `assign`
+inteiro fora da lista mesmo com metade dele dentro.
+
+**Verificado ao vivo**, não só na suíte: `material(PTC3314, busca="EP")` devolve os 5
+arquivos, e `baixar_arquivo` grava `EP1-2026.pdf` (218.344 B, PDF 1.7, 4 páginas) — cujo
+texto começa com *"PTC3314 - Ondas e Linhas — 1º Exercício de Simulação Computacional"*. O
+canário T120 guarda os cinco campos do anexo contra mudança de API.
+
+**E um efeito colateral que a amostra escondia:** o ODT saía como "arquivo" porque nenhum
+`resource` de PSI3323 era ODT. O professor publica o mesmo enunciado nos dois formatos —
+os mimetypes do OpenDocument entraram na tabela de tipos.
+
+**A lição de método, e ela dói: o registro já dizia.** A entrada de 28/08 fechou a questão
+do §4 com a frase *"`get_contents` é suficiente para material: os 22 arquivos de um curso já
+vêm com URL direta; **só fóruns e assigns pedem chamada própria**, e têm função dedicada de
+qualquer forma"*. A ressalva estava escrita, medida e datada — e a ferramenta nasceu em
+31/08 sem ela, com "suficiente" virando a parte que sobreviveu à leitura. A suíte não podia
+pegar: ela cobria `material` com a fixture de PSI3323, que tem **um** módulo `assign`, e
+nenhum teste perguntou o que havia dentro dele.
+
+O que fecha o buraco não é mais cobertura do caminho que existe, é a pergunta invertida —
+**"esta resposta é tudo?"** — feita contra dado, não contra a memória de quem escreveu a
+ferramenta. Custou uma mensagem de quem usou; pela suíte não ia aparecer nunca.
+
+### 12/09/2026 — a cobertura dos anexos, medida nas 19 disciplinas, e um rodapé que precisou de teto
+
+Verificação de largura logo depois da entrada acima, porque "funcionou em PTC3314" não é
+"funciona". **Uma chamada** de `mod_assign_get_assignments` com as 19 matrículas de 2026
+como escopo (52.454 B, ~13.113 tokens) — o escopo é o que evita 1 MB.
+
+| disciplina | entregas | com anexo |
+|---|---:|---:|
+| PTC3314 | 4 | 2 (os dois ECs, 4 arquivos) |
+| PSI3481 | 2 | 1 (`PSI3481_exercicio_com_nota_2024_IP3.pdf` + `.docx`) |
+| PSI3472 | 11 | 1 (`Projeto_PlanejamentoVoosNacionais.pdf`) |
+| PTC3312 | 6 | 0 |
+| as outras 15 | 0 | — |
+
+**7 arquivos no semestre inteiro, em 3 disciplinas.** Pouco em volume, e exatamente os que
+importam: são os enunciados de exercício-programa e projeto. Os dois casos novos foram
+conferidos ponta a ponta, e o casamento por `cmid` acertou a seção nos dois.
+
+**O que a largura pegou, e a amostra de uma disciplina não pegaria:** PSI3472 tem **10 das
+11** entregas sem anexo (as "Lição aulas N e N+1"), e o rodapé que eu tinha escrito nomeava
+as dez. Quatro linhas de nomes enterrando os outros três avisos. O Invariante 7 exige que o
+corte seja **dito**, não que não exista: ficaram a contagem (`10 de 11`), três nomes de
+amostra e `e mais 7`. T122 trava a contagem e o teto juntos.
+
+**O que a largura NÃO conserta, e vale registrar como limite conhecido:** o casamento de
+`baixar_arquivo` é por nome de ARQUIVO (decisão de 03/09), e o nome do enunciado costuma ser
+opaco — `EP1-2026.pdf` para o "EC-1", `PSI3481_exercicio_com_nota_2024_IP3.pdf` para o
+"exercício de cascata de amplificadores". O assunto está no nome do MÓDULO, que `material`
+imprime e o filtro não olha. O fluxo desenhado funciona (listar, ler o rótulo, pedir pelo
+nome exato), mas custa uma ida a mais sempre que alguém pede pelo nome da atividade. Está no
+backlog; mudar o campo do casamento é decisão de §9, não conserto de passagem.
