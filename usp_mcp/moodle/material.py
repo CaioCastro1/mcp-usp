@@ -46,6 +46,11 @@ from .texto import casa, normalizar
 # que por isso exigiria o token para ser baixado.
 _MARCAS_INTERNAS = ("/webservice/", "pluginfile.php")
 
+# Quantas entregas sem anexo o rodapé nomeia antes de virar contagem. Três é o
+# que cabe numa linha e ainda deixa reconhecer o padrão do nome; o resto vira
+# "e mais N", nunca silêncio.
+_TETO_NOMES_NO_RODAPE = 3
+
 _TIPOS = {
     "application/pdf": "PDF",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "documento",
@@ -489,11 +494,19 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         # Invariante 7 aplicado ao que a segunda chamada NÃO achou: a entrega
         # sem arquivo anexado continua fora da lista, e dizer quais são é o que
         # separa "o professor não anexou nada" de "a ferramenta não olhou".
+        #
+        # Com teto, porque medir doeu: PSI3472 tem 10 das 11 entregas sem anexo
+        # ("Lição aulas 1 e 2", "Lição aulas 3 e 4", …), e nomear as 10 produziu
+        # um rodapé que enterrava os outros três avisos. O que o Invariante 7
+        # exige é que o corte seja DITO — a contagem fica, os nomes é que são
+        # amostra, e "e mais N" é o que impede a amostra de passar por lista.
+        nomeadas = ", ".join(mudas[:_TETO_NOMES_NO_RODAPE])
+        if sobra := len(mudas) - _TETO_NOMES_NO_RODAPE:
+            nomeadas += f", e mais {sobra}"
         avisos.append(
             f"{len(mudas)} de {len(conteudo.entregas)} entregas não têm arquivo "
-            "anexado ao enunciado e por isso não aparecem acima: "
-            + ", ".join(mudas)
-            + ". O texto do enunciado, o prazo e a sua nota não são material — "
+            f"anexado ao enunciado e por isso não aparecem acima: {nomeadas}. "
+            "O texto do enunciado, o prazo e a sua nota não são material — "
             "use `o_que_vence` para o prazo."
         )
     if conteudo.avisos:

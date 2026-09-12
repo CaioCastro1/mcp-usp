@@ -250,3 +250,48 @@ def test_a_descricao_da_ferramenta_conta_que_o_enunciado_esta_la():
     assert "mod_assign" not in descricao, (
         "a descrição fala a língua de quem pergunta, não a da API (T43)"
     )
+
+
+@pytest.mark.contrato
+def test_o_rodape_nomeia_algumas_entregas_mudas_e_conta_o_resto(disciplinas_brutas):
+    """T122 — declarar o que ficou de fora não é despejar a lista inteira.
+
+    Medido em PSI3472 (12/09): 10 das 11 entregas não têm anexo, e nomear as 10
+    produziu um rodapé de 4 linhas que enterra os outros avisos. O Invariante 7
+    pede que o corte seja DITO, não que não exista — a contagem é o que faz o
+    corte honesto, e é ela que tem de sobreviver ao teto.
+    """
+    modulos = [
+        {"modname": "assign", "id": i, "name": f"Lição aulas {i}"} for i in range(11)
+    ]
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 999},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": [
+                {
+                    "name": "Geral",
+                    "modules": modulos
+                    + [
+                        {
+                            "modname": "resource",
+                            "id": 99,
+                            "name": "Regras",
+                            "contents": [
+                                {"filename": "regras.pdf", "mimetype": "application/pdf"}
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "mod_assign_get_assignments": {"courses": [], "warnings": []},
+        }
+    )
+
+    texto = mat.material(cliente, "PSI3323", agora=lambda: 0.0).texto
+
+    assert "11 de 11 entregas" in texto, "a contagem é o que não pode ser cortada"
+    assert texto.count("Lição aulas") <= 3, (
+        "o rodapé despeja a lista inteira de entregas mudas:\n" + texto
+    )
+    assert "e mais 8" in texto, "cortou sem dizer quantos ficaram de fora"
