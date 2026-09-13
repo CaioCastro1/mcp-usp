@@ -295,3 +295,73 @@ def test_o_rodape_nomeia_algumas_entregas_mudas_e_conta_o_resto(disciplinas_brut
         "o rodapé despeja a lista inteira de entregas mudas:\n" + texto
     )
     assert "e mais 8" in texto, "cortou sem dizer quantos ficaram de fora"
+
+
+@pytest.mark.contrato
+@pytest.mark.parametrize("quantas", [1, 2, 3, 4, 5])
+def test_o_rodape_nao_promete_entregas_que_nao_existem(disciplinas_brutas, quantas):
+    """T123 — abaixo do teto não há resto, e o rodapé não pode inventar um.
+
+    O T122 mediu o caso ACIMA do teto (11 de 11 em PSI3472) e travou o corte.
+    Abaixo dele ninguém olhou, e é lá que estava o defeito: com 2 entregas mudas
+    o rodapé de PTC3314 saiu, ao vivo em 12/09/2026, com
+
+        "... : Prova Presencial - 1, Prova Presencial - 2, e mais -1."
+
+    "e mais -1" não é nada que exista. E o dano não é cosmético: quem lê o
+    rodapé é um modelo decidindo se já viu tudo, e um resto anunciado o faz
+    procurar uma entrega que a ferramenta não tem — o Invariante 7 ao contrário,
+    afirmando ausência em vez de declará-la.
+
+    Parametrizado em torno do teto (3) porque o erro é de sinal: só aparece
+    quando a subtração dá negativo, e some exatamente no limite.
+    """
+    modulos = [
+        {"modname": "assign", "id": i, "name": f"Prova Presencial - {i}"}
+        for i in range(quantas)
+    ]
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 999},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "core_course_get_contents": [
+                {
+                    "name": "Geral",
+                    "modules": modulos
+                    + [
+                        {
+                            "modname": "resource",
+                            "id": 99,
+                            "name": "Regras",
+                            "contents": [
+                                {"filename": "regras.pdf", "mimetype": "application/pdf"}
+                            ],
+                        }
+                    ],
+                }
+            ],
+            "mod_assign_get_assignments": {"courses": [], "warnings": []},
+        }
+    )
+
+    texto = mat.material(cliente, "PSI3323", agora=lambda: 0.0).texto
+
+    assert "e mais -" not in texto, (
+        "o rodapé anunciou um resto negativo — não existe 'e mais -1':\n" + texto
+    )
+    assert f"{quantas} de {quantas} entregas" in texto, (
+        "a contagem some quando o teto muda de lado:\n" + texto
+    )
+
+    sobra = quantas - mat._TETO_NOMES_NO_RODAPE
+    if sobra > 0:
+        assert f"e mais {sobra}" in texto, (
+            f"cortou {sobra} sem dizer quantos ficaram de fora:\n" + texto
+        )
+    else:
+        assert "e mais" not in texto, (
+            "nomeou todas as entregas e ainda assim falou em resto:\n" + texto
+        )
+        assert texto.count("Prova Presencial") == quantas, (
+            "abaixo do teto o rodapé nomeia todas — não é amostra:\n" + texto
+        )
