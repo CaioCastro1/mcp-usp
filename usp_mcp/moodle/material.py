@@ -501,7 +501,12 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         # exige é que o corte seja DITO — a contagem fica, os nomes é que são
         # amostra, e "e mais N" é o que impede a amostra de passar por lista.
         nomeadas = ", ".join(mudas[:_TETO_NOMES_NO_RODAPE])
-        if sobra := len(mudas) - _TETO_NOMES_NO_RODAPE:
+        # `> 0` explícito, e não a verdade do walrus: abaixo do teto a subtração
+        # dá NEGATIVO, que é truthy, e o rodapé anunciava "e mais -1". Saiu ao
+        # vivo em PTC3314 (12/09/2026), com 2 entregas mudas e as 2 nomeadas.
+        # Não é cosmético — quem lê é um modelo decidindo se já viu tudo, e um
+        # resto inventado o manda procurar entrega que não existe.
+        if (sobra := len(mudas) - _TETO_NOMES_NO_RODAPE) > 0:
             nomeadas += f", e mais {sobra}"
         avisos.append(
             f"{len(mudas)} de {len(conteudo.entregas)} entregas não têm arquivo "
