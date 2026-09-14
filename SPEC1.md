@@ -2412,3 +2412,50 @@ fosse "Conjunto" em `PR`, e por isso eu não vi o terceiro tipo — "Requisito f
 30 das 33 linhas das fixtures. O que o revelou foi rodar o parser contra a fixture salva e
 **ler a saída**, não a suposição. Classificar antes de olhar a distribuição dos valores
 apaga exatamente a categoria que não se esperava.
+
+### 14/09/2026 — a ferramenta `requisitos`, e três defeitos que a suíte não via
+
+Implementação da fatia desenhada acima, por TDD. **463 verdes, 8 pulados** (os canários
+`live` das três trilhas), gate limpo. Módulo novo `usp_mcp/jupiter/requisitos.py`
+(recorte), mais `ferramentas.requisitos` e a segunda ferramenta na fronteira.
+
+**O primeiro RED derrubou um fato desta mesma sessão**, registrado em detalhe na correção
+acima: os sete currículos que eu tinha dado como vazios exigem `2000101`, e o cego era o
+meu parser de exploração. O teste que falhou foi escrito a partir do §9 errado — ou seja,
+**o §9 errado é que produziu o teste que o corrigiu**. Vale como método: registrar o fato
+por escrito é o que permite que ele seja testado e derrubado; medição que fica só na janela
+da conversa não tem como falhar em lugar nenhum.
+
+**O handshake achou o segundo.** `main()` registrava `listar_ferramentas()[0]` — com uma
+ferramenta só, correto; com duas, a segunda ficava **declarada e nunca anunciada no fio**.
+A suíte em processo (T45-T48) estava verde: ela lê o que `main()` registrou, e `main()`
+registrou o que ela esperava. Quem viu foi `tests/handshake/`, que compara o anunciado com
+o declarado. É a terceira vez que a assimetria "declarado × anunciado" morde neste repo, e
+a primeira em que o teste já existia antes do bug.
+
+**O terceiro fui eu que criei e o handshake matou em 4 minutos.** Ao registrar a segunda
+ferramenta, deduplicei o `try/except ErroJupiter` num decorator. O SDK deriva o schema da
+**assinatura**, e o wrapper `*args/**kwargs` fez o modelo ver uma ferramenta de dois
+parâmetros chamados `args` e `kwargs` — H6 e H7 vermelhos na mesma rodada. A duplicação do
+`except` voltou, agora com o motivo escrito ao lado: **abstração que atravessa a fronteira
+do SDK custa o schema.**
+
+**Dois defeitos de resposta, não de omissão, corrigidos:** correquisito saía sob o rótulo
+"Pré-requisito:" (PSI3322 pode ser cursada JUNTO com PSI3323, e o aluno adiaria um ano), e
+`stamtrrcp` era descartado, então "Requisito fraco" — dá para matricular devendo — era
+indistinguível do duro. Os dois estavam na `main` desde 31/08, com a suíte verde: nenhum
+teste olhava o RÓTULO, só a presença da sigla.
+
+**Superfície.** A allowlist DWR foi de 2 para 4 consultas (`pubListarCursoEntrada` e
+`pubListarColegiado`, ambas só para marcar pertencimento à lista de ingresso), e a trava do
+T23 subiu junto — ela exige decisão registrada por consulta nova, e foi ela que travou o
+commit até este parágrafo existir. Uma allowlist **nova, de caminho**, guarda o GET de HTML:
+`listarCursosRequisitos` é o único caminho permitido, e `obterTurma` é o caso que mostra por
+quê — mesmo host, mesmo parâmetro, e traz nome de professor e sala.
+
+**Custo medido na saída real:** 30.720 B → **511 B** (PTC3314), 66.116 B → **5.855 B**
+(MAT2455, 23 currículos). Canários T74-T75 verdes contra a USP.
+
+**O que a ferramenta declara não saber:** em que currículo você está. Ela mostra todos e
+marca qual é curso de ingresso — sem chamar de "extinto" o que não é ingresso, porque
+ênfase e módulo também ficam de fora da lista e o JupiterWeb não distingue os três.
