@@ -1,0 +1,80 @@
+{
+  "message" : {
+    "error" : false,
+    "message" : ""
+  },
+  "meals" : [ {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral \nSobrecoxa de frango assada\nOpção: Lentilha refogada com cebola\nMacarrão ao sugo\nSalada de escarola\nGoiabada\nMinipão / refresco\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**",
+      "calories" : "1075"
+    },
+    "date" : "14/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral \nTorta madalena \nOpção: Cassoulet vegetariano\nAbobrinha ao alho e óleo\nSalada de acelga\nMelancia\nMinipão / refresco\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**",
+      "calories" : "995"
+    },
+    "date" : "15/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nFrango em tiras com molho rosé\nOpção: Estrogonofe de PVT\nBatata palito assada \nSalada de repolho\nGelatina de limão\nMinipão / refresco\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**",
+      "calories" : "1100"
+    },
+    "date" : "16/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão preto / arroz integral \nCupim com molho roti\nOpção: PVT com ervilha\nVirado de couve\nSalada de alface\nMaçã\nMinipão / refresco\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**",
+      "calories" : "905"
+    },
+    "date" : "17/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Arroz / feijão / arroz integral\nBife de caçarola \nOpção: Canelone de PVT com molho sugo \nRepolho com mostarda\nSalada de cenoura ralada\nBananada\nMinipão / refresco\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**",
+      "calories" : "1080"
+    },
+    "date" : "18/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "19/09/2026"
+  }, {
+    "dinner" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "lunch" : {
+      "menu" : "Fechado",
+      "calories" : "0"
+    },
+    "date" : "20/09/2026"
+  } ],
+  "observation" : {
+    "observation" : "Cardápio sujeito a modificação.\n\n**Os Restaurantes Universitários não fornecem copos descartáveis. Tragam suas canecas.**"
+  }
+}
