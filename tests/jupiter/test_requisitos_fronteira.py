@@ -1,0 +1,94 @@
+"""T67-T73: a fronteira MCP da fatia de requisitos, e o bug que ela corrige.
+
+O `formatar` que estava na `main` imprimia correquisito sob o rótulo
+"Pré-requisito:". Não é omissão — é resposta errada: PSI3322 pode ser cursada
+JUNTO com PSI3323, e o aluno que lesse a saída adiaria a matrícula por um ano.
+"""
+import pytest
+
+from tests.jupiter.conftest import Gravador
+from usp_mcp.jupiter import cliente, server
+from tests.jupiter.test_requisitos_cliente import GravadorGet
+
+pytestmark = pytest.mark.politica
+
+
+def test_t67_o_servidor_expoe_duas_ferramentas():
+    nomes = [f["name"] for f in server.listar_ferramentas()]
+
+    assert nomes == ["disciplina", "requisitos"]
+
+
+def test_t68_requisitos_pede_so_a_sigla():
+    """Nenhum `codcur` na superfície: a medição de 14/09 mostrou que o código
+    descobrível é justamente o que não responde."""
+    (ferramenta,) = [f for f in server.listar_ferramentas() if f["name"] == "requisitos"]
+    schema = ferramenta["inputSchema"]
+
+    assert schema["required"] == ["sigla"]
+    assert set(schema["properties"]) == {"sigla"}
+    for vazamento in ("codcur", "codhab", "DWR", "listarCursosRequisitos"):
+        assert vazamento not in ferramenta["description"]
+
+
+def test_t69_a_descricao_diz_que_a_resposta_e_por_curriculo():
+    (ferramenta,) = [f for f in server.listar_ferramentas() if f["name"] == "requisitos"]
+    descricao = ferramenta["description"].lower()
+
+    assert "currículo" in descricao or "curso" in descricao
+    assert "correquisito" in descricao or "junto" in descricao
+
+
+def test_t70_correquisito_nao_sai_como_pre_requisito(
+    psi3323_html, ingresso_poli, colegiados
+):
+    """O bug de 31/08, agora travado: o rótulo tem que dizer que cursa junto."""
+    c = cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]),
+        transporte_get=GravadorGet(psi3323_html),
+    )
+    saida = server.chamar_ferramenta("requisitos", {"sigla": "PSI3323"}, cliente=c)
+
+    assert "PSI3322" in saida
+    assert "junto" in saida.lower()
+    linha = next(l for l in saida.splitlines() if "PSI3322" in l)
+    assert "pré-requisito" not in linha.lower()
+
+
+def test_t71_requisito_fraco_e_duro_saem_diferentes(
+    mat2455_html, ingresso_poli, colegiados
+):
+    """Em 3032 dá para matricular devendo Cálculo II; em 3250 não. Achatar os
+    dois apaga a informação que decide a matrícula."""
+    c = cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]),
+        transporte_get=GravadorGet(mat2455_html),
+    )
+    saida = server.chamar_ferramenta("requisitos", {"sigla": "MAT2455"}, cliente=c)
+
+    assert "devendo" in saida.lower()
+    assert saida.count("3032") >= 1 and saida.count("3250") >= 1
+
+
+def test_t72_o_silencio_do_ptc3313_chega_ao_modelo(
+    ptc3313_html, ingresso_poli, colegiados
+):
+    """Invariante 6: se a saída não disser, o modelo conclui que não há
+    exigência — que é exatamente a conclusão errada na fronteira da ênfase."""
+    c = cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]),
+        transporte_get=GravadorGet(ptc3313_html),
+    )
+    saida = server.chamar_ferramenta("requisitos", {"sigla": "PTC3313"}, cliente=c)
+
+    assert "não conclua" in saida.lower()
+    assert "ênfase" in saida.lower()
+
+
+def test_t73_disciplina_sem_curso_aponta_para_requisitos(gravador, psi3323):
+    """Antes, pedia um par (codcur, codhab) que ninguém sabe de cabeça — e que
+    a medição mostrou ser o par errado quando alguém sabe."""
+    c = cliente.ClienteJupiter(gravador([psi3323]))
+    saida = server.chamar_ferramenta("disciplina", {"sigla": "PSI3323"}, cliente=c)
+
+    assert "requisitos" in saida

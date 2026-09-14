@@ -18,7 +18,8 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
 | `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina — regras, listas, provas antigas |
 | `usp-moodle` | `baixar_arquivo` | Baixa um desses arquivos e devolve o caminho dele no disco |
-| `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e pré-requisito, pela sigla |
+| `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e programa, pela sigla |
+| `usp-jupiter` | `requisitos` | O que é preciso ter cursado antes, **por currículo** — e o que dá para cursar junto |
 
 `baixar_arquivo` entrega o **caminho**, não o conteúdo: quem lê o PDF é o agente que
 chamou, com a ferramenta de leitura dele. Blob em base64 custaria ~302k tokens no PDF

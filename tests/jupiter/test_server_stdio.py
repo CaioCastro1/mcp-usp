@@ -57,15 +57,18 @@ def test_t45_main_registra_a_ferramenta_no_sdk_instalado(servidor_montado):
     # nada aqui chega a rodar.
     ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
 
-    assert [f.name for f in ferramentas] == ["disciplina"]
+    # Registrar por índice deixava a segunda ferramenta declarada e nunca
+    # anunciada (achado do handshake, 14/09). A asserção é sobre o CONJUNTO.
+    assert sorted(f.name for f in ferramentas) == ["disciplina", "requisitos"]
     assert servidor_montado["transporte"] == "stdio", (
         "o adaptador deixou de escutar em stdio — o .mcp.json fala stdio"
     )
 
     # A descrição registrada é a que o T41 audita. Se as duas divergirem, o
     # T41 passa auditando um texto que o modelo nunca vê.
-    (declarada,) = server.listar_ferramentas()
-    assert ferramentas[0].description == declarada["description"]
+    declaradas = {f["name"]: f["description"] for f in server.listar_ferramentas()}
+    for f in ferramentas:
+        assert f.description == declaradas[f.name]
 
 
 @pytest.mark.contrato
@@ -77,15 +80,19 @@ def test_t46_schema_derivado_casa_com_o_declarado(servidor_montado):
     `--auto-verificar` já comparava os dois — mas só quando alguém lembra de
     rodá-lo.
     """
-    (ferramenta,) = asyncio.run(servidor_montado["servidor"].list_tools())
+    ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
+    declaradas = {f["name"]: f for f in server.listar_ferramentas()}
 
-    derivados = set(ferramenta.input_schema["properties"])
-    declarados = set(server.listar_ferramentas()[0]["inputSchema"]["properties"])
-    assert derivados == declarados, f"divergem: {derivados ^ declarados}"
+    for ferramenta in ferramentas:
+        derivados = set(ferramenta.input_schema["properties"])
+        declarados = set(declaradas[ferramenta.name]["inputSchema"]["properties"])
+        assert derivados == declarados, (
+            f"{ferramenta.name}: divergem {derivados ^ declarados}"
+        )
 
-    # `sigla` obrigatória dos dois lados: um default aqui viraria consulta sem
-    # disciplina nenhuma.
-    assert ferramenta.input_schema["required"] == ["sigla"]
+        # `sigla` obrigatória dos dois lados: um default aqui viraria consulta
+        # sem disciplina nenhuma.
+        assert ferramenta.input_schema["required"] == ["sigla"]
 
 
 @pytest.mark.contrato

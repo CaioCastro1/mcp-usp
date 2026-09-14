@@ -98,6 +98,7 @@ REQUISITOS = {
     "mat2455_html": "html-listarCursosRequisitos-MAT2455.html",
     "ptc3313_html": "html-listarCursosRequisitos-PTC3313.html",
     "ingresso_poli": "dwr-pubListarCursoEntrada-codclg3.txt",
+    "colegiados": "dwr-pubListarColegiado.txt",
 }
 
 
@@ -126,3 +127,10 @@ def ptc3313_html():
 @pytest.fixture
 def ingresso_poli():
     return (FIXTURES / REQUISITOS["ingresso_poli"]).read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def colegiados():
+    """As 47 unidades. Sem elas, decidir a unidade a partir do codcur seria
+    chute: oito codclg são prefixo de outro (§9, 14/09)."""
+    return (FIXTURES / REQUISITOS["colegiados"]).read_text(encoding="utf-8")
