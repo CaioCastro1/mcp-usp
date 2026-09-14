@@ -70,10 +70,11 @@ python3 scripts/reduzir.py
 curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCARD_HASH"
 
 # O venv é POR DIRETÓRIO e não vem no git: todo worktree novo precisa do seu,
-# senão o .mcp.json falha com ENOENT em `.venv/bin/python`. O `-e` instala o pacote
-# apontando para o checkout e põe os três entry points em .venv/bin/ — é o que o
+# senão o .mcp.json falha com ENOENT em `.venv/bin/python`. uv cria o mesmo .venv/
+# do python3 -m venv, por hardlink. O `-e` instala o pacote apontando para o
+# checkout e põe os três entry points em .venv/bin/ — é o que o
 # `tests/test_pacote.py` (P6) exige para não pular.
-python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
+uv venv && uv pip install -e ".[dev]"
 
 # O projeto é um PACOTE: um entry point por servidor, que sobe de qualquer pasta e
 # sem checkout na frente. Três comandos e não um com argumento — o porquê está no
