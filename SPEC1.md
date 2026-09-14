@@ -2722,6 +2722,87 @@ que têm `assign` (§9, 28/08), então mandar quem pergunta por questionário pa
 matou o servidor antes do handshake com a suíte verde em tudo que não fosse o T78. Agora
 indexa por nome: ferramenta nova precisa ser registrada, nunca contada.
 
+### 14/09/2026 — `notas`: UMA ferramenta com parâmetro opcional, e duas funções
+
+**A decisão de desenho é o número de ferramentas, e a alternativa era duas.** O catálogo
+(§3.7) diz das duas funções de nota que elas "não competem, se complementam — a escolha é
+por pergunta": `gradereport_overview_get_course_grades` dá a nota final de cada matrícula,
+e `gradereport_user_get_grade_items` dá item a item de UM curso, com peso e máximo. Duas
+funções, duas visões, e a tentação óbvia é duas ferramentas.
+
+**Ficou uma, e o critério é o §5: o nome vem da PERGUNTA, não da função da API.** "Como
+estou de nota?" e "como estou de nota em PTC3314?" são a mesma pergunta com e sem escopo —
+quem faz a segunda depois da primeira não mudou de assunto, estreitou. Duas ferramentas
+obrigariam o modelo a escolher entre `notas` e `notas_da_disciplina` por uma diferença que
+é um **parâmetro**, e é exatamente aí que ele chama a errada quando a frase é ambígua
+("como estou em eletrônica?" — isso é disciplina ou é a vida?). O mesmo argumento aparece
+ao contrário em `material` e `baixar_arquivo`, que **são** duas ferramentas porque
+respondem perguntas diferentes (o que existe × me dá esse arquivo) e não a mesma pergunta
+com escopo diferente.
+
+**O que a decisão custa, e por que o preço é aceitável:** a ferramenta fica com um `if`
+que escolhe a função, e o T42 passa a travar seis ferramentas para oito funções. A Regra de
+Ouro (§3.1) continua de pé porque a escolha é do CÓDIGO, à mão, determinística, e nunca
+chama as duas "para ter as duas visões" — N3 é o teste que trava isso, e a sabotagem que
+chama as duas reprova doze testes.
+
+**Allowlist de 6 para 8, e um prefixo novo em P5.** `gradereport_` não casava com nenhum
+dos cinco prefixos de leitura, e o teto do P5 existe para forçar exatamente esta
+declaração. Entraram **dois** prefixos estreitos — `gradereport_overview_get_` e
+`gradereport_user_get_` — e não o `gradereport_`, porque a família tem três nomes que este
+projeto não quer perto: `gradereport_overview_view_grade_report` e
+`gradereport_user_view_grade_report` são **escrita** (disparam evento de log), e
+`gradereport_grader_get_users_in_report` é leitura de **nota de terceiros**. O prefixo do
+plugin não serve de teto aqui; o do relatório mais o verbo, sim.
+
+**Dois parâmetros que este projeto manda e a API não exige, e é decisão e não zelo.** As
+duas funções declaram `userid [opt=0]`, e `grade_items` declara também `courseid [opt=0]`.
+O Apêndice B do catálogo registra, desde 31/08, que **ninguém verificou** o que o 0 faz ali
+("pode ser erro, pode ser todos os cursos e uma resposta gigante"). Uma ferramenta que
+depende de um default não verificado promete o que não sabe. E há um agravante: a descrição
+do core de `grade_items` é "a lista de itens de nota para os usuários **de um curso**" —
+num token com capacidade de correção, a ausência de `userid` traz terceiros. O id explícito
+fecha as duas portas, é derivado do token (nunca configurado, §9 de 28/08) e custa **zero
+chamada**: `disciplinas.carregar` já o buscava e o jogava fora. Agora ele fica no mesmo
+cache, atrás de `userid_do_token`.
+
+**A projeção, medida:**
+
+| visão | cru | texto devolvido | razão |
+|---|---|---|---|
+| geral, 74 matrículas com 3 notas lançadas | 5.965 B | 431 B | 13,8× |
+| uma disciplina, 5 itens de nota | 4.819 B | 493 B | 9,8× |
+
+O campo gordo da visão de disciplina é o `feedback` — o comentário do professor em HTML,
+**1.084 B dos 4.819** (22,5%) numa amostra de cinco itens. Ele é descartado, e a decisão
+não é "é grande": é que ele responde *o que eu errei*, que é outra pergunta. O corte é
+declarado com a contagem, porque sumir com ele calado esconderia que existe texto para ler.
+Saem também `userfullname` e `useridnumber` (o número USP — §3.3), `rank`/`maxrank` e
+`averageformatted`, que são desempenho de TERCEIROS, e `percentageformatted`, que é
+`graderaw/grademax` já calculado.
+
+**Duas coisas que a saída diz e a API não:** nota **ocultada pelo professor**
+(`gradeishidden`) não vira "sem nota lançada", porque "ainda não corrigiram" e "corrigiram
+e não liberaram" têm curas diferentes; e as matrículas sem nota são **contadas** em vez de
+listadas — o e-Disciplinas devolve as 74, semestres antigos inclusive, e 71 linhas de "-"
+enterrariam as três que respondem.
+
+**O que NÃO foi verificado ao vivo**, mesma ressalva da entrada anterior e pelo mesmo
+motivo (a worktree não tem token): as duas respostas de nota da suíte são **escritas à mão**
+a partir da forma documentada do core 5.0. Os `courseid` são reais, vindos de
+`users_courses.json`, então a tradução courseid → sigla é exercitada contra dado de
+verdade. Fica sem confirmação: se `userid` explícito é aceito pelas duas funções (o
+esperado, já que o parâmetro é declarado), se `overview` devolve mesmo as 74 matrículas ou
+só as correntes, e qual string o e-Disciplinas usa para "sem nota" — o código trata `""`,
+`"-"` e ausência como o mesmo caso, justamente para não depender de acertar essa string.
+
+**Um achado colateral foi para o `BACKLOG-correcoes.md` em vez de virar trabalho aqui:** o
+catálogo marca como **[notas]** ("medido na Fase 1") o custo em tokens destas duas funções
+e do `submission_status`, e a `notas/fase1-moodle.md` lista as três na seção *Ainda
+aberto*. Os números são plausíveis e não têm fonte, que é o modo de falha que o §9 de 27/08
+registra como o mais fácil de um documento de descoberta virar documento de viés. Nada
+nesta entrada depende deles.
+
 ---
 ### 14/09/2026 — o RUCard passou a publicar comunicado dentro do cardápio
 

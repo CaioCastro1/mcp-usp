@@ -29,7 +29,7 @@ FONTE_LIVE = Path(__file__).resolve().parent / "test_live.py"
 # numa guarda de segurança.
 CHAMADA_LIVE = re.compile(r"""cliente_real\s*\.\s*chamar\s*\(\s*["']([^"']+)["']""")
 
-# Os quatro prefixos de leitura da allowlist de hoje (§9, 31/08). Prefixo aqui
+# Os prefixos de leitura da allowlist de hoje (§9, 31/08 e 14/09). Prefixo aqui
 # NÃO é a regra de autorização — o T6 continua provando que a política casa por
 # igualdade exata, e glob não é blindagem. Isto é outra coisa: um teto sobre o
 # que a allowlist pode ganhar sem passar pelo §9. `_save_`, `_submit_`, `_add_`
@@ -44,6 +44,16 @@ PREFIXOS_DE_LEITURA = (
     # por isso — `mod_assign_` sozinho abriria a porta para `save_submission` e
     # `submit_for_grading`, que são as quatro vizinhas no bloqueio do §2.2.
     "mod_assign_get_",
+    # 14/09/2026, com a ferramenta `notas`. A família `gradereport_` é a
+    # primeira em que o prefixo do PLUGIN não serve de teto: ela tem duas
+    # funções de escrita (`gradereport_overview_view_grade_report` e
+    # `gradereport_user_view_grade_report`, que disparam evento de log) e uma
+    # leitura que entrega nota DE TERCEIROS
+    # (`gradereport_grader_get_users_in_report`). Por isso são dois prefixos
+    # estreitos e não um `gradereport_`: o relatório, o verbo `get_`, e nada
+    # de `grader`.
+    "gradereport_overview_get_",
+    "gradereport_user_get_",
 )
 
 # P4 vigia estes três nomes. Escrito à mão, e não derivado do módulo, porque
@@ -182,6 +192,10 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
     enviada é `mod_assign_get_submission_status`. `get_assignments`, que já
     estava aqui, diz o que EXISTE e o prazo — nunca o que foi feito.
 
+    E de 6 para 8 no mesmo dia, com `notas`: as duas visões de nota do
+    e-Disciplinas não competem, se complementam (catálogo §3.7), e a ferramenta
+    escolhe UMA por invocação conforme a pergunta tenha ou não disciplina.
+
     O teste segue travando o conjunto INTEIRO — é o que impede a próxima sessão
     de acrescentar "só mais uma" sem passar pelo §9.
     """
@@ -193,6 +207,8 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "core_course_get_contents",
             "mod_assign_get_assignments",
             "mod_assign_get_submission_status",
+            "gradereport_overview_get_course_grades",
+            "gradereport_user_get_grade_items",
         }
     )
 

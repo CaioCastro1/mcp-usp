@@ -20,6 +20,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
 | "Já entreguei o EP1?" | O que você já enviou, o que ficou só como rascunho e se saiu no prazo |
+| "Como estou de nota?" | As notas que o professor lançou no e-Disciplinas, de todas as disciplinas ou item a item de uma |
 | "Quantos créditos vale MAC0110?" | Créditos, carga horária e ementa pela sigla; programa, bibliografia e avaliação sob pedido |
 | "O que preciso ter feito antes de MAT2454?" | Pré-requisitos, pelo seu currículo |
 
@@ -172,8 +173,8 @@ nenhuma e só ocuparia espaço.
 
 ## O que o projeto não responde, e por quê
 
-Nota, histórico escolar, evolução do curso e saldo do RUCard ficam de fora. O motivo é
-falta de caminho, não de trabalho. Medido em 14/09/2026:
+Histórico escolar, evolução do curso e saldo do RUCard ficam de fora. O motivo é falta de
+caminho, não de trabalho. Medido em 14/09/2026:
 
 - A parte pública e organizada do JupiterWeb é o catálogo de entrada. A grade dos cursos de
   ingresso da Poli para no 5º semestre (verificado em quatro cursos), e da ênfase (7º) e do
@@ -186,6 +187,12 @@ O roteiro para medir isso está em
 
 Também não existem: aviso de professor, histórico de cardápio, saldo do cartão, horário,
 sala e vagas.
+
+As notas que o projeto mostra são as que o professor lançou no e-Disciplinas, e só elas.
+Prova corrigida no papel, nota combinada em aula e o histórico oficial da USP não estão
+ali, e nenhuma soma que o projeto fizesse seria a sua média de verdade. O comentário
+escrito do professor também não sai: a resposta avisa quando existe um para você ler na
+página da disciplina.
 
 "Já entreguei o EP1?" responde só sobre tarefa. Questionário não entra, e prova marcada só
 no quadro da sala não existe em sistema nenhum. A resposta diz isso quando você pergunta.
@@ -243,14 +250,15 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, oito ferramentas. Comunicação por
+Três servidores MCP, nove ferramentas. Comunicação por
 stdio, JSON-RPC, um processo por servidor. Sete delas foram exercitadas contra a USP de
-verdade; `ja_entreguei` é de 14/09 e até agora só rodou contra resposta de mentira.
+verdade; `ja_entreguei` e `notas` são de 14/09 e até agora só rodaram contra resposta de
+mentira.
 
 | Servidor | Ferramentas |
 |---|---|
 | `usp-rucard` | `bandejao` |
-| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de

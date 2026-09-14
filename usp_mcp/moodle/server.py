@@ -24,6 +24,7 @@ from .diagnostico import diagnostico
 from .erros import ErroMoodle
 from .ja_entreguei import ja_entreguei
 from .material import material
+from .notas import notas
 from .o_que_vence import o_que_vence
 
 # URL default: mesma do §8 do SPEC1 e de scripts/ws.sh. MOODLE_URL sobrescreve
@@ -31,14 +32,15 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Cinco ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, a quarta e a quinta em 14/09). Os nomes vêm das perguntas
-# do dono, não das funções do Moodle por trás.
+# Seis ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, e a quarta, a quinta e a sexta em 14/09). Os nomes vêm das
+# perguntas do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
 _NOME_ARQUIVO = "baixar_arquivo"
 _NOME_DIAGNOSTICO = "diagnostico"
 _NOME_JA_ENTREGUEI = "ja_entreguei"
+_NOME_NOTAS = "notas"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -229,6 +231,36 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_NOTAS,
+            "description": (
+                "Mostra as suas notas no e-Disciplinas (Moodle da USP). Sem "
+                "disciplina, dá a nota final de cada uma. Com disciplina, abre "
+                "item a item: cada prova, lista e exercício com a nota, de "
+                "quanto ela é e quanto vale no total. Use para 'como estou de "
+                "nota', 'quanto tirei no EP1', 'minhas notas em PTC3314', 'qual "
+                "minha média'. Diz quando o professor lançou e ocultou a nota, "
+                "em vez de fingir que não existe. Não traz o comentário escrito "
+                "do professor, e não sabe de nota que ficou no papel e nunca "
+                "foi lançada no sistema. Custa UMA chamada ao Moodle."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Opcional: sem ela vem a nota final de todas as "
+                            "disciplinas, que é a visão mais barata."
+                        ),
+                    },
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -264,6 +296,9 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_DIAGNOSTICO:
         return diagnostico(cliente)
+
+    if nome == _NOME_NOTAS:
+        return notas(cliente, disciplina=argumentos.get("disciplina")).texto
 
     if nome == _NOME_JA_ENTREGUEI:
         return ja_entreguei(
@@ -341,6 +376,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_arquivo = portas[_NOME_ARQUIVO]
     porta_diagnostico = portas[_NOME_DIAGNOSTICO]
     porta_ja_entreguei = portas[_NOME_JA_ENTREGUEI]
+    porta_notas = portas[_NOME_NOTAS]
     descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -441,6 +477,17 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_ja_entreguei["name"], description=porta_ja_entreguei["description"]
     )(_ja_entreguei)
 
+    def _notas(disciplina=None) -> str:
+        # `disciplina` COM default, ao contrário das outras três: aqui ela é
+        # opcional de verdade, e o `inputSchema` a declara fora de `required`.
+        # É a mesma regra de H6 lida ao contrário — o que não pode é divergir.
+        return _chamar(porta_notas["name"], {"disciplina": disciplina})
+
+    anotar(_notas, porta_notas["inputSchema"], {"disciplina": str | None})
+    servidor.tool(
+        name=porta_notas["name"], description=porta_notas["description"]
+    )(_notas)
+
     servidor.run(transport="stdio")
 
 
@@ -507,12 +554,17 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_ja_entreguei(disciplina: str, entrega: str | None = None) -> str:
         return ""
 
+    @servidor.tool(name="notas", description="verificação")
+    def _sonda_notas(disciplina: str | None = None) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
         "baixar_arquivo": _sonda_arquivo,
         "diagnostico": _sonda_diagnostico,
         "ja_entreguei": _sonda_ja_entreguei,
+        "notas": _sonda_notas,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():

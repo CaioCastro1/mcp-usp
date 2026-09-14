@@ -423,3 +423,131 @@ def status_de_entrega(
         },
         "warnings": [],
     }
+
+
+# --------------------------------------------------------------------------
+# As duas visões de nota — TAMBÉM ESCRITAS À MÃO, mesma procedência das de
+# entrega acima e mesma ressalva: forma documentada (`gradereport/overview` e
+# `gradereport/user` no core do Moodle 5.0), valores sintéticos. O que é real
+# aqui são os `courseid`, que vêm de `users_courses.json`, e é isso que faz a
+# tradução courseid → sigla ser exercitada contra dado de verdade.
+#
+# O catálogo estima ~870 tokens para a visão geral e ~320 para a de uma
+# disciplina, e a `fase1-moodle.md` lista as duas como não medidas — a
+# divergência está no `BACKLOG-correcoes.md` (14/09). Nada aqui depende de qual
+# das duas está certa: a medição da suíte é sobre o que a projeção descarta.
+def notas_gerais_falsas(pares, com_warning=False) -> dict:
+    """`gradereport_overview_get_course_grades`: três campos por curso.
+
+    `pares` é uma lista de (courseid, nota). Nota `None` vira o que o Moodle
+    devolve para curso sem nota lançada: a string "-", que é o caso mais comum
+    do semestre em andamento e o que não pode virar linha muda.
+    """
+    return {
+        "grades": [
+            {
+                "courseid": courseid,
+                "grade": "-" if nota is None else nota,
+                "rawgrade": "-" if nota is None else nota.replace(",", "."),
+                "rank": 12,
+                "maxrank": 58,
+            }
+            for courseid, nota in pares
+        ],
+        "warnings": (
+            [
+                {
+                    "item": "course",
+                    "itemid": 142099,
+                    "warningcode": "1",
+                    "message": "Sem permissão para ver as notas deste curso",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }
+
+
+def _item_de_nota(**campos) -> dict:
+    """Um `gradeitem` com as 24 chaves da forma documentada.
+
+    As chaves gordas estão aqui de propósito: `feedback` é o comentário do
+    professor em HTML, e é o campo que a projeção descarta declarando.
+    """
+    base = {
+        "id": 8812345,
+        "itemname": "EC-1 - Transitórios em LT",
+        "itemtype": "mod",
+        "itemmodule": "assign",
+        "iteminstance": 577509,
+        "itemnumber": 0,
+        "idnumber": None,
+        "categoryid": 55120,
+        "outcomeid": None,
+        "scaleid": None,
+        "locked": False,
+        "cmid": 6372328,
+        "graderaw": 8.5,
+        "gradedatesubmitted": 1789300000,
+        "gradedategraded": 1789700000,
+        "gradehiddenbydate": False,
+        "gradeneedsupdate": False,
+        "gradeishidden": False,
+        "gradeislocked": False,
+        "gradeisoverridden": False,
+        "gradeformatted": "8,50",
+        "grademin": 0,
+        "grademax": 10,
+        "rangeformatted": "0,00–10,00",
+        "percentageformatted": "85,00 %",
+        "feedback": (
+            "<p dir=\"ltr\">Bom relatório. A dedução do coeficiente de reflexão "
+            "está correta, mas o gráfico da tensão no terminal aberto ficou sem "
+            "escala no eixo do tempo, e a discussão do passo de simulação não "
+            "justifica o valor escolhido. Reveja o item 3 antes do EC-2.</p>"
+        ),
+        "feedbackformat": 1,
+        "weightraw": 0.25,
+        "weightformatted": "25,00 %",
+        "status": "",
+        "averageformatted": "7,10",
+    }
+    base.update(campos)
+    return base
+
+
+def itens_de_nota_falsos(itens=None, *, userid=8214, extras=(), com_warning=False) -> dict:
+    """`gradereport_user_get_grade_items` de UMA disciplina.
+
+    `extras` são blocos `usergrades` de OUTROS usuários — o que um token com
+    capacidade de correção receberia. Existem para provar que a projeção não os
+    imprime (§3.3): a fixture não pode ser o único motivo de eles não saírem.
+    """
+    itens = itens if itens is not None else [_item_de_nota()]
+    return {
+        "usergrades": [
+            {
+                "courseid": 142036,
+                "courseidnumber": "",
+                "userid": userid,
+                "userfullname": "Joao Pedro Barreto do Prado Gunthen",
+                "useridnumber": "12345678",
+                "maxdepth": 2,
+                "gradeitems": itens,
+            },
+            *extras,
+        ],
+        "warnings": (
+            [
+                {
+                    "item": "course",
+                    "itemid": 142036,
+                    "warningcode": "1",
+                    "message": "Um item de nota não pôde ser lido",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }

@@ -9,16 +9,25 @@ from __future__ import annotations
 
 import pytest
 
-from tests.moodle.conftest import ENTREGAS_PSI3323_SEM_ANEXO
+import json
+
+from tests.moodle.conftest import FIXTURE_DISCIPLINAS, ENTREGAS_PSI3323_SEM_ANEXO
 from usp_mcp.moodle import server
+
+
+def disciplinas_brutos():
+    """As 74 matrículas, sem passar pela fixture de sessão: este módulo usa a
+    lista dentro de um laço, e pedir a fixture por parâmetro amarraria o caso a
+    uma assinatura que os outros testes daqui não têm."""
+    return json.loads(FIXTURE_DISCIPLINAS.read_text(encoding="utf-8"))
 
 pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — cinco ferramentas. Cada crescimento é decisão registrada no §9:
-    `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico` e
-    `ja_entreguei` em 14/09.
+    """T42 — seis ferramentas. Cada crescimento é decisão registrada no §9:
+    `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico`,
+    `ja_entreguei` e `notas` em 14/09.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma
@@ -31,6 +40,7 @@ def test_expoe_exatamente_uma_ferramenta():
         "baixar_arquivo",
         "diagnostico",
         "ja_entreguei",
+        "notas",
     ]
 
 
@@ -141,6 +151,42 @@ def test_T108_chamar_ferramenta_roteia_ja_entreguei_com_cliente_injetado(
     dis.limpar_cache()
     assert "EC-1" in saida
     assert "pluginfile.php" not in saida
+
+
+def test_T109_chamar_ferramenta_roteia_notas_com_e_sem_disciplina():
+    """As duas metades do parâmetro opcional atravessam a fronteira.
+
+    É o caminho que nenhum outro teste alcança: T78 registra a ferramenta e T79
+    confere o schema, mas o `if` que escolhe entre as duas visões mora em
+    `chamar_ferramenta`, e verde nos dois não é verde nele.
+    """
+    from usp_mcp.moodle import disciplinas as dis
+
+    from .conftest import ClienteFalso, itens_de_nota_falsos, notas_gerais_falsas
+
+    for argumentos, esperado in (
+        ({}, "gradereport_overview_get_course_grades"),
+        ({"disciplina": "PTC3314"}, "gradereport_user_get_grade_items"),
+    ):
+        dis.limpar_cache()
+        cliente = ClienteFalso(
+            {
+                "core_webservice_get_site_info": {"userid": 8214},
+                "core_enrol_get_users_courses": disciplinas_brutos(),
+                "gradereport_overview_get_course_grades": notas_gerais_falsas(
+                    [(142036, "8,50")]
+                ),
+                "gradereport_user_get_grade_items": itens_de_nota_falsos(),
+            }
+        )
+
+        saida = server.chamar_ferramenta("notas", argumentos, cliente=cliente)
+
+        assert esperado in [f for f, _ in cliente.chamadas], argumentos
+        assert "PTC3314" in saida
+        # §3.3 atravessando a fronteira inteira, e não só a projeção.
+        assert "Gunthen" not in saida
+    dis.limpar_cache()
 
 
 def test_T106_descricao_de_material_nao_afirma_premissa_refutada():

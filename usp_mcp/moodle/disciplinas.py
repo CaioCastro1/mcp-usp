@@ -131,6 +131,7 @@ class _Cache:
 
     def __init__(self) -> None:
         self.disciplinas: list[Disciplina] | None = None
+        self.userid: int | None = None
         self.carregado_em: float = 0.0
 
     def valido(self, agora: float) -> bool:
@@ -176,5 +177,23 @@ def carregar(cliente, agora=None) -> list[Disciplina]:
 
     bruto = cliente.chamar("core_enrol_get_users_courses", userid=userid)
     _cache.disciplinas = projetar_disciplinas(bruto)
+    _cache.userid = userid
     _cache.carregado_em = momento
     return _cache.disciplinas
+
+
+def userid_do_token(cliente, agora=None) -> int:
+    """O `userid` que o token derivou, sem gastar uma chamada a mais.
+
+    Ele já é buscado aqui — `carregar` precisa dele para pedir as matrículas — e
+    ficava jogado fora. Quem passou a precisar dele foi `notas` (14/09): as duas
+    funções de `gradereport_` têm `userid [opt=0]`, e o catálogo registra que o
+    que o 0 faz **não foi verificado**. Mandar o id explícito troca um default
+    desconhecido por um valor derivado do próprio token.
+
+    Não existe caminho para passá-lo à mão, pelo mesmo motivo de sempre: §9 de
+    28/08 mediu que userid ERRADO devolve `[]` com HTTP 200. O modo perigoso é o
+    valor errado, não o ausente.
+    """
+    carregar(cliente, agora=agora)
+    return _cache.userid

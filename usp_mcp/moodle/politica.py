@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Cinco funções, todas de leitura. Crescer isso é decisão de §9, não
+# Oito funções, todas de leitura. Crescer isso é decisão de §9, não
 # conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
 # então novas existem porque `material` precisa traduzir sigla em `courseid`:
 # site_info dá o userid a partir do token, users_courses dá a lista, e
@@ -44,6 +44,18 @@ from dataclasses import dataclass
 # `submitted` (entregue) são uma palavra de distância. Ela é de leitura pura: a
 # função que ENTREGA é `mod_assign_submit_for_grading`, e continua bloqueada
 # duas vezes, pela omissão da allowlist e pelo §2.2.
+#
+# A sétima e a oitava entraram em 14/09/2026, com `notas`, e a decisão do §9 é
+# sobre serem DUAS: as duas visões de nota do e-Disciplinas não competem, se
+# complementam (catálogo §3.7). `gradereport_overview_get_course_grades` dá a
+# nota final de cada matrícula; `gradereport_user_get_grade_items` dá item a
+# item de UM curso, com peso e máximo. Nenhuma das duas responde o que a outra
+# responde, e a ferramenta escolhe UMA por invocação — nunca as duas.
+#
+# As duas são leitura. A família tem escrita (`gradereport_*_view_grade_report`,
+# que dispara evento de log) e tem leitura de nota DE TERCEIROS
+# (`gradereport_grader_get_users_in_report`): nenhuma das três entra, e os
+# prefixos declarados em P5 são estreitos o bastante para não as arrastar.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -52,6 +64,8 @@ ALLOWLIST: frozenset[str] = frozenset(
         "core_course_get_contents",
         "mod_assign_get_assignments",
         "mod_assign_get_submission_status",
+        "gradereport_overview_get_course_grades",
+        "gradereport_user_get_grade_items",
     }
 )
 
