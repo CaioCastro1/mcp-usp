@@ -42,6 +42,7 @@ def test_expoe_exatamente_uma_ferramenta():
         "ja_entreguei",
         "notas",
         "avisos",
+        "o_que_mudou",
     ]
 
 

@@ -26,6 +26,7 @@ from .erros import ErroMoodle
 from .ja_entreguei import ja_entreguei
 from .material import material
 from .notas import notas
+from .o_que_mudou import o_que_mudou
 from .o_que_vence import o_que_vence
 
 # URL default: mesma do §8 do SPEC1 e de scripts/ws.sh. MOODLE_URL sobrescreve
@@ -33,8 +34,8 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Sete ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, e da quarta à sétima em 14/09). Os nomes vêm das perguntas
+# Oito ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, e da quarta à oitava em 14/09). Os nomes vêm das perguntas
 # do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
@@ -43,6 +44,7 @@ _NOME_DIAGNOSTICO = "diagnostico"
 _NOME_JA_ENTREGUEI = "ja_entreguei"
 _NOME_NOTAS = "notas"
 _NOME_AVISOS = "avisos"
+_NOME_MUDOU = "o_que_mudou"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -295,6 +297,46 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_MUDOU,
+            "description": (
+                "Diz o que mexeu numa disciplina do e-Disciplinas (Moodle da "
+                "USP) nos últimos dias: arquivo novo ou trocado, tópico novo no "
+                "fórum, atividade com configuração ou prazo alterado, nota "
+                "lançada. Use para 'mudou alguma coisa em PTC3314?', 'tem "
+                "novidade desde ontem', 'o professor postou algo novo essa "
+                "semana', 'vale a pena eu abrir a página da disciplina'. É uma "
+                "chamada barata, feita para ser o PRIMEIRO passo: ela diz QUE "
+                "mudou e nunca O QUE mudou — para ver o arquivo use `material`, "
+                "para ler o que foi escrito no fórum use `avisos`, e para o que "
+                "tem prazo use `o_que_vence`. A janela é em dias e a resposta "
+                "repete desde quando ela olhou."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
+                            "também com pedaço do nome."
+                        ),
+                    },
+                    "dias": {
+                        "type": "integer",
+                        "description": (
+                            "Tamanho da janela, em dias para trás a partir de "
+                            "agora. Padrão 7. Precisa ser pelo menos 1: com "
+                            "zero a resposta seria 'nada mudou' por construção."
+                        ),
+                        "default": 7,
+                    },
+                },
+                "required": ["disciplina"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -336,6 +378,13 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_AVISOS:
         return avisos(cliente, argumentos["disciplina"]).texto
+
+    if nome == _NOME_MUDOU:
+        return o_que_mudou(
+            cliente,
+            argumentos["disciplina"],
+            dias=argumentos.get("dias", 7),
+        ).texto
 
     if nome == _NOME_JA_ENTREGUEI:
         return ja_entreguei(
@@ -415,6 +464,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_ja_entreguei = portas[_NOME_JA_ENTREGUEI]
     porta_notas = portas[_NOME_NOTAS]
     porta_avisos = portas[_NOME_AVISOS]
+    porta_mudou = portas[_NOME_MUDOU]
     descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -538,6 +588,20 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_avisos["name"], description=porta_avisos["description"]
     )(_avisos)
 
+    def _o_que_mudou(disciplina, dias=7) -> str:
+        # `disciplina` SEM default e `dias` COM: é a assinatura que o SDK lê para
+        # decidir o que é obrigatório no fio, e o `inputSchema` declara os dois
+        # do mesmo jeito. O default 7 aparece nos dois lugares de propósito —
+        # divergir é o que H6 pegou em 31/08.
+        return _chamar(porta_mudou["name"], {"disciplina": disciplina, "dias": dias})
+
+    anotar(
+        _o_que_mudou, porta_mudou["inputSchema"], {"disciplina": str, "dias": int}
+    )
+    servidor.tool(
+        name=porta_mudou["name"], description=porta_mudou["description"]
+    )(_o_que_mudou)
+
     servidor.run(transport="stdio")
 
 
@@ -612,6 +676,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_avisos(disciplina: str) -> str:
         return ""
 
+    @servidor.tool(name="o_que_mudou", description="verificação")
+    def _sonda_mudou(disciplina: str, dias: int = 7) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
@@ -620,6 +688,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "ja_entreguei": _sonda_ja_entreguei,
         "notas": _sonda_notas,
         "avisos": _sonda_avisos,
+        "o_que_mudou": _sonda_mudou,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():

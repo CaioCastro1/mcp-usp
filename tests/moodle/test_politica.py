@@ -228,6 +228,7 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "gradereport_user_get_grade_items",
             "mod_forum_get_forums_by_courses",
             "mod_forum_get_forum_discussions",
+            "core_course_get_updates_since",
         }
     )
 

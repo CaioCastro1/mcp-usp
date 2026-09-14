@@ -78,6 +78,17 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "mod_forum_get_forums_by_courses",
         "mod_forum_get_forum_discussions",
     ),
+    # `o_que_mudou` (14/09) pede `core_course_get_contents` junto, e não por
+    # acaso: sem ela o ponteiro devolve `cmid` e a resposta vira "o módulo
+    # 6372306 mudou", que não é português. Um site sem ela responderia a
+    # pergunta em números — o que é pior que não responder, porque parece
+    # resposta.
+    "o_que_mudou": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "core_course_get_updates_since",
+        "core_course_get_contents",
+    ),
 }
 
 
