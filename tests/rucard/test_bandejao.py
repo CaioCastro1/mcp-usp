@@ -21,7 +21,7 @@ import pytest
 from tests.rucard.conftest import HASH_DE_TESTE, texto
 from usp_mcp.rucard import ferramentas
 from usp_mcp.rucard.cliente import ClienteRucard
-from usp_mcp.rucard.erros import RucardIndisponivel
+from usp_mcp.rucard.erros import ErroRucard, RucardIndisponivel
 
 pytestmark = pytest.mark.contrato
 
@@ -458,3 +458,42 @@ def test_r42g_refeicao_sem_comunicado_tem_a_lista_vazia_e_nenhum_aviso(chamar):
             if dados["situacao"] == "aberto":
                 assert dados["avisos_publicados"] == []
     assert not [a for a in resposta["avisos"] if "publicado no cardápio" in a]
+
+
+# --- R43: o dia como a pessoa fala -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "pedido,esperado",
+    [
+        ("sexta", datetime.date(2026, 8, 28)),
+        ("sexta-feira", datetime.date(2026, 8, 28)),
+        ("na sexta", datetime.date(2026, 8, 28)),
+        ("SEX", datetime.date(2026, 8, 28)),
+        ("segunda", datetime.date(2026, 8, 24)),  # já passou na quarta: mesma semana
+        ("terca", datetime.date(2026, 8, 25)),
+        ("sábado", datetime.date(2026, 8, 29)),
+        ("no sabado", datetime.date(2026, 8, 29)),
+        ("dom", datetime.date(2026, 8, 30)),
+        ("depois de amanhã", datetime.date(2026, 8, 28)),
+    ],
+)
+def test_r43_nome_de_dia_resolve_para_o_dia_dessa_semana(pedido, esperado):
+    assert ferramentas.resolver_dia(pedido, hoje=QUARTA) == esperado
+
+
+def test_r43b_dias_da_semana_vao_de_segunda_a_domingo():
+    dias = ferramentas.dias_da_semana(QUARTA)
+    assert len(dias) == 7
+    assert dias[0] == SEGUNDA and dias[-1] == DOMINGO
+
+
+def test_r43c_no_domingo_segunda_ainda_e_a_semana_que_o_rucard_publica():
+    # No domingo 30/08 o RUCard ainda publica 24/08–30/08: "segunda" é 24/08, não 31/08.
+    assert ferramentas.resolver_dia("segunda", hoje=DOMINGO) == SEGUNDA
+
+
+def test_r43d_semana_nao_e_um_dia_e_a_funcao_diz_isso():
+    with pytest.raises(ErroRucard) as exc:
+        ferramentas.resolver_dia("semana", hoje=QUARTA)
+    assert "bandejao_semana" in str(exc.value)

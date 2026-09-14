@@ -95,20 +95,63 @@ def _comunicado(linha: str) -> str | None:
     return None
 
 
+# Nome de dia da semana → datetime.weekday(). Com e sem "-feira", com e sem
+# acento, e a abreviação de três letras — é assim que a pergunta chega ("na
+# sexta", "sábado", "qui"). Resolve para o dia DESSA semana, passado ou futuro,
+# porque é a única semana que tem cardápio.
+_NOMES_DIA: dict[str, int] = {
+    "segunda": 0, "segunda-feira": 0, "seg": 0,
+    "terça": 1, "terca": 1, "terça-feira": 1, "terca-feira": 1, "ter": 1,
+    "quarta": 2, "quarta-feira": 2, "qua": 2,
+    "quinta": 3, "quinta-feira": 3, "qui": 3,
+    "sexta": 4, "sexta-feira": 4, "sex": 4,
+    "sábado": 5, "sabado": 5, "sáb": 5, "sab": 5,
+    "domingo": 6, "dom": 6,
+}
+# "na sexta", "no sábado", "nesta quinta": o artigo não muda o dia.
+_ARTIGO_DE_DIA = re.compile(r"^(na|no|nesta|neste|nessa|nesse|esta|este|essa|esse|a|o)\s+")
+
+# O valor de `dia` que pede os sete dias. Quem o atende é `bandejao_semana`.
+SEMANA = "semana"
+
+
+def segunda_da_semana(dia: date) -> date:
+    """A segunda-feira da semana de `dia`. A semana do RUCard vai de seg a dom."""
+    return dia - timedelta(days=dia.weekday())
+
+
+def dias_da_semana(hoje: date) -> list[date]:
+    """Os sete dias, segunda a domingo, da semana de `hoje`."""
+    segunda = segunda_da_semana(hoje)
+    return [segunda + timedelta(days=i) for i in range(7)]
+
+
 def resolver_dia(bruto: str, hoje: date) -> date:
-    """"hoje", "amanhã", `DD/MM/AAAA` ou `AAAA-MM-DD` → data.
+    """"hoje", "amanhã", "sexta", `DD/MM/AAAA` ou `AAAA-MM-DD` → data.
 
     Aceita as duas formas de data porque as duas chegam: a brasileira é a que a
     pessoa digita e a que a API publica, e a ISO é a que um modelo tende a
-    normalizar sozinho. Aceitar só uma delas transforma pergunta boa em erro.
+    normalizar sozinho. Nome de dia resolve para o dia DESSA semana, mesmo que já
+    tenha passado — "o que teve na segunda" é pergunta válida na quarta, e a
+    semana corrente é a única com cardápio. Aceitar só uma forma transforma
+    pergunta boa em erro.
     """
-    texto = (bruto or "hoje").strip().lower()
+    texto = _ARTIGO_DE_DIA.sub("", (bruto or "hoje").strip().lower())
     if texto in ("hoje", "hj"):
         return hoje
     if texto in ("amanhã", "amanha"):
         return hoje + timedelta(days=1)
-    if texto in ("ontem",):
+    if texto in ("depois de amanhã", "depois de amanha"):
+        return hoje + timedelta(days=2)
+    if texto == "ontem":
         return hoje - timedelta(days=1)
+    if texto in _NOMES_DIA:
+        return segunda_da_semana(hoje) + timedelta(days=_NOMES_DIA[texto])
+    if texto == SEMANA:
+        raise ErroRucard(
+            "'semana' cobre os sete dias e é atendido por `bandejao_semana`, "
+            "não por `bandejao`. Pela ferramenta MCP, dia='semana' já faz isso."
+        )
     for formato in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m"):
         try:
             lido = datetime.strptime(texto, formato).date()
@@ -116,9 +159,10 @@ def resolver_dia(bruto: str, hoje: date) -> date:
             continue
         return lido.replace(year=hoje.year) if formato == "%d/%m" else lido
     raise ErroRucard(
-        f"não entendi o dia {bruto!r}. Use 'hoje', 'amanhã' ou uma data como "
-        "26/08/2026. O RUCard publica só a semana corrente, então data de outra "
-        "semana não tem cardápio — nem no passado, nem no futuro."
+        f"não entendi o dia {bruto!r}. Use 'hoje', 'amanhã', um dia da semana "
+        "como 'sexta', 'semana' para os sete dias, ou uma data como 26/08/2026. "
+        "O RUCard publica só a semana corrente, então data de outra semana não "
+        "tem cardápio — nem no passado, nem no futuro."
     )
 
 
