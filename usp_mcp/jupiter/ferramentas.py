@@ -266,3 +266,23 @@ def requisitos(sigla: str, *, cliente) -> dict:
         )
 
     return {"sigla": sigla, "curriculos": curriculos, "avisos": avisos}
+
+
+def agrupar_curriculos(curriculos: list[dict]) -> list[tuple[tuple, list[dict]]]:
+    """Currículos com o MESMO conjunto de exigências, nos mesmos termos, juntos.
+
+    A chave é o conjunto ordenado de (sigla, nome, tipo, rótulo). O tipo entra
+    de propósito: MAT2454 é dura em 3250 e fraca em 3032, e os dois NÃO podem
+    cair no mesmo grupo — é a informação que decide a matrícula (§9, 14/09).
+    Em MAT2455, 23 currículos viram 4 grupos sem perder um currículo nem um tipo.
+
+    Maiores primeiro; o grupo sem exigência (`()`) por último; dentro do grupo,
+    a ordem em que vieram (a da página, crescente de codcur).
+    """
+    grupos: dict[tuple, list[dict]] = {}
+    for curriculo in curriculos:
+        chave = tuple(
+            sorted((e["sigla"], e["nome"], e["tipo"], e["rotulo"]) for e in curriculo["exigencias"])
+        )
+        grupos.setdefault(chave, []).append(curriculo)
+    return sorted(grupos.items(), key=lambda item: (item[0] == (), -len(item[1]), item[0]))
