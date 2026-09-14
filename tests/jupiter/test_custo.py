@@ -12,7 +12,7 @@ import json
 
 import pytest
 
-from usp_mcp.jupiter import cliente, dwr, ferramentas
+from usp_mcp.jupiter import cliente, dwr, ferramentas, server
 
 pytestmark = pytest.mark.contrato
 
@@ -39,8 +39,10 @@ def tamanho(o):
     return len(json.dumps(o, ensure_ascii=False).encode())
 
 
-def saida(gravador, bruto, sigla):
-    return ferramentas.disciplina(sigla, cliente=cliente.ClienteJupiter(gravador([bruto])))
+def saida(gravador, bruto, sigla, secoes=ferramentas.SECOES):
+    return ferramentas.disciplina(
+        sigla, cliente=cliente.ClienteJupiter(gravador([bruto])), secoes=secoes
+    )
 
 
 @pytest.mark.parametrize("qual,sigla", [("psi", "PSI3323"), ("ptc", "PTC3314")])
@@ -85,3 +87,32 @@ def test_t37_erro_nunca_custa_mais_que_sucesso(gravador, psi3323, erro):
         f"erro projetado {projetado} B >= sucesso {sucesso} B. O erro cru são "
         "~1.978 tokens contra ~17 da mensagem: 116x, e é a resposta ERRADA."
     )
+
+
+# O que o modelo lê é o TEXTO, não o dicionário. Medido em 14/09/2026 (PTC3314):
+# padrão ~700 B, `todas` 3.880 B, `todas` + inglês ~6.700 B. Folga de ~30%.
+TETO_TEXTO_PADRAO_B = 1_200
+TETO_TEXTO_TODAS_B = 5_000
+TETO_TEXTO_TODAS_INGLES_B = 8_500
+
+
+def test_t34b_o_texto_padrao_responde_quantos_creditos_por_menos_de_1200_bytes(gravador, ptc3314):
+    ficha = saida(gravador, ptc3314, "PTC3314", secoes=ferramentas.SECOES_PADRAO)
+    texto = server.formatar(ficha)
+    assert len(texto.encode()) <= TETO_TEXTO_PADRAO_B, f"padrão: {len(texto.encode())} B"
+    assert "Créditos: 4 aula" in texto
+
+
+def test_t34c_o_texto_com_todas_as_secoes_tem_teto(gravador, ptc3314):
+    texto = server.formatar(saida(gravador, ptc3314, "PTC3314"))
+    assert len(texto.encode()) <= TETO_TEXTO_TODAS_B, f"todas: {len(texto.encode())} B"
+
+
+def test_t34d_o_texto_com_ingles_tem_teto(gravador, ptc3314):
+    ficha = ferramentas.disciplina(
+        "PTC3314", cliente=cliente.ClienteJupiter(gravador([ptc3314])),
+        secoes=ferramentas.SECOES, idiomas=("pt", "en"),
+    )
+    texto = server.formatar(ficha)
+    assert len(texto.encode()) <= TETO_TEXTO_TODAS_INGLES_B, f"inglês: {len(texto.encode())} B"
+    assert "Ementa (inglês):" in texto
