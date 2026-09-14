@@ -113,10 +113,13 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
         codcur, codhab = curso
         if codcur in _DISCREPANCIA_CODCUR:
             avisos.append(
-                f"O código de curso {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} "
-                "aparecem para a mesma habilitação em superfícies diferentes do "
-                "JupiterWeb. Relação entre os dois: não verificada (§5.1 do "
-                f"recon). Usei {codcur} como veio, sem traduzir."
+                f"O código {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} são o "
+                "mesmo curso em gerações diferentes de currículo — medido em "
+                "14/09, e não mais uma discrepância sem explicação. O que muda "
+                "entre eles: 3033 é quem tem a **grade** curricular (67 "
+                "disciplinas, 1º ao 5º semestre) e 3032 é quem tem os "
+                "**requisitos**; a grade de 3032 vem vazia. Usei "
+                f"{codcur} como veio, sem traduzir."
             )
         bruto = cliente.listar_requisito(coddis=sigla, codcur=codcur, codhab=codhab)
         ficha["pre_requisito"] = [
@@ -136,9 +139,15 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
         if not ficha["pre_requisito"]:
             avisos.append(
                 f"A consulta de requisito no curso {codcur}-{codhab} não trouxe "
-                "nenhuma linha. Isso pode significar que não há exigência, ou "
-                "que a disciplina não pertence a esse currículo — o JupiterWeb "
-                "não distingue os dois casos."
+                "nenhuma linha, e isso tem TRÊS causas possíveis — não duas. "
+                "Além de (a) não haver exigência e (b) a disciplina não "
+                "pertencer a esse currículo, há (c) o código ser de outra "
+                "geração do mesmo currículo: medido em 14/09, PTC3314 devolve "
+                "zero linha em 3033 e devolve PTC3213+PSI3213 em 3032, que são "
+                "o mesmo Ciclo Básico da Elétrica em gerações diferentes. A (c) "
+                "é a mais provável quando o código veio da lista de cursos de "
+                "ingresso. Use a ferramenta `requisitos` com a sigla: ela "
+                "mostra todos os currículos e dispensa o código."
             )
 
     ficha["avisos"] = avisos
