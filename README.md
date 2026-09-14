@@ -40,7 +40,7 @@ Ele instala, configura e te guia no único passo que precisa da sua mão.
 ```text
 Instale o usp-mcp neste computador e me conecte a ele.
 
-1. Clone https://github.com/Castro1/mcp-usp em ~/usp-mcp, crie um venv lá dentro e
+1. Clone https://github.com/CaioCastro1/mcp-usp em ~/usp-mcp, crie um venv lá dentro e
    instale com `pip install -e ".[dev]"`. Copie o `.env.example` para `.env` e rode
    `./scripts/gate.sh` para confirmar que ficou tudo certo.
 2. Registre os três servidores (moodle, jupiter, rucard) no meu Claude Code, no escopo
@@ -57,7 +57,7 @@ Abra o terminal e cole estes dois comandos, um de cada vez:
 
 ```bash
 python3 -m venv ~/usp-mcp
-~/usp-mcp/bin/pip install git+https://github.com/Castro1/mcp-usp.git
+~/usp-mcp/bin/pip install git+https://github.com/CaioCastro1/mcp-usp.git
 ```
 
 O primeiro cria um ambiente isolado dentro da sua pasta pessoal, sem alterar o Python nem
@@ -199,7 +199,7 @@ O repositório é público para ler, baixar e usar. Mudanças necessitam de apro
 caminho normal do GitHub: abra uma issue, ou um fork com pull request.
 
 ```bash
-git clone git@github.com:Castro1/mcp-usp.git && cd mcp-usp
+git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
 python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 cp .env.example .env
