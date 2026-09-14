@@ -65,6 +65,47 @@ _REFEICOES_COM_CARDAPIO = ("almoco", "jantar")
 
 _ROTULO_REFEICAO = {"cafe": "café da manhã", "almoco": "almoço", "jantar": "jantar"}
 
+# O vocabulário de quem pergunta, e o id que a allowlist entende. `politica`
+# continua decidindo POR ID (§1.2: name/alias é exibição); aqui só se traduz a
+# entrada do usuário antes de qualquer política. Sem acento nos nomes canônicos
+# porque são valores de enum que trafegam em JSON digitado por modelo — com
+# acento também são aceitos.
+NOMES_RU_PARA_ID: dict[str, str] = {
+    "central": "6", "prefeitura": "7", "fisica": "8", "quimicas": "9",
+}
+NOMES_RU: tuple[str, ...] = tuple(NOMES_RU_PARA_ID)
+ALIASES_RU: dict[str, str] = {
+    **NOMES_RU_PARA_ID,
+    "pusp": "7", "pusp-cb": "7", "puspcb": "7", "pusp-c": "7",
+    "física": "8",
+    "químicas": "9", "quimica": "9", "química": "9",
+}
+
+
+def resolver_restaurantes(pedidos) -> list[str]:
+    """Nomes e/ou ids → ids, sem repetição, na ordem pedida. Vazio → os quatro.
+
+    Nome desconhecido é erro legível AQUI, antes da política: passar "each" adiante
+    como se fosse id devolveria a mensagem de id inexistente, que é a cura errada.
+    """
+    if not pedidos:
+        return list(politica.RUS_PERMITIDOS)
+    ids: list[str] = []
+    for pedido in pedidos:
+        chave = str(pedido).strip().lower()
+        if chave.isdigit():
+            id_ = chave
+        elif chave in ALIASES_RU:
+            id_ = ALIASES_RU[chave]
+        else:
+            raise ErroRucard(
+                f"não conheço o restaurante {pedido!r}. Use {', '.join(NOMES_RU)} "
+                "— ou omita para comparar os quatro."
+            )
+        if id_ not in ids:
+            ids.append(id_)
+    return ids
+
 _MARCA_VEGETARIANA = re.compile(r"\(\s*v\s*\)", re.IGNORECASE)
 _PREFIXO_OPCAO = re.compile(r"^op[çc][ãa]o\s*:?\s*", re.IGNORECASE)
 _TAG_HTML = re.compile(r"<[^>]+>")
@@ -312,7 +353,7 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
             "'cafe' ou 'todas'."
         )
 
-    ids = [str(i) for i in (restaurantes or politica.RUS_PERMITIDOS)]
+    ids = resolver_restaurantes(restaurantes)
 
     fichas = catalogo.projetar(cliente.restaurantes())
 
