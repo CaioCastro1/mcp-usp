@@ -205,3 +205,53 @@ def test_t79_o_aviso_da_discrepancia_nao_diz_mais_nao_verificada(gravador, psi33
 
     assert "não verificada" not in avisos
     assert "grade" in avisos and "requisito" in avisos
+
+
+def _texto_de(sigla, html, ingresso_poli, colegiados):
+    c = cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]), transporte_get=GravadorGet(html)
+    )
+    return server.chamar_ferramenta("requisitos", {"sigla": sigla}, cliente=c)
+
+
+def test_t82_mat2455_sai_por_combinacao_e_cabe_em_3500_bytes(
+    mat2455_html, ingresso_poli, colegiados
+):
+    # Medido em 14/09/2026: 6.238 B por currículo → 2.458 B por combinação. Folga ~40%.
+    saida = _texto_de("MAT2455", mat2455_html, ingresso_poli, colegiados)
+
+    assert len(saida.encode()) <= 3_500, f"{len(saida.encode())} B"
+    assert "23 currículos, 4 combinações" in saida
+    assert saida.count("3033") == 1, "cada currículo aparece uma vez"
+    assert saida.count("Cálculo Diferencial e Integral II") <= 3, "uma vez por grupo que a exige"
+
+
+def test_t82b_a_marca_de_ingresso_sobrevive_ao_agrupamento(
+    mat2455_html, ingresso_poli, colegiados
+):
+    saida = _texto_de("MAT2455", mat2455_html, ingresso_poli, colegiados)
+    linha_3033 = next(l for l in saida.splitlines() if l.strip().startswith("3033 "))
+    linha_3032 = next(l for l in saida.splitlines() if l.strip().startswith("3032 "))
+    assert linha_3033.endswith("[curso de ingresso]")
+    assert "[curso de ingresso]" not in linha_3032
+    assert "Ciclo Básico - Engenharia Elétrica" in linha_3033
+    assert "3º período ideal" in linha_3033
+
+
+def test_t82c_duro_e_fraco_ficam_em_cabecalhos_diferentes(
+    mat2455_html, ingresso_poli, colegiados
+):
+    saida = _texto_de("MAT2455", mat2455_html, ingresso_poli, colegiados)
+    cabecalhos = [l for l in saida.splitlines() if l.startswith("• ")]
+    assert len(cabecalhos) == 4
+    assert any(l.startswith("• Pré-requisito: MAT2454") for l in cabecalhos), "o grupo do 3250 (duro)"
+    assert any(l.startswith("• Requisito fraco (dá para matricular devendo): MAT2454") for l in cabecalhos)
+    assert any("2000101" in l for l in cabecalhos)
+
+
+def test_t82d_um_curriculo_so_continua_legivel(psi3323_html, ingresso_poli, colegiados):
+    saida = _texto_de("PSI3323", psi3323_html, ingresso_poli, colegiados)
+    assert saida.startswith("Exigências para cursar PSI3323, por currículo:")
+    assert "combinações" not in saida
+    assert "• Correquisito (cursa junto): PSI3322" in saida
+    assert "3032 " in saida
