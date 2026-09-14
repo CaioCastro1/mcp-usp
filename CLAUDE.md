@@ -39,6 +39,7 @@ quatro é este arquivo.
 | `fixtures/moodle/raw/` | Cru do Moodle — **fora do git**, tem dado pessoal não higienizado |
 | `scripts/` | Chamadores de descoberta (`ws.sh`, `capture.sh`, `userid.sh`, `reduzir.py`), o obtentor de token (`token.sh`, com `fix-token.sh` para normalizar) e o gate (`gate.sh`) |
 | `.env` / `.env.example` | Credenciais por env var; `.env` no gitignore |
+| `pyproject.toml` | O pacote: um entry point por servidor, runtime só `mcp`, e a justificativa de cada escolha no próprio arquivo |
 | `docs/` | Este scaffold: domínios, convenções, handoffs, backlog |
 
 ## 3. Comandos
@@ -69,8 +70,15 @@ python3 scripts/reduzir.py
 curl -s -X POST https://uspdigital.usp.br/rucard/servicos/menu/6 -d "hash=$RUCARD_HASH"
 
 # O venv é POR DIRETÓRIO e não vem no git: todo worktree novo precisa do seu,
-# senão o .mcp.json falha com ENOENT em `.venv/bin/python`.
-python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+# senão o .mcp.json falha com ENOENT em `.venv/bin/python`. O `-e` instala o pacote
+# apontando para o checkout e põe os três entry points em .venv/bin/ — é o que o
+# `tests/test_pacote.py` (P6) exige para não pular.
+python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
+
+# O projeto é um PACOTE: um entry point por servidor, que sobe de qualquer pasta e
+# sem checkout na frente. Três comandos e não um com argumento — o porquê está no
+# `pyproject.toml`, ao lado da tabela `[project.scripts]`.
+usp-mcp-rucard   # e usp-mcp-jupiter, usp-mcp-moodle
 
 # Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
 .venv/bin/python -m pytest tests/handshake

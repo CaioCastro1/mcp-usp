@@ -1,0 +1,107 @@
+# Metadados de PACOTE — o degrau B1 do `docs/decisions/ROADMAP-proximos-passos.md`.
+#
+# Por que existe: até aqui instalar era `git clone` + venv, e isso travava as duas
+# pontas do MESMO problema — "rodar fora do Claude Code" (B1) e o onboarding (B2,
+# fricção 3). Com entry point o servidor vira um comando no PATH, alcançável por
+# `pipx`/`uvx`, e some o checkout como pré-requisito. O comparável
+# `loyaniu/moodle-mcp` já prova o formato (`[project.scripts] moodle-mcp =
+# "moodle_mcp.server:main"`); a diferença de desenho está anotada em
+# `[project.scripts]`, mais abaixo.
+#
+# Isto NÃO substitui o `scripts/servidor.sh` e não pode: o `.mcp.json` versionado
+# segue chamando o lançador, que serve o checkout de DESENVOLVIMENTO — onde não há
+# instalação nenhuma e o que se quer subir é o código da árvore, não o do site-packages.
+# Os dois caminhos convivem, e L1-L6 seguem travando o lançador inteiro.
+#
+# O `.mcpb` do §6.1 continua NÃO feito, e de propósito: ele responde por instalação
+# real no Claude Desktop, não por documentação. Está registrado no
+# `docs/decisions/BACKLOG-correcoes.md` como o degrau SEGUINTE a este.
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "usp-mcp"
+
+# O MESMO número que os três `MCPServer(version=...)` anunciam no `initialize`.
+# Não é cosmético: quem reportar "usp-mcp 0.3.0 quebrou" e receber um handshake
+# dizendo 0.1.0 está lendo duas verdades sobre o mesmo processo. P5 lê a `version=`
+# de dentro de cada `main()` por AST e reprova se divergirem.
+version = "0.1.0"
+
+description = "Ferramentas MCP para a vida acadêmica na USP — bandejão do RUCard, prazos e material do e-Disciplinas, catálogo do JupiterWeb. Projeto não-oficial, sem vínculo com a Universidade de São Paulo."
+readme = "README.md"
+
+# Sem `license` nem classificador de licença, e isso é escolha registrada, não
+# esquecimento: o A1 do ROADMAP foi ADIADO em 14/09/2026 com a resposta "nenhuma
+# por enquanto". Declarar uma aqui seria decidir por conta própria o que voltou
+# para o dono do repositório. O efeito prático — todos os direitos reservados —
+# está escrito no A1, e empacotar torna a lacuna mais visível, não menos.
+
+# Piso medido, não estimado: 3.11 é a versão mais baixa em que a SUÍTE deste
+# projeto roda, porque `tomllib` (que `tests/test_pacote.py` usa para ler este
+# arquivo) só entra na stdlib no 3.11. O runtime em si provavelmente desce até o
+# 3.10 — é onde `list[X] | None` passa a existir em tempo de execução, e o
+# `anotar` do RUCard avalia isso de verdade —, mas 3.10 é número que ninguém
+# rodou aqui. Anunciar piso não exercitado é a mesma classe de erro que o §1.1
+# corrige: afirmar sobre ambiente sem ter medido.
+requires-python = ">=3.11"
+
+# RUNTIME, e só. `pytest` é dependência de DESENVOLVIMENTO e nunca entra nesta
+# lista. O núcleo dos três sistemas — política, cliente, projeção/dwr, ferramenta —
+# é stdlib pura, e é justamente por isso que o import do SDK mora dentro de
+# `main()` em vez do topo do módulo (ver o cabeçalho de `requirements.txt`).
+# Um `pytest` aqui instalaria a suíte de testes deste repo na máquina de quem só
+# quer o bandejão, e declararia como produto uma coisa que o produto não importa.
+# P2 trava isto pelos dois lados: reprova se `pytest` aparecer, e reprova se esta
+# lista divergir do `requirements.txt`, que segue sendo citado pelo nome na
+# mensagem de SDK ausente dos três servidores (e tem teste sobre essa mensagem).
+dependencies = ["mcp>=2,<3"]
+
+[project.optional-dependencies]
+# Espelha `requirements-dev.txt`. `pip install -e ".[dev]"` num checkout faz o que
+# os dois `-r` faziam, mais os três comandos abaixo em `.venv/bin/`. Os arquivos
+# `requirements*.txt` continuam existindo, e não por nostalgia: os três `main()`
+# mandam `pip install -r requirements.txt` quando o SDK falta, e há teste sobre
+# essa frase exata (`tests/{jupiter,moodle}/test_server_stdio.py`).
+dev = ["pytest>=8,<10"]
+
+# TRÊS entry points, um por servidor — e não UM só com argumento de sistema
+# espelhando o `scripts/servidor.sh`. A alternativa foi considerada e perde por
+# três motivos, nenhum deles estético:
+#
+# 1. Um entry point com argumento exige um despachante NOVO em Python, que
+#    reimplementa o que o lançador já faz: descobrir os sistemas por `usp_mcp/*/server.py`,
+#    recusar o nome errado ANTES de subir o interpretador e citar os válidos na
+#    negativa (Invariante 6). Passariam a existir duas respostas para "quais
+#    sistemas existem", em duas linguagens, com um teste só cobrindo uma. Este
+#    repo já registrou três vezes o preço de a mesma pergunta ter duas
+#    implementações — foi o defeito do `[ -f .env ]` no gate, no `token.sh` e no
+#    `ws.sh` (§9, 12/09/2026).
+# 2. Os três `main()` já existem e já são exercitados como PROCESSO REAL
+#    (`tests/handshake/` e L1/L2). Apontar o console script direto para eles custa
+#    zero linha de runtime nova. O despachante custaria um módulo novo exatamente
+#    na casca stdio — que é o lugar onde este projeto já teve um `main()` quebrado
+#    com a suíte inteira verde (§9, 31/08/2026).
+# 3. O nome do comando fica IGUAL ao `serverInfo.name` que o servidor responde no
+#    `initialize`: `usp-mcp-moodle` dos dois lados. Quem escreve a config do
+#    cliente e quem lê o handshake leem a mesma palavra. P4 trava a fórmula deste
+#    lado; L2 já travava a do outro.
+#
+# O preço de três é ter de lembrar do quarto no dia em que um quarto sistema
+# nascer. Curado como este repo cura isso em todo lugar (H9, L2, o glob do
+# lançador): P1 deriva o conjunto esperado de `usp_mcp/*/server.py` e reprova se
+# esta tabela divergir dele. A lista à mão continua sendo lista à mão — o que
+# muda é que ela não envelhece calada.
+[project.scripts]
+usp-mcp-jupiter = "usp_mcp.jupiter.server:main"
+usp-mcp-moodle = "usp_mcp.moodle.server:main"
+usp-mcp-rucard = "usp_mcp.rucard.server:main"
+
+[tool.setuptools.packages.find]
+# Só `usp_mcp*`. Sem isto o setuptools acha `tests`, `scripts`, `notas` e `docs` na
+# raiz e ou reclama de layout ambíguo ou empacota a suíte de testes junto com o
+# produto — o mesmo erro do `pytest` em `dependencies`, por outra porta.
+include = ["usp_mcp*"]
+namespaces = false
