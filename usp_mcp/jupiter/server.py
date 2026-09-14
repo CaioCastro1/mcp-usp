@@ -21,9 +21,10 @@ from __future__ import annotations
 
 from .cliente import ClienteJupiter, transporte_http
 from .erros import ErroJupiter
-from .ferramentas import disciplina
+from .ferramentas import disciplina, requisitos
 
 _NOME_FERRAMENTA = "disciplina"
+_NOME_REQUISITOS = "requisitos"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -81,8 +82,51 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["sigla"],
                 "additionalProperties": False,
             },
-        }
+        },
+        {
+            "name": _NOME_REQUISITOS,
+            "description": (
+                "O que é preciso ter cursado antes de uma disciplina da USP, "
+                "pela sigla. A resposta vem POR CURRÍCULO, porque a exigência "
+                "depende do currículo e não só da disciplina: a mesma matéria "
+                "pode ser requisito duro num curso e 'fraco' (dá para "
+                "matricular devendo) em outro, ou correquisito (cursa junto). "
+                "Use para 'o que preciso ter feito antes de PTC3314', 'posso "
+                "pegar essas duas juntas', 'dá pra me matricular devendo'. NÃO "
+                "traz horário, sala nem vagas, e não sabe em que currículo "
+                "você está — ela mostra todos e diz qual é curso de ingresso."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sigla": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina — PTC3314, MAT2455. Os "
+                            "currículos novos usam código só de dígitos, como "
+                            "2000101, e ele funciona igual."
+                        ),
+                    },
+                },
+                "required": ["sigla"],
+                "additionalProperties": False,
+            },
+        },
     ]
+
+
+# O tipo da exigência, em português de quem vai se matricular. Verificado
+# contra o HTML do JupiterWeb em 3 pares (§9, 14/09): `CR` é "Indicação de
+# Conjunto", e chamá-lo de pré-requisito faz o aluno adiar a matrícula por um
+# ano. `stamtrrcp="S"` é o "Requisito fraco" da página.
+def rotulo_de(exigencia: dict) -> str:
+    if exigencia.get("tipo") == "CR" or exigencia.get("tipo") == "correquisito":
+        return "Correquisito (cursa junto)"
+    if exigencia.get("fraco") or exigencia.get("tipo") == "requisito_fraco":
+        return "Requisito fraco (dá para matricular devendo)"
+    if exigencia.get("tipo") in ("PR", "requisito", None):
+        return "Pré-requisito"
+    return f"Exigência ({exigencia['tipo']})"
 
 
 _ROTULOS = (
@@ -115,18 +159,54 @@ def formatar(ficha: dict) -> str:
         f"Tipo: {ficha['tipo']} · Ativação: {ficha['ativacao']}",
     ]
 
-    requisitos = ficha.get("pre_requisito")
-    if requisitos:
-        itens = ", ".join(
-            f"{r['sigla']} ({r['nome']})" for r in requisitos
-        )
-        linhas.append(f"Pré-requisito: {itens}")
+    exigencias = ficha.get("pre_requisito")
+    if exigencias:
+        for r in exigencias:
+            linhas.append(f"{rotulo_de(r)}: {r['sigla']} ({r['nome']})")
 
     for campo, rotulo in _ROTULOS:
         if ficha.get(campo):
             linhas.append(f"\n{rotulo}:\n{ficha[campo]}")
 
     # Invariante 7: o que a ferramenta NÃO sabe vai junto, nunca por omissão.
+    for aviso in ficha.get("avisos") or ():
+        linhas.append(f"\n⚠ {aviso}")
+
+    return "\n".join(linhas)
+
+
+def formatar_requisitos(ficha: dict) -> str:
+    """Texto para o modelo ler, agrupado por currículo.
+
+    O agrupamento não é estética: o tipo da exigência é propriedade do
+    currículo (MAT2454 é duro em Minas e fraco em Elétrica), e uma lista
+    achatada apagaria justamente o que decide a matrícula.
+    """
+    # Sem currículo, o cabeçalho prometeria uma lista que não vem — e promessa
+    # não cumprida na primeira linha é o que faz o modelo preencher o resto.
+    linhas = (
+        [f"Exigências para cursar {ficha['sigla']}, por currículo:"]
+        if ficha["curriculos"]
+        else [f"Não há exigência listada para {ficha['sigla']} — leia o aviso:"]
+    )
+
+    for c in ficha["curriculos"]:
+        marca = (
+            "curso de ingresso"
+            if c["ingresso"]
+            else "não consta na lista de ingresso"
+        )
+        linhas.append(
+            f"\n• {c['codcur']} — {c['habilitacao']} ({c['periodo']}), "
+            f"{c['periodo_ideal']}º período ideal [{marca}]"
+        )
+        if not c["exigencias"]:
+            linhas.append("    (a página não traz linha de exigência para este)")
+        for e in c["exigencias"]:
+            linhas.append(
+                f"    {rotulo_de(e)}: {e['sigla']} — {e['nome']}"
+            )
+
     for aviso in ficha.get("avisos") or ():
         linhas.append(f"\n⚠ {aviso}")
 
@@ -143,16 +223,19 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     `cliente` é injetável — sem credencial, a fronteira inteira roda offline
     contra fixture. É a diferença entre esta e a do Moodle.
     """
-    if nome != _NOME_FERRAMENTA:
+    if nome not in (_NOME_FERRAMENTA, _NOME_REQUISITOS):
         raise ErroJupiter(
-            f"Ferramenta desconhecida: {nome!r}. A única ferramenta exposta por "
-            f"este servidor é {_NOME_FERRAMENTA!r}."
+            f"Ferramenta desconhecida: {nome!r}. As ferramentas expostas por "
+            f"este servidor são {_NOME_FERRAMENTA!r} e {_NOME_REQUISITOS!r}."
         )
 
     if cliente is None:
         # Nenhuma credencial é montada aqui, e não há env de segredo a ler:
         # o bean é público e stateless (§4.4 do recon, verificado).
         cliente = ClienteJupiter(transporte_http)
+
+    if nome == _NOME_REQUISITOS:
+        return formatar_requisitos(requisitos(argumentos["sigla"], cliente=cliente))
 
     codcur = argumentos.get("codcur")
     curso = (codcur, argumentos.get("codhab", "0")) if codcur else None
@@ -196,35 +279,58 @@ def main() -> None:
 
     from usp_mcp.adaptador import anotar
 
-    descritor = listar_ferramentas()[0]
+    # Por nome, nunca por índice. `listar_ferramentas()[0]` registrava só a
+    # primeira: a segunda ferramenta ficava DECLARADA e não anunciada, e quem
+    # pegou isso foi o handshake — a suíte em processo estava verde.
+    por_nome = {f["name"]: f for f in listar_ferramentas()}
     servidor = MCPServer(name="usp-mcp-jupiter", version="0.1.0")
+
+    # Sem decorator de tradução de erro, por mais tentador que seja: o SDK
+    # deriva o schema da ASSINATURA, e um wrapper `*args/**kwargs` faz o modelo
+    # ver uma ferramenta de dois parâmetros chamados `args` e `kwargs`. Medido
+    # pelo handshake H6/H7 ao tentar exatamente isso. A duplicação do `except`
+    # é o preço da assinatura honesta.
+    #
+    # `ToolError` é o canal que o SDK define para "falha prevista, a mensagem é
+    # para o modelo ler" — sem ele, o 2.2.0 classifica `ErroJupiter` como crash
+    # e entrega 31 bytes de `Error executing tool` (medido em 10/09/2026),
+    # jogando fora a frase que a `JupiterErro` extraiu dos 46 frames do Tomcat.
+    # Só `ErroJupiter` é traduzido: `except Exception` devolveria o stack trace
+    # que aquela classe existe para descartar, 116x o custo.
 
     def _disciplina(sigla, codcur=None, codhab="0", ingles=False) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
         try:
             return chamar_ferramenta(
-                descritor["name"],
+                _NOME_FERRAMENTA,
                 {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
             )
         except ErroJupiter as exc:
-            # `ToolError` é o canal que o SDK define para "falha prevista, a
-            # mensagem é para o modelo ler" — sem isto, o 2.2.0 classifica
-            # `ErroJupiter` como crash e entrega 31 bytes de `Error executing
-            # tool disciplina` (medido em 10/09/2026), jogando fora justamente a
-            # frase que a `JupiterErro` extraiu dos 46 frames do Tomcat. Só
-            # `ErroJupiter` é traduzido: `except Exception` devolveria ao modelo
-            # o stack trace que aquela classe existe para descartar, 116x o custo.
+            raise ToolError(str(exc)) from exc
+
+    def _requisitos(sigla) -> str:
+        try:
+            return chamar_ferramenta(_NOME_REQUISITOS, {"sigla": sigla})
+        except ErroJupiter as exc:
             raise ToolError(str(exc)) from exc
 
     # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026): sem
     # isto, o aviso de que sem `codcur` não há pré-requisito não chega ao modelo.
     anotar(
         _disciplina,
-        descritor["inputSchema"],
+        por_nome[_NOME_FERRAMENTA]["inputSchema"],
         {"sigla": str, "codcur": str | None, "codhab": str, "ingles": bool},
     )
-    servidor.tool(name=descritor["name"], description=descritor["description"])(_disciplina)
+    anotar(_requisitos, por_nome[_NOME_REQUISITOS]["inputSchema"], {"sigla": str})
+
+    for descritor, funcao in (
+        (por_nome[_NOME_FERRAMENTA], _disciplina),
+        (por_nome[_NOME_REQUISITOS], _requisitos),
+    ):
+        servidor.tool(
+            name=descritor["name"], description=descritor["description"]
+        )(funcao)
 
     servidor.run(transport="stdio")
 

@@ -30,10 +30,14 @@ from usp_mcp.jupiter import dwr, politica
 from usp_mcp.jupiter.erros import ConsultaNegada, JupiterIndisponivel, RespostaInvalida
 from usp_mcp.jupiter.politica import CONSULTAS_PERMITIDAS
 
-__all__ = ["ClienteJupiter", "transporte_http", "ConsultaNegada", "CONSULTAS_PERMITIDAS",
-           "URL_BASE", "AGENTE", "TTL_PADRAO"]
+__all__ = ["ClienteJupiter", "transporte_http", "transporte_get_http", "ConsultaNegada",
+           "CONSULTAS_PERMITIDAS", "URL_BASE", "URL_PAGINA", "AGENTE", "TTL_PADRAO"]
 
 URL_BASE = "https://uspdigital.usp.br/jupiterweb/dwr/call/plaincall"
+
+# A segunda superfície (§9, 14/09): a página de requisitos por curso, que é a
+# única que cita os currículos onde a exigência de fato mora.
+URL_PAGINA = "https://uspdigital.usp.br/jupiterweb"
 
 # Identificável e com contato, como o §9 do recon recomenda: quem administra o
 # JupiterWeb tem que conseguir saber quem está batendo, e falar com alguém.
@@ -65,6 +69,27 @@ def transporte_http(url: str, corpo: str, cabecalhos: dict[str, str]) -> tuple[i
         ) from e
 
 
+def transporte_get_http(url: str, cabecalhos: dict[str, str]) -> tuple[int, bytes]:
+    """GET da página pública. Devolve BYTES de propósito.
+
+    O JupiterWeb serve ISO-8859-1 e nem sempre anuncia. Decodificar aqui, com o
+    palpite errado, entrega "CÃ¡lculo" para o recorte — erro que atravessa a
+    suíte inteira sem derrubar nada que conte linhas. Quem sabe o charset é
+    quem conhece a página.
+    """
+    pedido = urllib.request.Request(url, headers=cabecalhos, method="GET")
+    try:
+        with urllib.request.urlopen(pedido, timeout=_TEMPO_LIMITE) as resposta:
+            return resposta.status, resposta.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise JupiterIndisponivel(
+            f"o JupiterWeb não respondeu ({e}). Se você está num sandbox, a rede "
+            "da USP não é alcançável de lá — ver §1.1 do SPEC1."
+        ) from e
+
+
 class ClienteJupiter:
     """Chamador do `ControlePublicoDWR`, com política, cache e serialização.
 
@@ -73,9 +98,11 @@ class ClienteJupiter:
     da constante.
     """
 
-    def __init__(self, transporte, *, agente: str = AGENTE, relogio=time.monotonic,
+    def __init__(self, transporte, *, transporte_get=transporte_get_http,
+                 agente: str = AGENTE, relogio=time.monotonic,
                  ttl: int = TTL_PADRAO, permitir_escrita: bool = False):
         self._transporte = transporte
+        self._transporte_get = transporte_get
         self._agente = agente
         self._relogio = relogio
         self._ttl = ttl
@@ -130,3 +157,66 @@ class ClienteJupiter:
             consulta="pubListarRequisitoDisciplina",
             params={"codcur": codcur, "codhab": codhab, "coddis": coddis},
         )
+
+    # --- a segunda superfície: a página de requisitos por curso -------------
+
+    def obter_requisitos(self, sigla: str) -> bytes:
+        """A página crua de requisitos da disciplina, em bytes.
+
+        Passa pela allowlist de CAMINHO, não pela de consulta: é outra
+        superfície, e o filtro do DWR não alcança um GET.
+        """
+        decisao = politica.decidir_caminho("listarCursosRequisitos")
+        if not decisao.permitida:
+            raise ConsultaNegada(decisao.motivo)
+
+        chave = ("pagina", "listarCursosRequisitos", sigla)
+        with self._porta:
+            guardado = self._cache.get(chave)
+            if guardado is not None and self._relogio() - guardado[0] < self._ttl:
+                return guardado[1]
+
+            url = f"{URL_PAGINA}/listarCursosRequisitos?coddis={sigla}"
+            status, bruto = self._transporte_get(url, {"User-Agent": self._agente})
+            if status != 200:
+                raise RespostaInvalida(
+                    f"o JupiterWeb respondeu HTTP {status} para a página de "
+                    "requisitos. Diferente do DWR, aqui um status fora de 200 é "
+                    "mesmo falha — a página de erro dele não vem com 200."
+                )
+            self._cache[chave] = (self._relogio(), bruto)
+            return bruto
+
+    def listar_colegiados(self) -> list:
+        """As 47 unidades. Existe para NÃO adivinhar: `codclg` como prefixo de
+        `codcur` é ambíguo (§9, 14/09), e só a lista real decide candidato."""
+        return self._chamar(
+            metodo="listar",
+            consulta="pubListarColegiado",
+            params={"pfxdisval": "XXX", "codcg": 0},
+        )
+
+    def listar_cursos_entrada(self, codclg: str) -> list:
+        """Os cursos de ingresso de uma unidade."""
+        return self._chamar(
+            metodo="listar",
+            consulta="pubListarCursoEntrada",
+            params={"codclg": codclg},
+        )
+
+    def cursos_de_ingresso(self, codcur: str) -> set[str]:
+        """Os `codcur` de ingresso das unidades que PODEM ser a deste curso.
+
+        Não decide qual unidade é — isso seria chute, porque oito dos 47
+        `codclg` são prefixo de outro. Decide **pertencimento**, que é tudo o
+        que a marca precisa: se o código aparece na lista de ingresso de algum
+        candidato, ele é curso de ingresso.
+        """
+        candidatos = [
+            c["codclg"] for c in self.listar_colegiados()
+            if codcur.startswith(c["codclg"])
+        ]
+        de_ingresso: set[str] = set()
+        for codclg in candidatos:
+            de_ingresso.update(c["codcur"] for c in self.listar_cursos_entrada(codclg))
+        return de_ingresso

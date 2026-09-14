@@ -19,7 +19,9 @@ from usp_mcp.jupiter import cliente, erros, server
 
 @pytest.mark.politica
 def test_t41_descricao_fala_a_lingua_de_quem_pergunta():
-    (ferramenta,) = server.listar_ferramentas()
+    (ferramenta,) = [
+        f for f in server.listar_ferramentas() if f["name"] == "disciplina"
+    ]
     descricao = ferramenta["description"]
 
     # O nome vem da pergunta, não da API (§5 do SPEC1).

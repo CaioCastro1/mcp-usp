@@ -32,10 +32,13 @@ CORPO_ESPERADO = [
     "scriptSessionId=0000000000000000",
 ]
 
+# `pubListarColegiado` e `pubListarCursoEntrada` SAÍRAM desta lista em 14/09,
+# com decisão registrada no §9: elas não respondem pergunta nenhuma sozinhas —
+# servem para marcar se um `codcur` é curso de ingresso, e é essa marca que
+# impede "não consta" de sair como "extinto". `pubObterInfoCurso` continua fora
+# por outro motivo, agora medido: devolve objeto vazio.
 CONSULTAS_FORA_DA_FATIA = [
     "pubGradeCurricular",
-    "pubListarColegiado",
-    "pubListarCursoEntrada",
     "pubObterInfoCurso",
     "pubObterInfoCursoWeb",
     "pubListarDiscipResp",
@@ -214,14 +217,16 @@ def test_t22_requisicoes_nao_se_sobrepoem(psi3323):
     [("listar", q) for q in CONSULTAS_FORA_DA_FATIA]
     + [(m, "pubObterDisciplina") for m in METODOS_GENERICOS],
 )
-def test_t23_superficie_travada_em_duas_consultas(grav, metodo, consulta):
+def test_t23_superficie_travada_em_quatro_consultas(grav, metodo, consulta):
     c = cliente.ClienteJupiter(grav)
     with pytest.raises(cliente.ConsultaNegada):
         c._chamar(metodo=metodo, consulta=consulta, params={})
     assert set(cliente.CONSULTAS_PERMITIDAS) == {
         "pubObterDisciplina",
         "pubListarRequisitoDisciplina",
-    }, "a fatia tem duas consultas; uma terceira precisa de decisão registrada"
+        "pubListarCursoEntrada",
+        "pubListarColegiado",
+    }, "a fatia tem quatro consultas; uma quinta precisa de decisão registrada"
 
 
 @pytest.mark.politica

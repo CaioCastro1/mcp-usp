@@ -20,6 +20,8 @@ Invariante 7 proíbe.
 """
 from __future__ import annotations
 
+from . import requisitos as _recorte
+
 # O nome da consulta NUNCA aparece nesta camada: quem o conhece é a política.
 # Uma ferramenta que aceite o nome da consulta como argumento deixa de ter
 # superfície, e a allowlist inteira vira decoração.
@@ -101,9 +103,11 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
     if curso is None:
         ficha["pre_requisito"] = None
         avisos.append(
-            "Pré-requisito não consultado: ele depende do curso, não só da "
-            "disciplina (§5.2 do recon). Informe o par (codcur, codhab) para "
-            "que eu busque."
+            "Pré-requisito não consultado por aqui: ele depende do currículo, "
+            "não só da disciplina. Use a ferramenta `requisitos` com a mesma "
+            "sigla — ela mostra TODOS os currículos de uma vez, sem precisar "
+            "de código de curso. Medido em 14/09: o código que a API deixa "
+            "descobrir é justamente o que devolve lista vazia aqui."
         )
     else:
         codcur, codhab = curso
@@ -134,3 +138,92 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
 
     ficha["avisos"] = avisos
     return ficha
+
+
+# --- a fatia de 14/09: o requisito pela sigla, não pelo curso ---------------
+
+_SEM_CURRICULO = (
+    "O JupiterWeb não lista requisito para {sigla} em curso nenhum. Isso NÃO "
+    "quer dizer que não há exigência: da ênfase (7º semestre) e do módulo (9º) "
+    "em diante, estruturas que viram curso novo, esse endpoint costuma não ter "
+    "registro — medido em PTC3313, que devolve 26 kB e nenhum currículo. "
+    "Confira na coordenação antes de concluir; não conclua daqui."
+)
+
+_FORA_DO_INGRESSO = (
+    "{quantos} não {consta} na lista de cursos de ingresso. Isso pode ser "
+    "currículo de geração anterior, ênfase ou módulo — o JupiterWeb não "
+    "distingue os três, e eu não invento qual é."
+)
+
+_CURRICULO_VAZIO = (
+    "O currículo {codcur} aparece na página mas sem nenhuma linha de "
+    "exigência. Não li isso como 'não precisa de nada' — a página apenas não "
+    "traz registro para ele."
+)
+
+
+def requisitos(sigla: str, *, cliente) -> dict:
+    """O que é preciso ter feito antes desta disciplina, **por currículo**.
+
+    O parâmetro é a sigla, e só. A medição de 14/09 (§9) mostrou que pedir o
+    curso não funciona: o único `codcur` que a API deixa descobrir devolve zero
+    linha justamente para as disciplinas de 6º semestre em diante.
+
+    A resposta sai por currículo porque o tipo de exigência é propriedade do
+    currículo: MAT2454 é requisito duro em Minas e fraco em Elétrica.
+    """
+    sigla = normalizar_sigla(sigla)
+    blocos = _recorte.recortar(cliente.obter_requisitos(sigla))
+
+    avisos: list[str] = []
+    if not blocos:
+        return {
+            "sigla": sigla,
+            "curriculos": [],
+            "avisos": [_SEM_CURRICULO.format(sigla=sigla)],
+        }
+
+    # Uma consulta de pertencimento por família de código, não uma por bloco.
+    de_ingresso: set[str] = set()
+    for codcur in {b.codcur for b in blocos}:
+        de_ingresso |= cliente.cursos_de_ingresso(codcur)
+
+    curriculos = []
+    for b in blocos:
+        curriculos.append(
+            {
+                "codcur": b.codcur,
+                "curso": b.nome_curso,
+                "habilitacao": b.habilitacao,
+                "periodo": b.periodo,
+                "periodo_ideal": b.periodo_ideal,
+                "ingresso": b.codcur in de_ingresso,
+                "exigencias": [
+                    {
+                        "sigla": e.sigla,
+                        "nome": e.nome,
+                        "tipo": e.tipo,
+                        "rotulo": e.rotulo,
+                    }
+                    for e in b.exigencias
+                ],
+            }
+        )
+        if not b.exigencias:
+            avisos.append(_CURRICULO_VAZIO.format(codcur=b.codcur))
+
+    fora = sum(1 for c in curriculos if not c["ingresso"])
+    if fora:
+        avisos.append(
+            _FORA_DO_INGRESSO.format(
+                quantos=(
+                    "O único currículo listado"
+                    if len(curriculos) == 1
+                    else f"{fora} dos {len(curriculos)} currículos listados"
+                ),
+                consta="consta" if fora == 1 else "constam",
+            )
+        )
+
+    return {"sigla": sigla, "curriculos": curriculos, "avisos": avisos}

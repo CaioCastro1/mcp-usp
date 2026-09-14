@@ -154,8 +154,8 @@ matrícula do aluno.
 
 | chamada | bruto | depois do recorte |
 |---|---|---|
-| `listarCursosRequisitos` (PTC3314, 1 currículo) | 30.720 B | ~400 B |
-| `listarCursosRequisitos` (MAT2455, 23 currículos) | 66.116 B | ~3 kB |
+| `listarCursosRequisitos` (PTC3314, 1 currículo) | 30.720 B | **511 B** |
+| `listarCursosRequisitos` (MAT2455, 23 currículos) | 66.116 B | **5.855 B** |
 | `pubListarCursoEntrada` (por colegiado, cacheado) | 1.576 B | usado só como conjunto |
 
 O teto de 66 kB está abaixo do limite de ~200 kB do Invariante 8, e o parser lê
