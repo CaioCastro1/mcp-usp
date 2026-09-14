@@ -77,10 +77,10 @@ def decidir(rota: str, ru: str | None = None, permitir_escrita: bool = False) ->
         return Decisao(
             permitida=False,
             motivo=(
-                f"rota {rota!r} não está na allowlist do RUCard (Invariante 2: "
-                f"allowlist, não denylist). Permitidas: {sorted(ROTAS_PERMITIDAS)}. "
-                "Saldo, extrato e recarga do cartão não foram mapeados na Fase 1 "
-                "e nenhuma flag os libera."
+                f"rota {rota!r} não é uma das que esta ferramenta consulta no "
+                f"RUCard ({', '.join(sorted(ROTAS_PERMITIDAS))}; a lista é fechada). "
+                "Saldo, extrato e recarga do cartão não estão disponíveis por aqui, "
+                "e nenhuma configuração os libera."
             ),
         )
 
@@ -103,7 +103,7 @@ def decidir(rota: str, ru: str | None = None, permitir_escrita: bool = False) ->
                 f"o RU {ru} ({RUS_FORA_DE_ESCOPO[ru]}) existe no RUCard mas está "
                 "fora do escopo desta ferramenta, que cobre os quatro da Cidade "
                 f"Universitária: {', '.join(f'{i} {n}' for i, n in RUS_PERMITIDOS.items())}. "
-                "Incluir outro é decisão registrada no §9 do SPEC1."
+                "Incluir outro restaurante é mudança do projeto, não opção de chamada."
             ),
         )
 
