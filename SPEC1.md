@@ -3026,3 +3026,84 @@ aconteceu com o casamento por nome, que nasceu duas vezes com regras diferentes 
 T83.
 
 ---
+
+### 14/09/2026 — `o_que_mudou`: a janela é por dias, e a tradução do ponteiro é condicional
+
+**O C4 do ROADMAP, e a decisão que este commit pede para julgar é o DESENHO DA JANELA.**
+`core_course_get_updates_since` recebe `since`, um epoch, e a alternativa óbvia era expor
+esse epoch — "o que mudou desde 1788900000". Recusada, por três razões em ordem de peso:
+
+1. **Quem escolhe o valor é um modelo, e epoch calculado por modelo erra para o lado
+   invisível.** Um ano trocado põe `since` no futuro, o Moodle aceita e a resposta volta
+   vazia: *"nada mudou"*. É o falso vazio que o §9 de 28/08 registra como o modo de falha
+   mais caro deste projeto, e aqui ele é pior que em qualquer outra ferramenta — **ninguém
+   estranha "nada mudou"**. Uma lista de entregas vazia levanta suspeita; esta não. A
+   janela por dias não tem como produzir isso: `dias` é um inteiro pequeno, a aritmética é
+   do código, e `dias <= 0` é recusado **antes de qualquer chamada**, com erro legível que
+   diz por quê (M9).
+2. **Duas grafias da mesma ideia no mesmo servidor.** `o_que_vence` já fala `dias`, e as
+   duas ferramentas respondem a mesma noite. É o argumento do J18 uma camada acima: lá era
+   a grafia da data, aqui é a grafia da janela.
+3. **A janela por extenso cabe na resposta; um epoch, não.** A saída diz *"nos últimos 2
+   dias (desde sex 12/09 16:00)"*.
+
+**O que a decisão custa, e a cura:** não dá para dizer "desde a última vez que olhei". Por
+isso a saída imprime o instante exato que usou (M7) — é a informação que o carimbo daria de
+graça, escrita de um jeito que quem lê consegue encaixar com a próxima pergunta.
+
+**A segunda decisão: a tradução `cmid` → nome, e quando ela acontece.** O ponteiro devolve
+`cmid` e o tipo da mudança, e nada mais — *"o módulo 6372306 mudou os arquivos"* não é
+resposta. Quem sabe o nome é `core_course_get_contents`, que **já está na allowlist** desde
+31/08: nenhuma função nova foi necessária para isso. Mas as duas têm ordens de grandeza
+diferentes de custo — o catálogo (§3.3) mede o ponteiro em ~100 tokens para 7 dias e o
+`get_contents` em ~14.500 por disciplina.
+
+Então a cara só acontece **quando há mudança** (M3). O caso comum de "mudou alguma coisa?"
+é *não*, e nele a ferramenta custa uma chamada barata e pronto. Quando há, o custo do
+`get_contents` é de transporte e de latência e **não de contexto**: dele sobram dois campos
+por módulo, nome e `modname`. É a mesma economia que `projecao.py` existe para fazer, e é
+o que torna o preço aceitável.
+
+**Allowlist de 10 para 11, e pela primeira vez o P5 não pediu prefixo novo.**
+`core_course_get_updates_since` casa com `core_course_get_`, declarado desde 31/08 por
+causa de `get_contents`. Vale registrar que a família `core_course_` **tem** escrita —
+`core_course_set_favourite_courses`, que o T5 usa como exemplo justamente porque se declara
+`read` e grava, e `core_course_view_course` — e que nenhuma das duas casa com o prefixo do
+verbo. O teto funcionou sem ter de crescer, que é o comportamento que se espera dele.
+
+**Um parâmetro que este projeto NÃO manda, ao contrário das duas ferramentas anteriores.**
+`filter` é `[opt=[]]`, e aqui o default **não é incógnita**: vazio significa "todos os
+tipos", que é o documentado e é o que queremos. Nas irmãs (`userid [opt=0]` em `notas`,
+`perpage [opt=0]` em `avisos`) o explícito entrou porque o default era desconhecido;
+mandar uma lista aqui seria outra coisa — seria decidir por quem pergunta o que conta como
+mudança. M17 trava a ausência, para que a decisão não seja revertida por zelo.
+
+**A projeção, medida — e o payload do ponteiro é ESCRITO À MÃO:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 4 módulos mexidos, janela de 3 dias | 107.727 B | 801 B | **134,5×** |
+
+A ressalva é diferente da de `avisos`, e vale separar as duas metades: o
+`core_course_get_contents` desta conta é **fixture real** (PTC3314, 12/09, 107.113 B) e
+responde por 99,4% do cru — quem domina a razão é ele. O `updates_since` (614 B) é
+**escrito à mão** a partir da forma documentada do core 5.0, com os `cmid` reais da mesma
+fixture. Ou seja: a razão mede sobretudo o que descartamos da resposta real e cara, que é a
+parte que importa aqui; o que fica inventado é a forma do ponteiro, que é pequeno por
+natureza.
+
+**Duas coisas que a saída diz e a API não:** `cmid` que a tradução não acha **não some** —
+`get_contents` esconde módulo que o aluno não pode ver, e apagar a linha faria a resposta
+jurar que nada mais mudou (M5); e a resposta diz, sempre, que ela é **ponteiro e não
+conteúdo**, apontando `material`, `avisos` e `o_que_vence` por nome. Sem essa frase um
+modelo lê "arquivo novo ou trocado" como se soubesse qual arquivo é.
+
+**O que fica sem verificação ao vivo:** se `instances` vem mesmo com `contextlevel`
+`module` e `course` como o core declara (M14 depende disso); quais `name` de mudança o
+e-Disciplinas usa de fato — a tradução cobre dezesseis e deixa o desconhecido sair cru,
+então o pior caso medido é vocabulário estranho e nunca rótulo inventado (M6); e se
+`since` no futuro devolve vazio em vez de erro, que é a hipótese por trás de recusar
+`dias <= 0`. As três são baratas de fechar: uma chamada cada, e a primeira já sai da mesma
+execução que capturar a fixture.
+
+---

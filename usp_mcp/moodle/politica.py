@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Oito funções, todas de leitura. Crescer isso é decisão de §9, não
+# Onze funções, todas de leitura. Crescer isso é decisão de §9, não
 # conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
 # então novas existem porque `material` precisa traduzir sigla em `courseid`:
 # site_info dá o userid a partir do token, users_courses dá a lista, e
@@ -72,6 +72,15 @@ from dataclasses import dataclass
 # inteira quando o post é o tópico). Nenhuma começa por `mod_forum_get_`, que é
 # o prefixo estreito declarado em P5 — o do plugin, `mod_forum_`, casaria com
 # todas as quatorze.
+#
+# A décima primeira entrou em 14/09/2026, com `o_que_mudou`, e é a primeira que
+# NÃO precisou de prefixo novo: `core_course_get_updates_since` casa com
+# `core_course_get_`, declarado desde 31/08 por causa de `get_contents`. A
+# decisão do §9 dela é outra — a janela é por DIAS e não por carimbo —, e o que
+# vale registrar aqui é que a família `core_course_` tem escrita
+# (`core_course_set_favourite_courses`, que o T5 usa justamente porque ela se
+# declara `read` e grava, e `core_course_view_course`), e nenhuma das duas casa
+# com o prefixo do verbo.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -84,6 +93,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         "gradereport_user_get_grade_items",
         "mod_forum_get_forums_by_courses",
         "mod_forum_get_forum_discussions",
+        "core_course_get_updates_since",
     }
 )
 

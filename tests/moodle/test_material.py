@@ -369,6 +369,7 @@ def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
         "gradereport_user_get_grade_items",
         "mod_forum_get_forums_by_courses",
         "mod_forum_get_forum_discussions",
+        "core_course_get_updates_since",
     })
     assert not (politica.ALLOWLIST & politica.BLOQUEIO_PERMANENTE)
     for funcao in politica.ALLOWLIST:

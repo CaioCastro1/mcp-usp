@@ -751,3 +751,64 @@ def discussoes_falsas(discussoes=None, *, com_warning=False):
             else []
         ),
     }
+
+
+# --------------------------------------------------------------------------
+# `core_course_get_updates_since` — **FIXTURE ESCRITA À MÃO**, mesmo rótulo e
+# mesma ressalva das duas seções acima.
+#
+# **Não é captura.** A forma vem da declaração de `core_course_get_updates_since`
+# no core do Moodle 5.0 (`course/externallib.php`,
+# `get_updates_since_returns` → `course_updates`) e do que
+# `notas/moodle-catalogo.md` §3.3 registra dela: *"devolve ponteiro, não
+# conteúdo: diz qual cmid mudou e em quê"*.
+#
+# O que aqui é REAL são os `cmid`, que vêm de `course_contents_ptc3314.json`
+# (12/09): 6372306 é a "Apostila sobre Linhas e Ondas" (`resource`) e 6372301 é
+# o fórum "Avisos". É isso que faz a tradução cmid → nome ser exercitada contra
+# dado de verdade em vez de contra um dicionário que o próprio teste escreveu —
+# a tradução é metade desta ferramenta, e é a metade que teria como errar calada.
+# Os `timeupdated` e a escolha de quais tipos de mudança aparecem são inventados.
+CMID_APOSTILA = 6372306
+CMID_FORUM_AVISOS = 6372301
+CMID_QUE_NAO_EXISTE = 9999999
+
+
+def mudancas_falsas(instancias=None, *, com_warning=False, contextlevel="module"):
+    """`core_course_get_updates_since`: ponteiro, não conteúdo.
+
+    `instancias` é uma lista de `(cmid, [(nome_da_mudanca, timeupdated)])`. Os
+    nomes seguem os do core — `configuration`, `contentfiles`, `introfiles`,
+    `discussions`, `submissions`, `gradeitems` —, e um nome fora da lista existe
+    para provar que o desconhecido sai cru em vez de virar rótulo inventado.
+    """
+    if instancias is None:
+        instancias = [
+            (CMID_APOSTILA, [("contentfiles", 1788900000)]),
+            (CMID_FORUM_AVISOS, [("discussions", 1788910000)]),
+        ]
+    return {
+        "instances": [
+            {
+                "contextlevel": contextlevel,
+                "id": cmid,
+                "updates": [
+                    {"name": nome, "timeupdated": quando, "itemids": [1, 2]}
+                    for nome, quando in mudancas
+                ],
+            }
+            for cmid, mudancas in instancias
+        ],
+        "warnings": (
+            [
+                {
+                    "item": "course",
+                    "itemid": 142036,
+                    "warningcode": "1",
+                    "message": "Uma atividade não pôde ser verificada",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }
