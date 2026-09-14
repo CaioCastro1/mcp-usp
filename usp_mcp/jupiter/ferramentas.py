@@ -106,16 +106,16 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
             "Pré-requisito não consultado por aqui: ele depende do currículo, "
             "não só da disciplina. Use a ferramenta `requisitos` com a mesma "
             "sigla — ela mostra TODOS os currículos de uma vez, sem precisar "
-            "de código de curso. Medido em 14/09: o código que a API deixa "
-            "descobrir é justamente o que devolve lista vazia aqui."
+            "de código de curso. O código que a API deixa descobrir é "
+            "justamente o que devolve lista vazia aqui."
         )
     else:
         codcur, codhab = curso
         if codcur in _DISCREPANCIA_CODCUR:
             avisos.append(
                 f"O código {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} são o "
-                "mesmo curso em gerações diferentes de currículo — medido em "
-                "14/09, e não mais uma discrepância sem explicação. O que muda "
+                "mesmo curso em gerações diferentes de currículo, não uma "
+                "discrepância sem explicação. O que muda "
                 "entre eles: 3033 é quem tem a **grade** curricular (67 "
                 "disciplinas, 1º ao 5º semestre) e 3032 é quem tem os "
                 "**requisitos**; a grade de 3032 vem vazia. Usei "
@@ -142,8 +142,8 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
                 "nenhuma linha, e isso tem TRÊS causas possíveis — não duas. "
                 "Além de (a) não haver exigência e (b) a disciplina não "
                 "pertencer a esse currículo, há (c) o código ser de outra "
-                "geração do mesmo currículo: medido em 14/09, PTC3314 devolve "
-                "zero linha em 3033 e devolve PTC3213+PSI3213 em 3032, que são "
+                "geração do mesmo currículo: PTC3314 devolve zero linha em "
+                "3033 e devolve PTC3213+PSI3213 em 3032, que são "
                 "o mesmo Ciclo Básico da Elétrica em gerações diferentes. A (c) "
                 "é a mais provável quando o código veio da lista de cursos de "
                 "ingresso. Use a ferramenta `requisitos` com a sigla: ela "
