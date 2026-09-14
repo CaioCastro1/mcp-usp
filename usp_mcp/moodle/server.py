@@ -381,7 +381,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     print("ferramentas expostas :", [f["name"] for f in listar_ferramentas()])
 
     arquivo = _env.achar_env()
-    print(".env encontrado      :", arquivo or "NÃO — copie .env.example (§8)")
+    print(".env encontrado      :", arquivo or "NÃO — copie .env.example")
     _env.carregar_env()
     # Forma, nunca valor (Invariante 3).
     token = os.environ.get("MOODLE_TOKEN") or ""

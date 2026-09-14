@@ -479,7 +479,7 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
     avisos = [
         "O link do arquivo interno do e-Disciplinas não é entregue aqui: um "
         "endereço sem a credencial não abre, e um com ela poria a credencial "
-        "no seu contexto — por isso ele não sai desta máquina (Invariante 3), "
+        "no seu contexto — por isso ele não sai desta máquina, "
         "mesmo sabendo que a requisição de download autentica pelo corpo do "
         "pedido, sem precisar colar a credencial no endereço. Para baixar de "
         "fato um destes arquivos, use a ferramenta `baixar_arquivo`.",
