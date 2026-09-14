@@ -77,5 +77,44 @@ def test_t44_fronteira_ponta_a_ponta_offline(psi3323):
     assert texto.startswith("PSI3323 — Laboratório de Eletrônica I")
     assert "45 h" in texto, "carga horária calculada não chegou ao texto"
     assert "3×15 + 0×30" in texto, "a conta fica à vista para ninguém 'corrigir' para cgahoreto"
-    assert "⚠" in texto and "curso" in texto, "o aviso do Invariante 7 sumiu na formatação"
+    assert "⚠" in texto and "requisitos" in texto, "o aviso que aponta para `requisitos` sumiu"
     assert "Ementa:" in texto
+
+
+@pytest.mark.politica
+def test_t85_o_schema_de_disciplina_tem_secoes_e_nao_tem_curso():
+    (ferramenta,) = [f for f in server.listar_ferramentas() if f["name"] == "disciplina"]
+    propriedades = ferramenta["inputSchema"]["properties"]
+
+    assert set(propriedades) == {"sigla", "secoes", "ingles"}
+    assert propriedades["secoes"]["items"]["enum"] == [
+        "ementa", "objetivos", "programa", "bibliografia", "avaliacao", "todas"
+    ]
+    assert propriedades["secoes"]["default"] == ["ementa"]
+    descricao = ferramenta["description"]
+    assert "requisitos" in descricao, "a descrição tem que apontar para quem responde pré-requisito"
+    for vazamento in ("codcur", "codhab"):
+        assert vazamento not in descricao
+
+
+@pytest.mark.contrato
+def test_t86_o_texto_declara_as_secoes_que_ficaram_de_fora(ptc3314):
+    c = cliente.ClienteJupiter(Gravador([ptc3314]))
+    padrao = server.chamar_ferramenta("disciplina", {"sigla": "PTC3314"}, cliente=c)
+    assert "Ementa:" in padrao and "Objetivos:" not in padrao
+    assert "Seções não incluídas" in padrao and "objetivos" in padrao
+
+    c2 = cliente.ClienteJupiter(Gravador([ptc3314]))
+    tudo = server.chamar_ferramenta(
+        "disciplina", {"sigla": "PTC3314", "secoes": ["todas"]}, cliente=c2
+    )
+    assert "Objetivos:" in tudo and "Bibliografia:" in tudo and "Norma de recuperação:" in tudo
+    assert "Seções não incluídas" not in tudo
+
+
+@pytest.mark.contrato
+def test_t87_secao_desconhecida_na_fronteira_e_erro_legivel(ptc3314):
+    c = cliente.ClienteJupiter(Gravador([ptc3314]))
+    with pytest.raises(erros.ErroJupiter) as exc:
+        server.chamar_ferramenta("disciplina", {"sigla": "PTC3314", "secoes": ["horario"]}, cliente=c)
+    assert "horario" in str(exc.value) and "todas" in str(exc.value)
