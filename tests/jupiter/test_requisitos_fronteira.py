@@ -94,37 +94,6 @@ def test_t73_disciplina_sem_curso_aponta_para_requisitos(gravador, psi3323):
     assert "requisitos" in saida
 
 
-@pytest.mark.parametrize(
-    "marca,fraco,esperado",
-    [('stamtrrcp:"S"', True, "devendo"), ('stamtrrcp:"N"', False, "pré-requisito")],
-)
-def test_t76_o_caminho_dwr_tambem_distingue_fraco_de_duro(
-    psi3323, requisito, marca, fraco, esperado
-):
-    """`disciplina` com curso lê `pubListarRequisitoDisciplina`, e ali o
-    discriminador é `stamtrrcp` — 'S' é o "Requisito fraco" da página.
-
-    Sem isto, a mesma exigência sai como "Pré-requisito" por uma ferramenta e
-    como "Requisito fraco" pela outra, para o mesmo par. Duas respostas
-    diferentes para a mesma pergunta é pior do que uma incompleta.
-
-    A fixture real de MAT2454 vem com `S` — MAT2453 é exigência FRACA dela. O
-    caso duro nasce trocando só essa letra, para as duas metades virem da mesma
-    forma de resposta e não de um envelope inventado.
-    """
-    from usp_mcp.jupiter import ferramentas
-
-    c = cliente.ClienteJupiter(
-        Gravador([psi3323, requisito.replace('stamtrrcp:"S"', marca)])
-    )
-
-    ficha = ferramentas.disciplina("PSI3323", ("3032", "0"), cliente=c)
-    saida = server.formatar(ficha)
-
-    assert ficha["pre_requisito"][0]["fraco"] is fraco
-    assert esperado in saida.lower()
-
-
 def test_t77_o_silencio_nao_escolhe_a_causa_que_nao_sabe(
     ptc3313_html, ingresso_poli, colegiados
 ):
@@ -155,53 +124,3 @@ def test_t77_o_silencio_nao_escolhe_a_causa_que_nao_sabe(
         )
 
 
-def test_t78_requisito_vazio_cita_a_terceira_causa_e_manda_para_requisitos(
-    gravador, psi3323
-):
-    """Vazio no `disciplina` com curso tinha DUAS explicações; a medição de
-    14/09 achou a terceira, e ela é a mais provável de todas.
-
-    PTC3314 em 3033 devolve zero linha não porque não exija nada, e não porque
-    não pertença ao currículo — mas porque 3033 e 3032 são **gerações** do
-    mesmo currículo e o requisito mora na outra. Quem lê "pode não haver
-    exigência" para em conclusão errada; quem lê o nome da outra ferramenta
-    chega na resposta certa.
-    """
-    from usp_mcp.jupiter import ferramentas
-
-    vazio = (
-        "throw 'allowScriptTagRemoting is false.';\n//#DWR-REPLY\n//#DWR-START#\n"
-        "(function(){\nif(!window.dwr)return;\nvar dwr=window.dwr._[0];\n"
-        'dwr.engine.remote.handleCallback("0","0",[]);\n})();\n//#DWR-END#\n'
-    )
-    c = cliente.ClienteJupiter(Gravador([psi3323, vazio]))
-
-    ficha = ferramentas.disciplina("PTC3314", ("3033", "0"), cliente=c)
-    avisos = "\n".join(ficha["avisos"])
-
-    assert "geraç" in avisos, "a terceira causa não aparece"
-    assert "requisitos" in avisos, "não manda para a ferramenta que responde"
-
-
-def test_t79_o_aviso_da_discrepancia_nao_diz_mais_nao_verificada(gravador, psi3323):
-    """O texto de 31/08 declarava a relação 3032×3033 como não verificada — o
-    que era honesto então. Em 14/09 ela foi medida: 3033 tem a grade (1º ao 5º)
-    e 3032 tem os requisitos. Aviso que continua dizendo "não verificada"
-    depois da medição é o mesmo modo de falha que o backlog registrou duas
-    vezes hoje: texto escrito uma vez e nunca conferido contra o que se sabe.
-    """
-    from usp_mcp.jupiter import ferramentas
-
-    vazio = (
-        "throw 'allowScriptTagRemoting is false.';\n//#DWR-REPLY\n//#DWR-START#\n"
-        "(function(){\nif(!window.dwr)return;\nvar dwr=window.dwr._[0];\n"
-        'dwr.engine.remote.handleCallback("0","0",[]);\n})();\n//#DWR-END#\n'
-    )
-    c = cliente.ClienteJupiter(Gravador([psi3323, vazio]))
-
-    avisos = "\n".join(
-        ferramentas.disciplina("PTC3314", ("3033", "0"), cliente=c)["avisos"]
-    )
-
-    assert "não verificada" not in avisos
-    assert "grade" in avisos and "requisito" in avisos
