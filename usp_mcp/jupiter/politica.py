@@ -28,8 +28,25 @@ from dataclasses import dataclass
 CONSULTAS_PERMITIDAS: dict[str, str] = {
     "pubObterDisciplina": "obter",
     "pubListarRequisitoDisciplina": "listar",
+    "pubListarCursoEntrada": "listar",
+    "pubListarColegiado": "listar",
 }
 
+# A SEGUNDA superfície: `listarCursosRequisitos` é GET de HTML no mesmo host,
+# fora do DWR. Um buscador genérico de URL anularia a allowlist de consulta
+# inteira — é o `executarBatch` de novo, por outra porta. Por isso o caminho
+# também é allowlist, e não há flag que a dispense.
+#
+# `obterTurma` fica de fora e é o caso que mostra por quê: mesmo host, mesmo
+# parâmetro (a sigla), e traz nome de professor e sala — 110 kB de dado que a
+# fatia não pediu.
+CAMINHOS_PERMITIDOS: frozenset[str] = frozenset({"listarCursosRequisitos"})
+
+# A fatia de requisitos (14/09) acrescentou duas consultas de navegação. Elas
+# não respondem pergunta nenhuma sozinhas: servem para dizer se um `codcur` é
+# curso de ingresso, e essa marca é o que impede "não consta" de virar
+# "extinto" na saída.
+#
 # Os únicos métodos do bean que esta fatia usa.
 METODOS_PERMITIDOS: frozenset[str] = frozenset({"obter", "listar"})
 
@@ -105,3 +122,20 @@ def decidir(metodo: str, consulta: str, permitir_escrita: bool = False) -> Decis
         )
 
     return Decisao(permitida=True, motivo=f"{consulta} via {metodo}.")
+
+
+def decidir_caminho(caminho: str) -> Decisao:
+    """Decide se um caminho HTML do JupiterWeb pode ser buscado.
+
+    Sem `permitir_escrita`: GET de página pública não escreve, e uma flag aqui
+    só serviria para dar a impressão de que existe caminho liberável.
+    """
+    if caminho in CAMINHOS_PERMITIDOS:
+        return Decisao(permitida=True, motivo=f"{caminho} está na allowlist de caminho.")
+    return Decisao(
+        permitida=False,
+        motivo=(
+            f"caminho {caminho} não está na allowlist (Invariante 2, allowlist e "
+            f"não denylist). A fatia atual tem {len(CAMINHOS_PERMITIDOS)} caminho."
+        ),
+    )

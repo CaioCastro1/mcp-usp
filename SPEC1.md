@@ -2373,3 +2373,157 @@ mais conferido vira mapa errado**. O custo aqui foi menor porque o backlog não 
 começo de toda sessão — mas ele é o que responde "o que atacar primeiro", e ele apontava
 para duas ruas sem dívida. Não há cura estrutural registrada; fica o hábito de conferir a
 linha contra o código antes de agir sobre ela.
+
+### 14/09/2026 — Jupiter: o curso descobrível é o que não responde
+
+Desenho em `docs/superpowers/specs/2026-09-14-jupiter-requisitos-design.md`. A fatia
+aberta era "resolver curso", para destravar o pré-requisito do `disciplina`. Onze
+chamadas à mão (dado público, sem credencial) mataram o desenho óbvio antes de ele
+existir.
+
+**O caminho DWR de descoberta entrega o código errado.** `pubListarCursoEntrada
+{codclg:3}` devolve **3033** para a Elétrica. Com 3033, `pubListarRequisitoDisciplina`
+responde **0 linhas** para PSI3323 e PTC3314; com **3032** — que não aparece em lista
+nenhuma — responde PSI3322 `[CR]` e PTC3213+PSI3213 `[PR]`. A grade de 3033 tem 67
+registros e vai até o 5º semestre; a de 3032 vem **vazia**. São duas metades do mesmo
+programa sob códigos diferentes, o que fecha parcialmente a discrepância do §5.1 do
+recon: não é erro de digitação nem de superfície, é **geração de currículo**.
+
+**O projeto piloto trocou o vocabulário de disciplina.** Em `MAT2455` (23 currículos),
+os sete cursos de ingresso que já migraram — 3023, 3073, 3084, 3093, 3123, 3201, 3251 —
+exigem **`2000101` Fundamentos Científicos e Modelagem para Engenharia I**, código só de
+dígitos, no lugar de MAT2454+MAT3458. A adoção é **parcial**: 3033 (Elétrica), 3045
+(Mecânica) e 3152 (Ambiental) seguem no vocabulário antigo. Regra do tipo "filtre pelo
+curso vigente" acerta metade da Poli e erra a outra. Os pares 3021/3022/**3023**,
+3072/**3073**, 3092/**3093** são a mesma coisa em gerações diferentes.
+
+> **Correção lavrada no mesmo dia, algumas horas depois.** O parágrafo acima dizia que
+> esses sete currículos traziam **zero linha** e que o piloto existia "antes de o
+> requisito ser cadastrado". Era falso, e a fonte do erro era minha: o parser de
+> exploração exigia letras na sigla (`[A-Z]{2,4}\d{3,4}`) e era **cego a `2000101`**.
+> Quem derrubou a afirmação foi o primeiro ciclo de TDD: o T54, escrito sobre a premissa
+> errada, falhou com a linha que eu jurava não existir. Duas lições, e a segunda é a
+> cara: (a) classificar antes de olhar a distribuição dos valores apaga justamente a
+> categoria inesperada; (b) **o `//` entre medir e registrar é onde o erro entra** — este
+> §9 recebeu o fato às 16h e o desmentiu às 18h, e o que separou os dois foi um teste que
+> falhou, não uma releitura. Medição de exploração não é fato até um teste dependê-la.
+
+**A ausência tem quatro formas e nenhuma é "não precisa de nada":** bloco com zero linhas
+(MAT2455 em 3023), zero blocos na página inteira (**PTC3313: 26.623 B, nenhum curso**),
+curso não informado, e sigla inexistente. PTC3314, PTC3360 e PTC3361 aparecem só sob 3032,
+6º período — da ênfase (7º) e do módulo (9º) em diante, estruturas que viram curso novo,
+esse endpoint não registra nada.
+
+**Três tipos de exigência, e o `stamtrrcp` é o discriminador.** Cruzando HTML e DWR no
+mesmo par: `PR`+`stamtrrcp=N` = "Requisito" (duro), `PR`+`stamtrrcp=S` = "Requisito fraco"
+(matricula devendo), `CR`+`N` = "Indicação de Conjunto" (cursa junto). **Mapeamento de 3
+pontos, não lei.** O tipo é propriedade do currículo, não do par: MAT2454 é duro em 3250
+(Minas) e fraco em 3032 (Elétrica). O `formatar()` que está na `main` imprime os três sob
+"Pré-requisito:" e descarta `stamtrrcp` — o correquisito vira exigência prévia, e "fraco"
+some. Dois defeitos, um deles resposta errada.
+
+**Dois "não verificado" do §8 do recon fecham:** `pubObterInfoCurso {3033,0}` devolve
+**objeto vazio** (196 B) e não serve de fonte de vigência — nenhum payload do Jupiter tem
+campo de vigência, e a lista de ingresso é a única âncora que existe.
+
+**Hipótese rejeitada, registrada para ninguém tentar de novo:** `codclg` como prefixo de
+`codcur`. Oito dos 47 colegiados (`1 2 3 5 6 7 8 9`) são prefixo de outro, então `27223`
+pode ser da unidade `2` ou da `27`. Derivar unidade de código de curso é chute. Testar
+*pertencimento* nos ≤2 candidatos, não.
+
+**Decisão:** a pergunta passa a ser respondida pela **sigla**, não pelo curso — ferramenta
+`requisitos(sigla)` sobre `listarCursosRequisitos`, que devolve todos os currículos com
+tipo e período, cada um rotulado como curso de ingresso ou não. A ferramenta `curso` de
+navegação unidade→curso **sai desta fatia**: a medição mostrou que ela não destrava o
+pré-requisito, destrava a grade curricular, que é outra pergunta.
+
+**Erro de método desta sessão.** O primeiro script de recon colapsou todo rótulo que não
+fosse "Conjunto" em `PR`, e por isso eu não vi o terceiro tipo — "Requisito fraco", que é
+30 das 33 linhas das fixtures. O que o revelou foi rodar o parser contra a fixture salva e
+**ler a saída**, não a suposição. Classificar antes de olhar a distribuição dos valores
+apaga exatamente a categoria que não se esperava.
+
+### 14/09/2026 — a ferramenta `requisitos`, e três defeitos que a suíte não via
+
+Implementação da fatia desenhada acima, por TDD. **463 verdes, 8 pulados** (os canários
+`live` das três trilhas), gate limpo. Módulo novo `usp_mcp/jupiter/requisitos.py`
+(recorte), mais `ferramentas.requisitos` e a segunda ferramenta na fronteira.
+
+**O primeiro RED derrubou um fato desta mesma sessão**, registrado em detalhe na correção
+acima: os sete currículos que eu tinha dado como vazios exigem `2000101`, e o cego era o
+meu parser de exploração. O teste que falhou foi escrito a partir do §9 errado — ou seja,
+**o §9 errado é que produziu o teste que o corrigiu**. Vale como método: registrar o fato
+por escrito é o que permite que ele seja testado e derrubado; medição que fica só na janela
+da conversa não tem como falhar em lugar nenhum.
+
+**O handshake achou o segundo.** `main()` registrava `listar_ferramentas()[0]` — com uma
+ferramenta só, correto; com duas, a segunda ficava **declarada e nunca anunciada no fio**.
+A suíte em processo (T45-T48) estava verde: ela lê o que `main()` registrou, e `main()`
+registrou o que ela esperava. Quem viu foi `tests/handshake/`, que compara o anunciado com
+o declarado. É a terceira vez que a assimetria "declarado × anunciado" morde neste repo, e
+a primeira em que o teste já existia antes do bug.
+
+**O terceiro fui eu que criei e o handshake matou em 4 minutos.** Ao registrar a segunda
+ferramenta, deduplicei o `try/except ErroJupiter` num decorator. O SDK deriva o schema da
+**assinatura**, e o wrapper `*args/**kwargs` fez o modelo ver uma ferramenta de dois
+parâmetros chamados `args` e `kwargs` — H6 e H7 vermelhos na mesma rodada. A duplicação do
+`except` voltou, agora com o motivo escrito ao lado: **abstração que atravessa a fronteira
+do SDK custa o schema.**
+
+**Dois defeitos de resposta, não de omissão, corrigidos:** correquisito saía sob o rótulo
+"Pré-requisito:" (PSI3322 pode ser cursada JUNTO com PSI3323, e o aluno adiaria um ano), e
+`stamtrrcp` era descartado, então "Requisito fraco" — dá para matricular devendo — era
+indistinguível do duro. Os dois estavam na `main` desde 31/08, com a suíte verde: nenhum
+teste olhava o RÓTULO, só a presença da sigla.
+
+**Superfície.** A allowlist DWR foi de 2 para 4 consultas (`pubListarCursoEntrada` e
+`pubListarColegiado`, ambas só para marcar pertencimento à lista de ingresso), e a trava do
+T23 subiu junto — ela exige decisão registrada por consulta nova, e foi ela que travou o
+commit até este parágrafo existir. Uma allowlist **nova, de caminho**, guarda o GET de HTML:
+`listarCursosRequisitos` é o único caminho permitido, e `obterTurma` é o caso que mostra por
+quê — mesmo host, mesmo parâmetro, e traz nome de professor e sala.
+
+**Custo medido na saída real:** 30.720 B → **511 B** (PTC3314), 66.116 B → **5.855 B**
+(MAT2455, 23 currículos). Canários T74-T75 verdes contra a USP.
+
+**O que a ferramenta declara não saber:** em que currículo você está. Ela mostra todos e
+marca qual é curso de ingresso — sem chamar de "extinto" o que não é ingresso, porque
+ênfase e módulo também ficam de fora da lista e o JupiterWeb não distingue os três.
+
+### 14/09/2026 — a superfície pública do Jupiter cobre só a metade de entrada do curso
+
+Quatro chamadas a `pubGradeCurricular`, uma por curso de ingresso da Poli, escolhidas à
+mão. A pergunta era se a fatia `curso` — adiada em 14/09 por não destravar o
+pré-requisito — destrava ao menos "o que falta pra formar".
+
+| curso | disciplinas | semestres ideais |
+|---|---|---|
+| 3033 Ciclo Básico - Eng Elétrica | 67 | **1–5** |
+| 3123 Habilitação: Eng de Computação | 28 | **1–4** |
+| 3084 Habilitação: Eng de Produção | 33 | **1–5** |
+| 3045 Habilitação: Eng Mecânica | 30 | **1–4** |
+
+**Nenhum passa do 5º semestre**, nem os que se chamam "Habilitação". Some-se ao que já
+havia sido medido no mesmo dia: `pubListarCursoEntrada` só lista curso de **ingresso**;
+`pubGradeCurricular` do 3032 (que carrega os requisitos da Elétrica) vem **vazia**; e
+`listarCursosRequisitos` de PTC3313 devolve 26 kB com **zero** currículo.
+
+**A conclusão, e ela é uma limitação do produto, não uma tarefa pendente:** a superfície
+pública estruturada do JupiterWeb é o **catálogo de entrada**. Da ênfase (7º semestre) e
+do módulo (9º) em diante — exatamente onde o dono está — não há grade, não há requisito e
+não há código de curso alcançável. O §5.4 do recon já dizia que o Jupiter público é
+"catálogo institucional, não perfil de aluno"; agora está medido que ele nem sequer é o
+catálogo **inteiro**.
+
+**Consequência de escopo, decidida aqui:** a fatia `curso` **não será construída** para
+responder "o que falta pra formar". Ela responderia isso para um calouro e devolveria um
+currículo que termina antes das matérias do dono começarem — o mesmo erro da fatia de
+requisitos, evitado desta vez por quatro chamadas em vez de uma implementação. Se algum
+dia ela existir, será por outra pergunta ("essa disciplina é obrigatória no ciclo
+básico?"), registrada no §5 como todas as outras.
+
+**O que isso deixa em aberto, e é a limitação a declarar:** nota, histórico, evolução do
+curso e saldo do RUCard **não têm caminho público**. Todos exigem a área logada, que não
+oferece token — só sessão de navegador, com dois cookies (§ nota do recon de 14/09) e
+timeout não medido. Enquanto essa medição não acontecer, o projeto **não responde** essas
+perguntas, e é melhor dizer isso do que ter ferramenta que responde pela metade.

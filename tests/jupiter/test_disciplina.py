@@ -108,11 +108,23 @@ def test_t32_erro_da_usp_em_portugues_sem_stacktrace(gravador, erro):
 
 def test_t33_discrepancia_codcur_e_declarada_nao_resolvida(gravador, psi3323, requisito):
     # §5.1 do recon: o Ciclo Básico Elétrica é 3033 no DWR e 3032 no HTML de
-    # listarCursosRequisitos. Não investigado, e não se inventa explicação.
-    # Comportamento travado: usar o código recebido sem traduzir E avisar.
+    # listarCursosRequisitos. Comportamento travado desde 31/08: usar o código
+    # recebido SEM TRADUZIR e avisar — é isso que este teste protege, e segue
+    # valendo.
+    #
+    # O que mudou em 14/09: a relação deixou de ser desconhecida. Foi medida —
+    # são gerações do mesmo currículo, 3033 tem a grade e 3032 tem os
+    # requisitos (§9). O aviso que dizia "não verificada" virou texto obsoleto,
+    # e um teste que exigisse aquela frase estaria travando a ignorância em vez
+    # do comportamento.
     c = cliente.ClienteJupiter(gravador([psi3323, requisito]))
     d = ferramentas.disciplina("PSI3323", curso=("3032", "0"), cliente=c)
 
     avisos = " ".join(d["avisos"])
     assert "3032" in avisos and "3033" in avisos
-    assert "não verificad" in avisos.lower() or "não investigad" in avisos.lower()
+    assert "geraç" in avisos, "a relação medida em 14/09 não é declarada"
+    assert "sem traduzir" in avisos, "o invariante de 31/08: não traduzir o código"
+
+    # E o código enviado continua sendo o recebido, não o "corrigido".
+    corpo_do_requisito = c._transporte.chamadas[-1]["corpo"]
+    assert "3032" in corpo_do_requisito and "3033" not in corpo_do_requisito
