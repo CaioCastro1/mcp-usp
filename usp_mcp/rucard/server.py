@@ -42,17 +42,19 @@ def listar_ferramentas() -> list[dict]:
         {
             "name": _NOME_FERRAMENTA,
             "description": (
-                "Cardápio dos bandejões da USP na Cidade Universitária — "
-                "CENTRAL, PUSP-CB, FÍSICA e QUÍMICAS. Diz o que tem no almoço e "
-                "no jantar de um dia, com calorias, preço de aluno, horário e a "
+                "Cardápio dos bandejões da USP na Cidade Universitária — Central, "
+                "Prefeitura (PUSP-CB), Física e Químicas. Diz o que tem no almoço "
+                "e no jantar de um dia, com calorias, preço de aluno, horário e a "
                 "opção do dia (marcada como vegetariana quando o RU marca), nos "
                 "quatro restaurantes de uma vez, para comparar onde vale a pena "
-                "comer. Use para 'o que tem no bandejão hoje', 'vale a pena "
-                "almoçar no Central?', 'que horas fecha o jantar', 'o das "
-                "Químicas abre no sábado?'. LIMITES: só a semana corrente (não "
-                "há cardápio de outra semana, nem passada nem futura); não há "
-                "cardápio de café da manhã publicado, só o horário; e nada de "
-                "saldo, extrato ou recarga do cartão."
+                "comer. Com dia='semana' traz os sete dias numa chamada só. Use "
+                "para 'o que tem no bandejão hoje', 'o que tem na sexta?', 'que "
+                "dia tem lasanha essa semana?', 'vale a pena almoçar na "
+                "Prefeitura?', 'que horas fecha o jantar', 'o das Químicas abre "
+                "no sábado?'. LIMITES: só a semana corrente (não há cardápio de "
+                "outra semana, nem passada nem futura); não há cardápio de café "
+                "da manhã publicado, só o horário; e nada de saldo, extrato ou "
+                "recarga do cartão."
             ),
             "inputSchema": {
                 "type": "object",
@@ -60,8 +62,11 @@ def listar_ferramentas() -> list[dict]:
                     "dia": {
                         "type": "string",
                         "description": (
-                            "'hoje', 'amanhã' ou uma data como 26/08/2026. "
-                            "Somente a semana corrente tem cardápio."
+                            "'hoje', 'amanhã', um dia da semana ('sexta', "
+                            "'sábado'), 'semana' para os sete dias de segunda a "
+                            "domingo, ou uma data como 26/08/2026. Nome de dia é "
+                            "o dessa semana, mesmo que já tenha passado: só a "
+                            "semana corrente tem cardápio."
                         ),
                         "default": "hoje",
                     },
@@ -77,10 +82,15 @@ def listar_ferramentas() -> list[dict]:
                     },
                     "restaurantes": {
                         "type": "array",
-                        "items": {"type": "string", "enum": ["6", "7", "8", "9"]},
+                        "items": {
+                            "type": "string",
+                            "enum": ["central", "prefeitura", "fisica", "quimicas"],
+                        },
                         "description": (
-                            "Ids dos restaurantes: 6 CENTRAL, 7 PUSP-CB, 8 "
-                            "FÍSICA, 9 QUÍMICAS. Omita para comparar os quatro."
+                            "Quais bandejões: central (Central), prefeitura "
+                            "(PUSP-CB, o da Prefeitura do campus), fisica "
+                            "(Física), quimicas (Químicas). Omita para comparar "
+                            "os quatro."
                         ),
                     },
                 },
@@ -234,7 +244,7 @@ def main() -> None:  # pragma: no cover — casca stdio
         {
             "dia": str,
             "refeicao": Literal["almoco", "jantar", "cafe", "todas"],
-            "restaurantes": list[Literal["6", "7", "8", "9"]] | None,
+            "restaurantes": list[Literal["central", "prefeitura", "fisica", "quimicas"]] | None,
         },
     )
     servidor.tool(name=descritor["name"], description=descritor["description"])(_bandejao)
