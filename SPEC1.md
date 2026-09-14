@@ -2601,3 +2601,26 @@ rodar primeiro, registre aqui.
 `pyproject.toml` não declara nenhuma, de propósito e com o motivo escrito no arquivo:
 declarar uma seria decidir por conta própria o que voltou para o dono. O A1 já registra
 que empacotar torna a lacuna mais visível, não menos.
+
+### 14/09/2026 — `disciplina` responde por seção, e deixa o pré-requisito com `requisitos`
+
+Revisão de má prática nos servidores públicos. Medido em `server.formatar` sobre as
+fixtures: "quantos créditos tem PTC3314" é respondida pelo cabeçalho (139 B) e a
+ferramenta entregava 3.880 B — 28×; 38% disso era a lista de competências dos objetivos.
+O teste de custo (T34) media o dicionário, não o texto, e `ingles=True` (6.452 B) não era
+medido em lugar nenhum.
+
+**Decisão:** (a) parâmetro `secoes` (`ementa`, `objetivos`, `programa`, `bibliografia`,
+`avaliacao`, `todas`), padrão só `ementa`, cabeçalho sempre, e o que ficou de fora
+declarado na última linha (Invariante 7); (b) `codcur`/`codhab` **saem** de `disciplina`:
+o §9 de 14/09 já tinha medido que o único código descobrível devolve zero linha, e manter
+o parâmetro era oferecer ao modelo o caminho que não responde, com três avisos para
+explicar por quê; (c) `pubListarRequisitoDisciplina` sai da allowlist (4 → 3) e
+`ClienteJupiter.listar_requisito` some — a fixture DWR dela fica no disco como evidência,
+fora da `FATIA`; (d) parágrafo repetido na fonte (bibliografia de PTC3314) sai uma vez;
+(e) tetos novos sobre o **texto**: 1.200 B padrão, 5.000 B `todas`, 8.500 B `todas`+inglês.
+
+**Descartado:** um enum de "nível de detalhe" (`resumo`/`completo`). Perguntas reais pedem
+uma seção específica ("o que cai", "como é a avaliação"), e o array deixa o modelo pedir
+exatamente essa. Testes T80–T80g, T85–T87, T34b–T34d; T31, T33, T76, T78 e T79 removidos
+com o caminho que exercitavam.

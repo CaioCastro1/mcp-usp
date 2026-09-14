@@ -18,7 +18,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | "O que eu tenho para entregar essa semana?" | Tarefas e questionários do e-Disciplinas, com prazo |
 | "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
-| "Quantos créditos vale MAC0110?" | Créditos, carga horária, ementa e programa, pelo JupiterWeb |
+| "Quantos créditos vale MAC0110?" | Créditos, carga horária e ementa pela sigla; programa, bibliografia e avaliação sob pedido |
 | "O que preciso ter feito antes de MAT2454?" | Pré-requisitos, pelo seu currículo |
 
 Bandejão e JupiterWeb funcionam para qualquer pessoa. O e-Disciplinas mostra as **suas**
