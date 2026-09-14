@@ -3,7 +3,10 @@
 Estes testes não olham código: olham a **ordem** das instruções. Existem porque
 o primeiro comando que alguém novo roda neste repositório reprovava, e por um
 motivo que a mensagem de erro não nomeava — o `./scripts/gate.sh` estava na
-seção *Rodando* e o `cp .env.example .env` só aparecia na *Configuração*, depois.
+seção de instalação e o `cp .env.example .env` só aparecia na *Configuração*,
+depois. Essa seção chamava-se *Rodando* e em 14/09/2026 virou *Instalando*, com
+os dois caminhos (usar e mexer no código) como subseções: é por isso que estes
+testes olham a `## Instalando` inteira, e não uma das duas.
 Quem lê de cima para baixo levava um `FAILED` sobre `RUCARD_HASH` e nenhuma
 pista de que faltava um passo que ainda nem tinha lido.
 
@@ -43,40 +46,40 @@ def bloco(titulo: str) -> str:
 
 
 def test_d1_o_readme_manda_criar_o_env_antes_do_gate():
-    rodando = bloco("Rodando")
-    i_cura = rodando.find(CURA)
-    i_gate = rodando.find("scripts/gate.sh")
+    instalando = bloco("Instalando")
+    i_cura = instalando.find(CURA)
+    i_gate = instalando.find("scripts/gate.sh")
 
     # As duas presenças são asserção própria, e não pressuposto: `find` devolve
     # -1 quando não acha, e -1 é menor que qualquer índice. Sem estas duas
     # linhas, um README que perdesse o `cp` passaria neste teste — o falso-verde
     # que o Invariante 6 proíbe, aqui na forma "comparei ausência com presença".
     assert i_cura != -1, (
-        f"a seção Rodando não traz {CURA!r}. Num clone limpo não existe `.env`, "
+        f"a seção Instalando não traz {CURA!r}. Num clone limpo não existe `.env`, "
         "e sem ele o gate reprova falando de RUCARD_HASH — que não é o passo "
         "que faltou."
     )
     assert i_gate != -1, (
-        "a seção Rodando não chama mais o `scripts/gate.sh`. Se o gate saiu "
+        "a seção Instalando não chama mais o `scripts/gate.sh`. Se o gate saiu "
         "daqui, este teste está medindo outra coisa."
     )
     assert i_cura < i_gate, (
-        "a seção Rodando manda rodar o gate antes de criar o `.env`. Quem lê de "
+        "a seção Instalando manda rodar o gate antes de criar o `.env`. Quem lê de "
         "cima para baixo reprova na primeira tentativa; a ordem no papel é a "
         "ordem em que os comandos são executados."
     )
 
 
 def test_d2_o_readme_nao_manda_preencher_o_token_para_o_gate():
-    rodando = bloco("Rodando")
+    instalando = bloco("Instalando")
 
     # Invariante 4: o token do Moodle é credencial pessoal. Um caminho de
     # "primeiros passos" que peça credencial para o commit passar transforma
     # colar segredo em pré-requisito de contribuir — e o gate é offline, não
     # precisa de token nenhum. O `.env.example` traz `MOODLE_TOKEN` vazio de
     # propósito, e D5 prova que vazio basta.
-    assert "MOODLE_TOKEN" not in rodando, (
-        "a seção Rodando pede o MOODLE_TOKEN. O gate roda offline e não toca a "
+    assert "MOODLE_TOKEN" not in instalando, (
+        "a seção Instalando pede o MOODLE_TOKEN. O gate roda offline e não toca a "
         "USP: exigir credencial pessoal aqui contraria o Invariante 4."
     )
 
