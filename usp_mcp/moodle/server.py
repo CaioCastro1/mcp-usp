@@ -20,6 +20,7 @@ import os
 from ..env import carregar_env
 from .arquivo import baixar_arquivo
 from .cliente import ClienteMoodle
+from .diagnostico import diagnostico
 from .erros import ErroMoodle
 from .material import material
 from .o_que_vence import o_que_vence
@@ -35,6 +36,7 @@ _URL_PADRAO = "https://edisciplinas.usp.br"
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
 _NOME_ARQUIVO = "baixar_arquivo"
+_NOME_DIAGNOSTICO = "diagnostico"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -163,6 +165,27 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_DIAGNOSTICO,
+            "description": (
+                "Diz se este servidor funciona no Moodle configurado, e o que "
+                "ele alcança por lá: nome do site, versão do Moodle, quantas "
+                "funções o seu token atinge e qual das ferramentas daqui está "
+                "disponível. Use quando alguma ferramenta falhar sem motivo "
+                "claro, ao configurar o servidor pela primeira vez, ou para "
+                "responder 'isso funciona no Moodle da minha faculdade?'. "
+                "Custa UMA chamada ao Moodle e não lê disciplina nem entrega "
+                "nenhuma. Exige token já configurado: para checar um site ANTES "
+                "de ter token, o caminho é `scripts/compatibilidade.sh`, que não "
+                "usa credencial."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -174,11 +197,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     porque "ferramenta não existe" e "ferramenta existe mas não achou nada"
     têm curas diferentes para quem lê o erro.
     """
-    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL, _NOME_ARQUIVO):
+    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL, _NOME_ARQUIVO, _NOME_DIAGNOSTICO):
         raise ErroMoodle(
             f"Ferramenta desconhecida: {nome!r}. As ferramentas expostas por "
-            f"este servidor são {_NOME_FERRAMENTA!r}, {_NOME_MATERIAL!r} e "
-            f"{_NOME_ARQUIVO!r}."
+            f"este servidor são {_NOME_FERRAMENTA!r}, {_NOME_MATERIAL!r}, "
+            f"{_NOME_ARQUIVO!r} e {_NOME_DIAGNOSTICO!r}."
         )
 
     if cliente is None:
@@ -195,6 +218,9 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
             token=os.environ.get("MOODLE_TOKEN", ""),
             url=os.environ.get("MOODLE_URL", _URL_PADRAO),
         )
+
+    if nome == _NOME_DIAGNOSTICO:
+        return diagnostico(cliente)
 
     if nome == _NOME_MATERIAL:
         return material(
@@ -254,7 +280,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
 
     from usp_mcp.adaptador import anotar
 
-    porta_vence, porta_material, porta_arquivo = listar_ferramentas()
+    porta_vence, porta_material, porta_arquivo, porta_diagnostico = listar_ferramentas()
     descritor = porta_vence
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -323,6 +349,20 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_arquivo["name"], description=porta_arquivo["description"]
     )(_baixar_arquivo)
 
+    def _diagnostico() -> str:
+        # Sem parâmetro nenhum, e é de propósito: a pergunta é sobre o site
+        # inteiro. `anotar` ainda é chamado para manter uma porta só de entrada
+        # do schema declarado — com `properties` vazio ele só fixa o retorno.
+        try:
+            return chamar_ferramenta(porta_diagnostico["name"], {})
+        except ErroMoodle as exc:
+            raise ToolError(str(exc)) from exc
+
+    anotar(_diagnostico, porta_diagnostico["inputSchema"], {})
+    servidor.tool(
+        name=porta_diagnostico["name"], description=porta_diagnostico["description"]
+    )(_diagnostico)
+
     servidor.run(transport="stdio")
 
 
@@ -381,10 +421,15 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_arquivo(disciplina: str, nome: str, todos: bool = False) -> str:
         return ""
 
+    @servidor.tool(name="diagnostico", description="verificação")
+    def _sonda_diagnostico() -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
         "baixar_arquivo": _sonda_arquivo,
+        "diagnostico": _sonda_diagnostico,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():
