@@ -20,6 +20,8 @@ Invariante 7 proíbe.
 """
 from __future__ import annotations
 
+from . import requisitos as _recorte
+
 # O nome da consulta NUNCA aparece nesta camada: quem o conhece é a política.
 # Uma ferramenta que aceite o nome da consulta como argumento deixa de ter
 # superfície, e a allowlist inteira vira decoração.
@@ -101,18 +103,23 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
     if curso is None:
         ficha["pre_requisito"] = None
         avisos.append(
-            "Pré-requisito não consultado: ele depende do curso, não só da "
-            "disciplina (§5.2 do recon). Informe o par (codcur, codhab) para "
-            "que eu busque."
+            "Pré-requisito não consultado por aqui: ele depende do currículo, "
+            "não só da disciplina. Use a ferramenta `requisitos` com a mesma "
+            "sigla — ela mostra TODOS os currículos de uma vez, sem precisar "
+            "de código de curso. Medido em 14/09: o código que a API deixa "
+            "descobrir é justamente o que devolve lista vazia aqui."
         )
     else:
         codcur, codhab = curso
         if codcur in _DISCREPANCIA_CODCUR:
             avisos.append(
-                f"O código de curso {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} "
-                "aparecem para a mesma habilitação em superfícies diferentes do "
-                "JupiterWeb. Relação entre os dois: não verificada (§5.1 do "
-                f"recon). Usei {codcur} como veio, sem traduzir."
+                f"O código {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} são o "
+                "mesmo curso em gerações diferentes de currículo — medido em "
+                "14/09, e não mais uma discrepância sem explicação. O que muda "
+                "entre eles: 3033 é quem tem a **grade** curricular (67 "
+                "disciplinas, 1º ao 5º semestre) e 3032 é quem tem os "
+                "**requisitos**; a grade de 3032 vem vazia. Usei "
+                f"{codcur} como veio, sem traduzir."
             )
         bruto = cliente.listar_requisito(coddis=sigla, codcur=codcur, codhab=codhab)
         ficha["pre_requisito"] = [
@@ -121,16 +128,122 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
                 "nome": r["nomdisreq"],
                 "tipo": r["tipreq"],
                 "grupo": r.get("numgrpreq"),
+                # `stamtrrcp="S"` é o que a página do JupiterWeb chama de
+                # "Requisito fraco": dá para matricular devendo. Ficou fora da
+                # fatia de 31/08 por não ter sido medido, e a ferramenta
+                # anunciava exigência dura onde não havia (§9, 14/09).
+                "fraco": r.get("stamtrrcp") == "S",
             }
             for r in bruto
         ]
         if not ficha["pre_requisito"]:
             avisos.append(
                 f"A consulta de requisito no curso {codcur}-{codhab} não trouxe "
-                "nenhuma linha. Isso pode significar que não há exigência, ou "
-                "que a disciplina não pertence a esse currículo — o JupiterWeb "
-                "não distingue os dois casos."
+                "nenhuma linha, e isso tem TRÊS causas possíveis — não duas. "
+                "Além de (a) não haver exigência e (b) a disciplina não "
+                "pertencer a esse currículo, há (c) o código ser de outra "
+                "geração do mesmo currículo: medido em 14/09, PTC3314 devolve "
+                "zero linha em 3033 e devolve PTC3213+PSI3213 em 3032, que são "
+                "o mesmo Ciclo Básico da Elétrica em gerações diferentes. A (c) "
+                "é a mais provável quando o código veio da lista de cursos de "
+                "ingresso. Use a ferramenta `requisitos` com a sigla: ela "
+                "mostra todos os currículos e dispensa o código."
             )
 
     ficha["avisos"] = avisos
     return ficha
+
+
+# --- a fatia de 14/09: o requisito pela sigla, não pelo curso ---------------
+
+# Zero currículo tem DUAS causas, e a página devolve a mesma coisa para as duas.
+# Ranquear uma delas foi o que a pergunta de aceite P8 pegou: MAT2453 é Cálculo
+# I, primeira do currículo, e recebia a explicação sobre ênfase e 7º semestre.
+_SEM_CURRICULO = (
+    "O JupiterWeb não lista nenhum currículo com exigência para {sigla}. Isso "
+    "tem duas causas possíveis, e desta página não dá para saber qual é: (a) a "
+    "disciplina realmente não exige nada — é o caso das primeiras do currículo, "
+    "como Cálculo I; ou (b) existe exigência e ela não está registrada aqui — "
+    "acontece da ênfase (7º semestre) e do módulo (9º) em diante, estruturas "
+    "que viram curso novo. NÃO conclua 'não precisa de nada' a partir deste "
+    "silêncio: se a disciplina for de meio ou fim de curso, confirme na "
+    "coordenação ou na grade do seu currículo."
+)
+
+_FORA_DO_INGRESSO = (
+    "{quantos} não {consta} na lista de cursos de ingresso. Isso pode ser "
+    "currículo de geração anterior, ênfase ou módulo — o JupiterWeb não "
+    "distingue os três, e eu não invento qual é."
+)
+
+_CURRICULO_VAZIO = (
+    "O currículo {codcur} aparece na página mas sem nenhuma linha de "
+    "exigência. Não li isso como 'não precisa de nada' — a página apenas não "
+    "traz registro para ele."
+)
+
+
+def requisitos(sigla: str, *, cliente) -> dict:
+    """O que é preciso ter feito antes desta disciplina, **por currículo**.
+
+    O parâmetro é a sigla, e só. A medição de 14/09 (§9) mostrou que pedir o
+    curso não funciona: o único `codcur` que a API deixa descobrir devolve zero
+    linha justamente para as disciplinas de 6º semestre em diante.
+
+    A resposta sai por currículo porque o tipo de exigência é propriedade do
+    currículo: MAT2454 é requisito duro em Minas e fraco em Elétrica.
+    """
+    sigla = normalizar_sigla(sigla)
+    blocos = _recorte.recortar(cliente.obter_requisitos(sigla))
+
+    avisos: list[str] = []
+    if not blocos:
+        return {
+            "sigla": sigla,
+            "curriculos": [],
+            "avisos": [_SEM_CURRICULO.format(sigla=sigla)],
+        }
+
+    # Uma consulta de pertencimento por família de código, não uma por bloco.
+    de_ingresso: set[str] = set()
+    for codcur in {b.codcur for b in blocos}:
+        de_ingresso |= cliente.cursos_de_ingresso(codcur)
+
+    curriculos = []
+    for b in blocos:
+        curriculos.append(
+            {
+                "codcur": b.codcur,
+                "curso": b.nome_curso,
+                "habilitacao": b.habilitacao,
+                "periodo": b.periodo,
+                "periodo_ideal": b.periodo_ideal,
+                "ingresso": b.codcur in de_ingresso,
+                "exigencias": [
+                    {
+                        "sigla": e.sigla,
+                        "nome": e.nome,
+                        "tipo": e.tipo,
+                        "rotulo": e.rotulo,
+                    }
+                    for e in b.exigencias
+                ],
+            }
+        )
+        if not b.exigencias:
+            avisos.append(_CURRICULO_VAZIO.format(codcur=b.codcur))
+
+    fora = sum(1 for c in curriculos if not c["ingresso"])
+    if fora:
+        avisos.append(
+            _FORA_DO_INGRESSO.format(
+                quantos=(
+                    "O único currículo listado"
+                    if len(curriculos) == 1
+                    else f"{fora} dos {len(curriculos)} currículos listados"
+                ),
+                consta="consta" if fora == 1 else "constam",
+            )
+        )
+
+    return {"sigla": sigla, "curriculos": curriculos, "avisos": avisos}

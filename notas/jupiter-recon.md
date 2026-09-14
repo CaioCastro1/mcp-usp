@@ -525,3 +525,26 @@ nenhuma requisição foi feita em nome dele. O `html-obterTurma-PSI3323.html` co
 professores e contagens de vagas/matriculados** de páginas públicas do catálogo; é o conteúdo
 em si, não um vazamento, mas fica o registro para quem for decidir sobre commit.
 O `cookies.txt` da sessão de captura foi **apagado** (Invariante 3).
+
+## 14/09/2026 — o JupiterWeb entrega DOIS cookies, não um
+
+Medido sem credencial, contra `webLogin.jsp` e `jupCarreira.jsp`. O §2 desta nota
+registrava só o `JSESSIONID`.
+
+```
+JSESSIONID=…;      Path=/jupiterweb;  HttpOnly            (sem Secure)
+UD_jupiterweb=…;   path=/;            secure;  httponly   (80 hex)
+```
+
+O segundo é entregue a visitante **anônimo**, então não é prova de sessão autenticada —
+pode ser identificador de dispositivo, pré-auth ou anti-CSRF. O que ele é de fato só se
+sabe com uma sessão logada, e está na Fase 1a do plano.
+
+**Por que isso importa antes de qualquer código:** eu havia afirmado, na conversa de
+14/09, que o cookie do Jupiter é `Path=/jupiterweb` e portanto não alcança outros sistemas
+do USP Digital. O `UD_jupiterweb` tem **`path=/`** — escopo de host. Nome e path discordam,
+e a afirmação tranquilizadora não se sustenta enquanto a discordância não for medida.
+
+**Nenhum dos dois traz `Max-Age` nem `Expires`**: morrem com o navegador. O timeout de
+inatividade do servidor continua **não medido** — 30 min é default do Tomcat, não fato
+deste deployment, e a distinção entre as duas coisas é o assunto do item 9 do `CLAUDE.md`.

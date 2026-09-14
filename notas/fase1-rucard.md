@@ -105,3 +105,40 @@ O que a segunda captura resolveu, e o que continua aberto:
 - Se algum RU já teve cardápio publicado num dia sem horário publicado (ou o inverso). As
   duas fontes concordaram nas duas capturas; o código declara o desacordo se ele aparecer,
   em vez de escolher um lado calado.
+
+## 14/09/2026 — existe auth pessoal alcançável no RUCard? Medido: não pelo web
+
+Motivo da medição: eu havia sugerido, na conversa de 14/09, que o RUCard fosse "a trilha
+mais promissora" para dado pessoal (saldo, extrato), por ter camada `servicos` de app —
+diferente do JupiterWeb, cujo `/jupiterweb/servicos` responde 404. **A sugestão não se
+sustenta.** Quatro requisições, sem credencial nenhuma, seguindo o código que o próprio
+site carrega (nunca adivinhando nome de endpoint, §4.6 do recon do Jupiter):
+
+| o que | resultado |
+|---|---|
+| `GET /rucard/` | 200, 12.468 B, **19 scripts** — `dwr/engine.js` e `dwr/util.js` entre eles |
+| `GET /rucard/webLogin.jsp` | 200, 12.995 B, **nenhuma interface DWR** carregada |
+| `GET /rucard/javascript/rucard-util.js` | 200, 10.034 B, **zero menção** a `servicos`, `hash`, `saldo` ou `extrato` |
+| `Set-Cookie` do web | `JSESSIONID=…; Path=/rucard; HttpOnly` |
+
+**Três achados:**
+
+1. **O site web do RUCard não usa a camada `/servicos`.** Ele é DWR, como o JupiterWeb. A
+   camada `servicos` — a que serve o cardápio com o hash de aplicação — é o backend do
+   **app móvel**, e o JS do web não a menciona em lugar nenhum. Descobrir como o app
+   autentica usuário exigiria ler o binário do app, que é outro tipo de trabalho e não foi
+   feito.
+2. **O login é o de sempre**: `<form action="autenticar">` com `codpes` + `senusu`, os
+   mesmos campos dos outros sistemas do USP Digital. Não é credencial própria do RUCard.
+3. **A sessão é `Path=/rucard`** — estreita, e da mesma forma que a do JupiterWeb
+   (`Path=/jupiterweb`). Ou seja: para saldo e extrato, o caminho alcançável hoje é **o
+   mesmo** do Jupiter, com o mesmo desenho e o mesmo risco. Não há token pessoal.
+
+**Correção explícita ao que eu disse na conversa:** "o RUCard talvez tenha auth de app e
+nem precise de sessão de navegador" era hipótese minha, não fato — e a medição a nega no
+caminho alcançável. O que restou dela é uma questão aberta de outro tamanho (ler o app), não
+um atalho.
+
+**Nota sobre superfície de escrita, para quando alguém desenhar isso:** o risco de um erro
+no RUCard logado não é menor que o do Jupiter, é **de outra natureza** — lá é matrícula,
+aqui é compra de crédito. Nenhum dos dois é lugar para POST por engano.

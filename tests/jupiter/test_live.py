@@ -66,3 +66,50 @@ def test_t40_skip_diz_o_motivo_por_escrito():
     assert "USP_MCP_LIVE=1" in MOTIVO
     assert "uspdigital" in MOTIVO
     assert len(MOTIVO) > 80
+
+
+# --- T74-T75: a página de requisitos, ao vivo (fatia de 14/09) --------------
+#
+# UMA requisição real a mais por execução, e ela é a que a fatia inteira
+# depende: o recorte é de HTML, e HTML muda sem aviso e sem versão.
+
+
+@ao_vivo
+def test_t74_a_pagina_de_requisitos_ainda_tem_a_forma_que_o_recorte_espera():
+    """Compara FORMA, não conteúdo: currículo, período ideal e tipo.
+
+    PTC3314 tem um currículo só (3032) e dois pré-requisitos — medido em
+    14/09. Se a USP mexer no layout, é aqui que aparece, e não em produção.
+    """
+    from usp_mcp.jupiter import requisitos as recorte
+
+    c = cliente.ClienteJupiter(cliente.transporte_http)
+    blocos = recorte.recortar(c.obter_requisitos("PTC3314"))
+
+    assert blocos, (
+        "a página de requisitos de PTC3314 não rendeu currículo nenhum. Ou a "
+        "USP mudou o layout, ou o registro sumiu — os dois pedem medição nova, "
+        "não conserto às cegas."
+    )
+    (bloco,) = blocos
+    assert bloco.codcur == "3032"
+    assert bloco.periodo_ideal == 6
+    assert {e.sigla for e in bloco.exigencias} == {"PTC3213", "PSI3213"}
+    assert all(e.tipo in recorte.TIPOS.values() for e in bloco.exigencias), (
+        "apareceu um tipo de exigência fora dos três mapeados em 14/09. O "
+        "mapeamento é de 3 pontos, não uma lei — meça antes de estender."
+    )
+
+
+@ao_vivo
+def test_t75_o_rotulo_cru_continua_sendo_um_dos_tres_conhecidos():
+    """O tipo traduzido sai de um rótulo em português que a USP escreve. Se ela
+    inventar um quarto, `desconhecido` aparece — e é melhor descobrir aqui."""
+    from usp_mcp.jupiter import requisitos as recorte
+
+    c = cliente.ClienteJupiter(cliente.transporte_http)
+    blocos = recorte.recortar(c.obter_requisitos("PSI3323"))
+
+    exigencia = blocos[0].exigencias[0]
+    assert exigencia.rotulo in recorte.TIPOS
+    assert exigencia.tipo == "correquisito"
