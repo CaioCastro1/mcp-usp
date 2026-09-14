@@ -75,6 +75,12 @@ python3 -m venv .venv && .venv/bin/python -m pip install -r requirements-dev.txt
 # Handshake stdio real com TODOS os servidores descobertos (offline; entra no gate)
 .venv/bin/python -m pytest tests/handshake
 
+# Este projeto funciona no Moodle de OUTRA faculdade? Uma requisicao, SEM credencial.
+# Sai 0 (transporte ok), 1 (servico mobile desligado no site) ou 2 (URL nao e raiz
+# de Moodle). Verde aqui NAO promete que as ferramentas respondem bem — ver §4 e §5
+# de notas/portabilidade-moodle.md.
+./scripts/compatibilidade.sh https://moodle.ggte.unicamp.br
+
 # Gate antes de commit: .env presente, segredo no git, cru ignorado, suíte offline. Não toca a rede.
 ./scripts/gate.sh
 
