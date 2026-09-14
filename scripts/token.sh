@@ -20,6 +20,13 @@
 # um link, e o endereco DESSE link e o token — "botao direito -> copiar endereco"
 # no lugar do DevTools. Leva ~20 s.
 #
+# Duas fricoes desse passo foram MEDIDAS numa passagem real de um segundo usuario
+# em 12/09/2026, e o passo 3 as trata: (a) a pagina tem tres elementos e nenhum
+# parece um token, entao o script cita o texto do link em voz alta e avisa para
+# NAO clicar nele — clicar tenta abrir o app e nao copia nada; (b) nao havia como
+# conferir o clipboard antes de entregar, entao o script confere sozinho e
+# reconhece o erro nº 1, que e colar a URL do proprio launch.php.
+#
 # `--auto` tenta antes a captura de scripts/_capturar_redirect.sh, que registra um
 # handler para um esquema nosso e recebe o redirect direto do navegador. Ela
 # funciona contra duble e NUNCA entregou contra a USP — por isso nao e o padrao.
@@ -174,9 +181,24 @@ fi
 if [ -z "$valor" ]; then
   titulo "2/7  (manual) abra esta URL no navegador LOGADO na Senha Unica"
   printf '\n   %s\n\n' "$url_manual"
-  nota "Com \`confirmed=1\` o Moodle nao redireciona: ele mostra uma pagina com um"
-  nota "link. O endereco DESSE link e o token. Clique nele com o botao direito e"
-  nota "escolha 'copiar endereco do link' — nao precisa de DevTools."
+  nota "Com \`confirmed=1\` o Moodle nao redireciona: ele mostra uma pagina, e o"
+  nota "ENDERECO de um dos links dela e o token — nao precisa de DevTools."
+  nota ""
+  # Qual link. A instrucao antiga dizia "o link" e a pagina tem tres coisas
+  # clicaveis: numa passagem real de um segundo usuario em 12/09/2026 o que foi
+  # para o clipboard foi a URL da propria pagina. Nada ali se parece com um
+  # token, e o texto do link certo promete ser um plano B dispensavel — por isso
+  # ele e citado em voz alta, e por isso os dois chamarizes sao nomeados para
+  # serem ignorados de proposito, em vez de ficarem de fora da instrucao.
+  nota "A pagina tem tres coisas, e so UMA interessa:"
+  nota "  caixa verde  'O seu cadastro foi confirmado'   -> ignore"
+  nota "  botao cinza  'Ambientes'                       -> ignore"
+  nota "  link azul    'Clique aqui se a aplicacao nao abrir automaticamente'"
+  nota "               -> E ESTE. O texto promete plano B e mente: e o unico"
+  nota "                  lugar da pagina onde o token existe."
+  nota ""
+  aviso "NAO CLIQUE nesse link. Clicar tenta abrir o app e nao copia nada."
+  nota "Botao DIREITO em cima dele -> 'Copiar endereco do link'. So isso."
   nota ""
   nota "Se a pagina nao aparecer e o navegador tentar abrir um app, ai o caminho e"
   nota "o DevTools (Cmd+Opt+I) -> aba Network -> a linha bloqueada para"
@@ -200,11 +222,49 @@ if [ -z "$valor" ]; then
       elif command -v xclip >/dev/null 2>&1; then valor=$(xclip -selection clipboard -o)
       else nota "sem pbpaste/wl-paste/xclip nesta maquina"
       fi
-      [ -n "$valor" ] && nota "li do clipboard ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
+      [ -n "$valor" ] && nota "li do clipboard."
     fi
   else
     valor=$(cat)   # pbpaste | ./scripts/token.sh
-    nota "li do stdin ($(printf '%s' "$valor" | wc -c | tr -d ' ') bytes)"
+    nota "li do stdin."
+  fi
+
+  # --------------------------- confere o clipboard ANTES de gastar a tentativa
+  # Fricao medida na mesma passagem de 12/09/2026: nao havia como olhar o que
+  # estava no clipboard antes de entregar. Da para fazer a mao com
+  # `pbpaste | cut -c1-21`, que mostra `moodlemobile://token=` e nada alem — mas
+  # quem esta SEGUINDO o script nao tem por que inventar esse comando, entao ele
+  # vira passo daqui. Custa zero e roda antes de qualquer decodificacao.
+  #
+  # O QUE PODE SER IMPRESSO, e isto e o Invariante 3 e nao estilo: no maximo o
+  # prefixo do esquema, e SO quando o valor comeca exatamente com ele. Tudo
+  # depois de `token=` e a credencial. Quando nao confere, a saida fala de forma
+  # — quantos bytes — e nunca dos bytes: um `cut -c1-21` incondicional num base64
+  # nu imprimiria 21 caracteres de token no scrollback.
+  #
+  # So existe no caminho manual. Na captura automatica o valor vem do navegador
+  # com o esquema NOSSO (`uspmcp://`), nao passa por clipboard nenhum, e conferir
+  # contra `moodlemobile://` ali daria alarme falso em toda rodada boa.
+  ESQUEMA='moodlemobile://token='
+  bytes=$(printf '%s' "$valor" | wc -c | tr -d ' ')
+  if [ "$(printf '%s' "$valor" | cut -c1-${#ESQUEMA})" = "$ESQUEMA" ]; then
+    nota "confere: comeca com \`$ESQUEMA\`, $bytes bytes no total."
+  else
+    aviso "o que chegou ($bytes bytes) NAO comeca com \`$ESQUEMA\`."
+    case "$valor" in
+      *launch.php*)
+        # O caso medido, e o unico em que da para afirmar o que aconteceu.
+        nota "Isto e a URL de IDA (a da pagina que voce abriu), e nao a de VOLTA."
+        nota "As duas sao URLs, e e por isso que se confundem; so a segunda"
+        nota "carrega o token."
+        nota "Volte a pagina, BOTAO DIREITO no link azul 'Clique aqui se a"
+        nota "aplicacao nao abrir automaticamente' -> 'Copiar endereco do"
+        nota "link', e rode este script de novo. Nao clique com o esquerdo."
+        nota "O .env NAO foi tocado."
+        exit 1 ;;
+    esac
+    nota "Colar so o base64, sem o esquema na frente, tambem vale — o passo 4/7"
+    nota "decide. Se nao for isso, refaca do passo 2."
   fi
 fi
 
