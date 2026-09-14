@@ -187,8 +187,13 @@ caminho, não de trabalho. Medido em 14/09/2026:
 O roteiro para medir isso está em
 `docs/superpowers/plans/2026-09-14-jupiter-sessao-recon.md`. Nada dele foi executado.
 
-Também não existem: aviso de professor, histórico de cardápio, saldo do cartão, horário,
-sala e vagas.
+Também não existem: histórico de cardápio, saldo do cartão, horário, sala e vagas.
+
+Aviso de professor passou a existir em 14/09, e cobre o que foi escrito no fórum da
+disciplina. Recado dado em sala e não postado não chega até lá, e nem o projeto nem o
+e-Disciplinas têm como saber dele. Quem escreveu cada tópico não sai na resposta: o fórum é
+o único lugar do e-Disciplinas em que a resposta traz nome de outras pessoas, e esses nomes
+param aqui.
 
 As notas que o projeto mostra são as que o professor lançou no e-Disciplinas, e só elas.
 Prova corrigida no papel, nota combinada em aula e o histórico oficial da USP não estão
