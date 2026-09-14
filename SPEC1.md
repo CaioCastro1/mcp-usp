@@ -2527,3 +2527,77 @@ curso e saldo do RUCard **não têm caminho público**. Todos exigem a área log
 oferece token — só sessão de navegador, com dois cookies (§ nota do recon de 14/09) e
 timeout não medido. Enquanto essa medição não acontecer, o projeto **não responde** essas
 perguntas, e é melhor dizer isso do que ter ferramenta que responde pela metade.
+
+### 14/09/2026 — o projeto vira pacote instalável, e são **três** entry points, não um
+
+O B1 do ROADMAP diz que "rodar fora do Claude Code" e o onboarding são o **mesmo**
+trabalho, e que o degrau que fecha os dois é publicar como pacote com entry point — o
+que o comparável `loyaniu/moodle-mcp` já faz (`[project.scripts] moodle-mcp =
+"moodle_mcp.server:main"`). Feito: `pyproject.toml` com `usp-mcp-jupiter`,
+`usp-mcp-moodle` e `usp-mcp-rucard`.
+
+**A decisão de desenho foi quantos entry points**, e a alternativa era um só com
+argumento de sistema, espelhando o `scripts/servidor.sh`. Perdeu por três motivos:
+
+1. Um entry point com argumento exige um **despachante novo em Python** que
+   reimplementa o que o lançador já faz — descobrir os sistemas pelo glob, recusar o
+   nome errado antes de subir o interpretador, citar os válidos na negativa. Passariam
+   a existir duas respostas para "quais sistemas existem", em duas linguagens. É o
+   molde exato do defeito do `[ -f .env ]`, que este §9 registra três vezes (gate,
+   `token.sh`, `ws.sh` — 12/09/2026).
+2. Os três `main()` já existem e já são exercitados **como processo real**
+   (`tests/handshake/`, L1/L2). Três console scripts apontando para eles custam **zero
+   linha de runtime nova**; o despachante custaria um módulo novo exatamente na casca
+   stdio — o lugar onde este projeto já teve um `main()` quebrado com a suíte verde
+   (31/08/2026).
+3. O nome do comando fica **idêntico ao `serverInfo.name`** que o servidor responde no
+   `initialize`. P4 trava a fórmula do lado do pacote; L2 já travava a do lado do fio.
+
+O preço de três é lembrar do quarto quando um quarto sistema nascer. Curado como o
+repo cura isso em todo lugar: **P1 deriva o conjunto esperado do glob
+`usp_mcp/*/server.py`** e reprova se a tabela divergir.
+
+**`pytest` não é dependência de runtime, e agora há teste dizendo isso.** O núcleo dos
+três sistemas é stdlib pura (31/08/2026) e é por isso que o import do SDK mora dentro
+de `main()`; `dependencies = ["mcp>=2,<3"]` e nada mais. P2 reprova se `pytest`
+aparecer e reprova se o `pyproject.toml` divergir do `requirements.txt` — que **não
+some**, porque os três `main()` citam `requirements.txt` pelo nome na mensagem de SDK
+ausente e há teste sobre essa frase.
+
+**O dado, medido à mão em venv limpo (Python 3.14.7, fora do checkout):**
+
+| passo | resultado |
+|---|---|
+| `pip install -e <checkout>` | `usp-mcp-0.1.0`, 28 pacotes, `mcp==2.2.0` |
+| `pytest` no venv de runtime | **ausente** (0 ocorrências em `pip list`) |
+| comandos criados | `usp-mcp-jupiter`, `usp-mcp-moodle`, `usp-mcp-rucard` |
+| `initialize` de `/tmp`, cliente MCP real | `usp-mcp-rucard` / `usp-mcp-jupiter` / `usp-mcp-moodle`, `version='0.1.0'` nos três |
+| `tools/list` de `/tmp` | `[bandejao]`, `[disciplina, requisitos]`, `[o_que_vence, material, baixar_arquivo, diagnostico]` |
+
+Nenhuma chamada à USP: o handshake para antes de `chamar_ferramenta`, que é onde mora
+qualquer credencial — a mesma razão pela qual esta camada roda no gate.
+
+**Um falso-verde foi achado escrevendo o próprio teste, e vale registrar porque a cura
+não é óbvia.** P6 localizava o console script por `Path(sys.executable).resolve().parent`.
+O `.venv/bin/python` é um **symlink** para o interpretador do sistema, então `.resolve()`
+sai do venv e aponta para um `bin/` que nunca teve os comandos — P6 pulava, dentro do
+ambiente onde ele é o único teste que verifica a instalação. Salvou o fato de o pulo ser
+`skipif` com motivo escrito, e não um `if` calado: apareceu como `sss` na primeira
+execução. A porta certa é `sysconfig.get_path("scripts")`.
+
+**O que isto NÃO fez, e é o §6.1:** o `.mcpb` continua não testado. O pacote é o degrau
+**anterior** a ele, não o substituto — as duas perguntas que travam o bundle (quanto
+atrito o runtime Python devolve numa máquina limpa, e onde o `"sensitive": true` do
+`user_config` guarda o valor) só se respondem com instalação real no Claude Desktop, e
+nenhuma delas fica mais perto por causa deste commit. Está no
+`docs/decisions/BACKLOG-correcoes.md`.
+
+**Também não medido, e o README diz isso com todas as letras:** `pipx`, `uvx` e instalar
+direto da URL do repositório. São portas que o `pyproject.toml` abre; "abre" e "foi
+usado" são coisas diferentes, que é a mesma distinção do item 9 do `CLAUDE.md`. Quem
+rodar primeiro, registre aqui.
+
+**Licença continua fora** (A1, adiado em 14/09 com "nenhuma por enquanto"). O
+`pyproject.toml` não declara nenhuma, de propósito e com o motivo escrito no arquivo:
+declarar uma seria decidir por conta própria o que voltou para o dono. O A1 já registra
+que empacotar torna a lacuna mais visível, não menos.

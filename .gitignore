@@ -14,3 +14,10 @@ fixtures/jupiter/html-obterTurma-*.html
 .venv/
 .pytest_cache/
 __pycache__/
+
+# Subprodutos de `pip install -e .` e de build do pacote (pyproject.toml). O
+# .egg-info nasce DENTRO da árvore no instalável-editável, então sem esta linha
+# todo `pip install -e .` suja o `git status` de quem instalou.
+*.egg-info/
+build/
+dist/

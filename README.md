@@ -52,9 +52,13 @@ a USP.
 histórico de cardápio, saldo do cartão, horário, sala ou vagas. `material` diz o nome, o
 tipo e o tamanho de cada arquivo, mas **não** emite a URL interna dele: endereço sem a
 credencial não abre, e é `baixar_arquivo` que resolve isso sem nunca pôr o token numa URL.
-Instalar continua sendo `git clone` + venv: empacotar como MCP Bundle (`.mcpb`) está
-pesquisado no §6.1 e **não** testado. Nenhuma ferramenta nasce por conveniência: o
-critério está no §5, e as questões abertas do §4 fecham com dado registrado no §9.
+Instalar deixou de ser `git clone` + venv: o projeto é um **pacote com um entry point
+por servidor** — `usp-mcp-moodle`, `usp-mcp-jupiter`, `usp-mcp-rucard` —, e os três sobem
+de qualquer pasta, sem checkout na frente. Verificado em 14/09/2026 num venv limpo, com
+cliente MCP real a partir de `/tmp`. Empacotar como MCP Bundle (`.mcpb`) segue **não**
+testado: ele está pesquisado no §6.1 por leitura de documentação, e é o degrau *seguinte*
+a este. Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
+abertas do §4 fecham com dado registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
 tomada, com o dado que a fechou e o que foi descartado.
@@ -70,10 +74,16 @@ tomada, com o dado que a fechou e o que foi descartado.
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+.venv/bin/python -m pip install -e ".[dev]"
 cp .env.example .env
 ./scripts/gate.sh
 ```
+
+O `-e ".[dev]"` substitui os dois `-r` de antes e entrega uma coisa a mais: além do SDK e
+do `pytest`, ele põe `usp-mcp-moodle`, `usp-mcp-jupiter` e `usp-mcp-rucard` em
+`.venv/bin/`. O `-e` aponta para **este checkout**, então editar o código muda o que os
+comandos sobem, sem reinstalar. Os `requirements*.txt` continuam válidos e instalam o
+mesmo — menos os três comandos, que são o ponto.
 
 O `cp` vem **antes** do gate porque sem `.env` ele reprova: a hash do RUCard é o único
 valor que o gate precisa, e ela já vem preenchida no exemplo — é a chave embutida no
@@ -84,6 +94,42 @@ toca a USP. Para de fato usar o servidor do Moodle, veja *Configuração*.
 O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
 MCP neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e é
 o script que resolve a raiz do checkout — não o cliente.
+
+### Sem checkout: o pacote instalado
+
+O bloco acima é o caminho de quem vai **mexer no código**. Quem só quer usar não precisa
+de venv nem de `cd` em lugar nenhum: instale o pacote e chame o comando.
+
+```bash
+pipx install <CAMINHO-OU-URL-DO-REPOSITORIO>
+usp-mcp-rucard   # sobe o servidor stdio; ele fala JSON-RPC, não tem prompt
+```
+
+E o cliente MCP aponta para o comando, sem `args` e sem caminho de projeto:
+
+```json
+{
+  "mcpServers": {
+    "usp-rucard": { "command": "usp-mcp-rucard" },
+    "usp-jupiter": { "command": "usp-mcp-jupiter" },
+    "usp-moodle": { "command": "usp-mcp-moodle" }
+  }
+}
+```
+
+São **três comandos e não um com argumento** de propósito: o nome de cada um é o mesmo
+`serverInfo.name` que o servidor responde no `initialize`, e o porquê está escrito no
+`pyproject.toml`, ao lado da tabela.
+
+**O que foi medido e o que não foi.** Medido em 14/09/2026: `pip install -e` num venv
+limpo, e os três comandos subindo a partir de `/tmp`, com cliente MCP real, cada um se
+anunciando com o próprio nome. **Não** medidos: `pipx`, `uvx` e instalar direto da URL do
+repositório. São as portas que o `pyproject.toml` abre, e a distinção entre "abre" e
+"foi usado" é a mesma que o §6.1 faz sobre o `.mcpb` — quem rodar primeiro, registre.
+
+Este caminho **não** dispensa a *Configuração* abaixo: o pacote traz o código, não o
+`.env`. E ele não substitui o `scripts/servidor.sh`, que segue sendo como o `.mcp.json`
+versionado sobe os servidores deste checkout.
 
 ### Cliente que não faz `cd`
 
@@ -135,8 +181,14 @@ credencial a ninguém.
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
 python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt
+.venv/bin/python -m pip install -e ".[dev]"
 ```
+
+O `-e` instala o pacote **apontando para este checkout**: nada é copiado para o
+site-packages, editar o código muda o que roda, e `usp-mcp-moodle`, `usp-mcp-jupiter` e
+`usp-mcp-rucard` passam a existir em `.venv/bin/`. Os passos 2 a 4 abaixo usam o
+checkout, então ele continua sendo o caminho daqui — quem só quer usar o servidor pode
+pular o clone inteiro, ver *Sem checkout: o pacote instalado*.
 
 **2. Pegue seu token do e-Disciplinas.** Um comando, com o navegador logado na Senha Única:
 
