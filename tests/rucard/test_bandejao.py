@@ -497,3 +497,34 @@ def test_r43d_semana_nao_e_um_dia_e_a_funcao_diz_isso():
     with pytest.raises(ErroRucard) as exc:
         ferramentas.resolver_dia("semana", hoje=QUARTA)
     assert "bandejao_semana" in str(exc.value)
+
+
+# --- R44: o restaurante como a pessoa fala -----------------------------------
+
+
+def test_r44_restaurante_por_nome_ou_por_id():
+    assert ferramentas.resolver_restaurantes(["Prefeitura", "6", "fisica"]) == ["7", "6", "8"]
+    assert ferramentas.resolver_restaurantes(["Químicas", "quimicas", "9"]) == ["9"]
+    assert ferramentas.resolver_restaurantes(["PUSP-CB", "pusp"]) == ["7"]
+    assert ferramentas.resolver_restaurantes(None) == ["6", "7", "8", "9"]
+    assert ferramentas.resolver_restaurantes([]) == ["6", "7", "8", "9"]
+
+
+def test_r44b_nome_desconhecido_e_erro_legivel_citando_os_quatro():
+    with pytest.raises(ErroRucard) as exc:
+        ferramentas.resolver_restaurantes(["each"])
+    for palavra in ("each", "central", "prefeitura", "fisica", "quimicas"):
+        assert palavra in str(exc.value)
+
+
+def test_r44c_bandejao_aceita_o_nome_e_so_pede_aquele_ru(chamar):
+    resposta, transporte = chamar(restaurantes=["prefeitura"], refeicao="almoco")
+    assert [ru["id"] for ru in resposta["restaurantes"]] == ["7"]
+    assert transporte.rotas() == ["restaurants", "menu/7"]
+
+
+def test_r44d_o_enum_declarado_e_exatamente_a_lista_de_nomes():
+    assert ferramentas.NOMES_RU == ("central", "prefeitura", "fisica", "quimicas")
+    assert set(ferramentas.ALIASES_RU.values()) == set(ferramentas.NOMES_RU_PARA_ID.values())
+    for nome in ferramentas.NOMES_RU:
+        assert nome in ferramentas.ALIASES_RU
