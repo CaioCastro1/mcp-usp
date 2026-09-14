@@ -27,6 +27,21 @@ médio; extrair o texto no servidor perderia as figuras — e devolveria 9 bytes
 lista manuscrita escaneada, chamando isso de sucesso (§9, 01/09 e 03/09). O arquivo cai
 em `~/.cache/usp-mcp/moodle/`, fora do repositório.
 
+### O que o projeto não responde, e por quê
+
+**Nota, histórico escolar, evolução do curso e saldo do RUCard ficam de fora** — não por
+falta de trabalho, por falta de caminho. Medido em 14/09:
+
+- A superfície pública estruturada do JupiterWeb é o **catálogo de entrada**: a grade
+  curricular dos cursos de ingresso da Poli para no 5º semestre (medido em quatro cursos),
+  e da ênfase (7º) e do módulo (9º) em diante não há grade, requisito nem código de curso
+  alcançável.
+- Dado pessoal exige a área logada, que **não oferece token** como o Moodle: só sessão de
+  navegador, com dois cookies e timeout de inatividade ainda não medido.
+
+O roteiro para medir isso, com as regras que valem desde a primeira requisição, está em
+`docs/superpowers/plans/2026-09-14-jupiter-sessao-recon.md`. Nada dele foi executado.
+
 O Moodle é entrypoint **local** por carregar credencial pessoal; o Jupiter e o RUCard não
 usam credencial nenhuma e por isso seguem candidatos a servidor hospedado (§6 do
 `SPEC1.md`). Suíte: testes offline em segundos — incluindo um handshake stdio que sobe
