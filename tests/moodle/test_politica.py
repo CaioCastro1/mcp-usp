@@ -345,3 +345,104 @@ def test_p5_a_allowlist_e_so_de_leitura():
         "prefixo é novo, a entrada dela é decisão de §9 — e o prefixo entra "
         "aqui junto, com o motivo. Se é de escrita, o Invariante 1 já a nega."
     )
+
+
+# --------------------------------------------------------------------------
+# T11-T12 — a auditoria de 14/09/2026, virada teste.
+#
+# O §2.2 nasceu de uma leitura do catálogo; em 14/09 as 447 funções que o
+# e-Disciplinas libera ao token foram varridas por verbo de escrita (57
+# candidatas) e classificadas contra as categorias que o próprio §2.2 usa.
+# Quinze caíam dentro delas e estavam FORA da lista.
+#
+# A allowlist as negava por omissão — primeira linha, e ela funcionou. O §2.2 é
+# a segunda, e o arquivo diz por quê: "garante que um erro futuro na allowlist
+# ainda não libere um destes nomes". Uma segunda linha com buraco é uma segunda
+# linha que ninguém sabe que não está lá.
+#
+# As duas listas abaixo são o registro da classificação. A primeira TEM de estar
+# bloqueada; a segunda é o que foi olhado e deliberadamente deixado fora, com o
+# motivo. Função de escrita nova que apareça no site e não esteja em nenhuma das
+# duas é trabalho não feito, não silêncio.
+# --------------------------------------------------------------------------
+
+# Medidas vivas no token em 14/09/2026, e dentro das categorias do §2.2.
+ESCRITAS_EM_NOME_DO_ALUNO = (
+    # respondem/entregam em atividade que não é `assign`
+    "mod_choice_submit_choice_response",
+    "mod_choicegroup_submit_choicegroup_response",
+    "mod_feedback_process_page",
+    "mod_questionnaire_submit_questionnaire_response",
+    # queimam tentativa
+    "mod_feedback_launch_feedback",
+    "mod_scorm_launch_sco",
+    # publicam conteúdo assinado pelo usuário
+    "mod_data_add_entry",
+    "mod_glossary_add_entry",
+    "core_blog_add_entry",
+    # falam com terceiros em nome do usuário
+    "core_comment_add_comments",
+    "core_rating_add_rating",
+    "core_notes_create_notes",
+    "core_message_create_contact_request",
+    # afirmam progresso que o usuário não fez
+    "core_completion_mark_course_self_completed",
+    "core_completion_update_activity_completion_status_manually",
+)
+
+# Escritas que a auditoria olhou e NÃO bloqueou, com o motivo. Ficar fora é
+# decisão registrada, não esquecimento — e escrever isso aqui é o que impede a
+# próxima varredura de reabrir as mesmas quinze perguntas.
+ESCRITAS_FORA_DE_ESCOPO = {
+    # Capacidade de professor/monitor. A conta de aluno não as alcança, e o §2.2
+    # trata do uso indevido da conta de quem roda isto. Se um dia o projeto
+    # servir conta com permissão de correção, elas entram — é decisão de §9.
+    "mod_assign_save_grade": "nota — capacidade de quem corrige",
+    "mod_assign_save_grades": "nota — capacidade de quem corrige",
+    "mod_assign_submit_grading_form": "nota — capacidade de quem corrige",
+    "mod_assign_save_user_extensions": "prazo — capacidade de quem corrige",
+    "mod_diary_save_feedback": "nota — capacidade de quem corrige",
+    "mod_journal_save_feedback": "nota — capacidade de quem corrige",
+    # Escrevem no calendário PESSOAL, sem alcançar entrega nem terceiro.
+    "core_calendar_create_calendar_events": "agenda pessoal",
+    "core_calendar_submit_create_update_form": "agenda pessoal",
+    "core_calendar_update_event_start_day": "agenda pessoal",
+    # Conta e dados pessoais do próprio usuário, sem efeito acadêmico.
+    "core_user_add_user_device": "registro de dispositivo",
+    "core_user_add_user_private_files": "área privada do próprio usuário",
+    "tool_dataprivacy_create_data_request": "pedido de dados do próprio usuário",
+    # Emissão de certificado é consequência de conclusão, não caminho para ela;
+    # a conclusão em si está bloqueada acima.
+    "mod_simplecertificate_create_issue": "derivada da conclusão, que está bloqueada",
+}
+
+
+@pytest.mark.parametrize("funcao", ESCRITAS_EM_NOME_DO_ALUNO)
+def test_t11_escrita_em_nome_do_aluno_esta_no_bloqueio_permanente(funcao):
+    """T11 — a segunda linha cobre o que a auditoria de 14/09 encontrou.
+
+    Reprovava para as quinze antes da correção: elas existem no site, escrevem
+    em nome de quem roda isto, e o §2.2 não as nomeava.
+    """
+    assert funcao in politica.BLOQUEIO_PERMANENTE, (
+        f"{funcao} escreve em nome do usuário e não está no §2.2. A allowlist a "
+        "nega por omissão, mas o bloqueio permanente é a camada que sobrevive a "
+        "um engano na allowlist — e é onde o motivo fica escrito."
+    )
+
+
+def test_t12_a_classificacao_da_auditoria_nao_se_sobrepoe():
+    """T12 — nenhum nome está nas duas listas ao mesmo tempo.
+
+    Sobreposição aqui significaria que a mesma função foi classificada como
+    "tem de bloquear" e "decidimos não bloquear", e a próxima pessoa não saberia
+    qual das duas leituras vale.
+    """
+    ambos = set(ESCRITAS_EM_NOME_DO_ALUNO) & set(ESCRITAS_FORA_DE_ESCOPO)
+    assert not ambos, f"classificadas nos dois lados: {sorted(ambos)}"
+
+    fora_mas_bloqueadas = set(ESCRITAS_FORA_DE_ESCOPO) & politica.BLOQUEIO_PERMANENTE
+    assert not fora_mas_bloqueadas, (
+        f"{sorted(fora_mas_bloqueadas)} estão no §2.2 mas a auditoria as declara "
+        "fora de escopo. Uma das duas leituras mudou e a outra não acompanhou."
+    )
