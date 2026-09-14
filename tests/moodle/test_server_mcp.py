@@ -16,10 +16,20 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — três ferramentas. Cada crescimento é decisão registrada no §9:
-    a segunda (`material`) em 31/08, a terceira (`baixar_arquivo`) em 01/09."""
+    """T42 — quatro ferramentas. Cada crescimento é decisão registrada no §9:
+    `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico` em 14/09.
+
+    A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
+    quarta a passar por aqui — é este teste que transforma "acrescentei uma
+    ferramenta" em decisão declarada em vez de efeito colateral.
+    """
     fs = server.listar_ferramentas()
-    assert [f["name"] for f in fs] == ["o_que_vence", "material", "baixar_arquivo"]
+    assert [f["name"] for f in fs] == [
+        "o_que_vence",
+        "material",
+        "baixar_arquivo",
+        "diagnostico",
+    ]
 
 
 def test_o_nome_vem_da_pergunta_nao_da_funcao_do_moodle():
