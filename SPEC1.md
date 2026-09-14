@@ -2601,3 +2601,17 @@ rodar primeiro, registre aqui.
 `pyproject.toml` não declara nenhuma, de propósito e com o motivo escrito no arquivo:
 declarar uma seria decidir por conta própria o que voltou para o dono. O A1 já registra
 que empacotar torna a lacuna mais visível, não menos.
+
+### 14/09/2026 — `requisitos` agrupa currículos com a mesma combinação
+
+Medido em `formatar_requisitos` sobre a fixture de MAT2455: 6.238 B, 23 blocos, 18 deles
+com exatamente as mesmas duas linhas. Agrupando pelo conjunto exato de (sigla, nome, tipo,
+rótulo): **4 combinações** — 13 currículos com MAT2454+MAT3458 fraco, 7 do piloto com
+2000101, 2 com MAT2454+MAT2458 fraco, e o 3250 sozinho com as mesmas siglas como requisito
+DURO. Texto agrupado: 2.458 B (2,5× menor). PSI3323 (1 currículo): 437 → 408 B.
+
+**Decisão:** só formatação. A projeção continua por currículo; o texto sai por combinação,
+com cada currículo numa linha (código, habilitação, período, período ideal, marca de
+ingresso). O agrupamento preserva por construção o que o desenho de 14/09 protege — o tipo
+é propriedade do currículo — porque o tipo está na chave. Teto: 3.500 B (T82). Testes
+T81–T82d; T70–T72 não precisaram mudar.
