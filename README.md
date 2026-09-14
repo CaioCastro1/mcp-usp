@@ -16,6 +16,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | Pergunta que você faz | Onde ele busca |
 |---|---|
 | "O que tem no bandejão hoje, na sexta ou na semana inteira?" | Cardápio dos quatro restaurantes, com horário e preço |
+| "Quais matérias eu tenho?" | Suas disciplinas no e-Disciplinas: as do semestre primeiro, com a sigla que as outras perguntas usam |
 | "O que eu tenho para entregar essa semana?" | Tarefas e questionários do e-Disciplinas, com prazo |
 | "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
@@ -201,6 +202,12 @@ ali, e nenhuma soma que o projeto fizesse seria a sua média de verdade. O comen
 escrito do professor também não sai: a resposta avisa quando existe um para você ler na
 página da disciplina.
 
+A lista de disciplinas é a do e-Disciplinas, e o e-Disciplinas não é a sua matrícula
+oficial. O que separa uma matéria "em andamento" de uma encerrada ali são as datas que o
+professor declarou no espaço da disciplina: trancamento e cancelamento não chegam até lá, e
+uma matéria sem data declarada aparece à parte, dizendo que não dá para saber. Matéria de
+semestre passado continua na lista, com a sigla, porque você ainda pergunta sobre ela.
+
 "Já entreguei o EP1?" responde só sobre tarefa. Questionário não entra, e prova marcada só
 no quadro da sala não existe em sistema nenhum. A resposta diz isso quando você pergunta.
 
@@ -257,15 +264,16 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, onze ferramentas. Comunicação por
+Três servidores MCP, doze ferramentas. Comunicação por
 stdio, JSON-RPC, um processo por servidor. Nove delas foram exercitadas contra a USP de
-verdade; `avisos` e `o_que_mudou` são de 14/09 e até agora só rodaram contra resposta
-escrita à mão.
+verdade; `avisos`, `o_que_mudou` e `disciplinas` são de 14/09 e ainda não rodaram contra a
+USP. As duas primeiras nasceram contra resposta escrita à mão; `disciplinas` nasceu contra
+a resposta real capturada em agosto, que é outra coisa e ainda não é uso ao vivo.
 
 | Servidor | Ferramentas |
 |---|---|
 | `usp-rucard` | `bandejao` |
-| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de

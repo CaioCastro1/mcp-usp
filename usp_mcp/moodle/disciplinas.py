@@ -1,8 +1,19 @@
-"""Resolução sigla → `courseid`, e o cache que impede martelar a USP por isso.
+"""As suas matrículas: a resolução sigla → `courseid`, e a ferramenta que as mostra.
 
-O modelo recebe "PSI3323" de quem pergunta; o Moodle só entende `courseid`. Esta
-tradução é a razão de a fatia de material custar três funções e não uma, e vale
-registrar o preço medido, porque ele é o que justifica o cache:
+Este módulo nasceu só como tradutor — o modelo recebe "PSI3323" e o Moodle só
+entende `courseid` — e ganhou a ferramenta `disciplinas` em 14/09/2026, na mesma
+casa e de propósito: **a lista que responde "quais matérias eu tenho?" é a mesma
+que `carregar` já busca e já cacheia para resolver sigla.** Nenhuma função nova
+entrou na allowlist por causa dela, e a segunda pergunta não gasta chamada
+nenhuma. Separá-la em outro módulo teria criado um segundo caminho para a mesma
+lista, que é como um cache vira dois caches que discordam.
+
+Antes dela, o único jeito de alguém ver as próprias siglas era **provocar um
+erro**: pedir `material` de uma sigla que não existe e ler a lista que o
+Invariante 7 faz `resolver` cuspir no motivo. Funcionava, e é constrangedor.
+
+A tradução é a razão de a fatia de material custar três funções e não uma, e
+vale registrar o preço medido, porque ele é o que justifica o cache:
 
 | | cru | projetado |
 |---|---|---|
@@ -17,13 +28,19 @@ O `userid` é derivado do token, nunca configurado: §9 de 28/08 mediu que
 `get_users_courses` com userid errado devolve `[]` com HTTP 200, que é a falha
 silenciosa que o Invariante 6 proíbe. O modo perigoso é o valor errado, não o
 ausente — por isso não há como passá-lo à mão por aqui.
+
+**A decisão de desenho da ferramenta está em `minhas_disciplinas`**, no fim do
+arquivo: o que fazer com as dezenas de matrículas de semestre passado que a
+resposta traz junto com as do semestre corrente.
 """
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from datetime import datetime
 
 from .erros import ErroMoodle
+from .projecao import FUSO_SAO_PAULO, data_de
 from .texto import normalizar as _normalizar
 
 # Um semestre. Matrícula não muda entre duas perguntas sobre material.
@@ -36,10 +53,24 @@ _SEPARADOR = "-"
 
 @dataclass(frozen=True)
 class Disciplina:
+    """`inicio` e `fim` entraram em 14/09 com a ferramenta, e são os dois únicos
+    campos que a projeção guarda sem precisar para resolver sigla.
+
+    Custam ~16 B por matrícula e são o que permite responder "quais matérias eu
+    tenho AGORA" sem uma segunda chamada: sem eles a única saída seria adivinhar
+    o semestre pelo sufixo do `shortname`, e o `shortname` real tem 23 formatos
+    diferentes nesta conta (de `PSI3323-2026` a `AEX-IF-00020.01`).
+
+    Ausentes por default porque `enddate: 0` existe de verdade na resposta do
+    e-Disciplinas — e "não declarado" não é "encerrada" (DI7).
+    """
+
     courseid: int
     sigla: str
     rotulo: str
     nome: str
+    inicio: datetime | None = None
+    fim: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -56,10 +87,12 @@ class Resolucao:
 
 
 def projetar_disciplinas(bruto) -> list[Disciplina]:
-    """29 chaves por disciplina viram 3. As outras 26 não resolvem sigla nenhuma.
+    """29 chaves por disciplina viram 5. As outras 24 não respondem nada daqui.
 
     `summary`, `courseimage`, `overviewfiles` e `progress` respondem por quase
-    todo o payload e por nada da pergunta.
+    todo o payload e por nada da pergunta. `courseimage` é ainda uma URL de
+    `pluginfile.php`, a família de endereço que o Invariante 3 mantém fora de
+    toda resposta deste servidor.
     """
     lista = []
     for curso in bruto or ():
@@ -70,6 +103,8 @@ def projetar_disciplinas(bruto) -> list[Disciplina]:
                 sigla=_normalizar(rotulo.split(_SEPARADOR)[0]),
                 rotulo=rotulo,
                 nome=curso.get("fullname") or "",
+                inicio=data_de(curso.get("startdate")),
+                fim=data_de(curso.get("enddate")),
             )
         )
     return lista
@@ -197,3 +232,245 @@ def userid_do_token(cliente, agora=None) -> int:
     """
     carregar(cliente, agora=agora)
     return _cache.userid
+
+
+# --------------------------------------------------------------------------
+# A ferramenta `disciplinas`: "quais matérias eu tenho?"
+#
+# Ela mora aqui, e não num módulo próprio, porque a lista que responde a
+# pergunta é a MESMA que `carregar` cacheia para resolver sigla. Um módulo
+# separado teria de ou reimportar `carregar` (e então este comentário estaria lá
+# em vez de aqui) ou abrir um segundo caminho até `core_enrol_get_users_courses`
+# — que é como um cache vira dois caches que discordam.
+# --------------------------------------------------------------------------
+
+EM_ANDAMENTO = "em andamento"
+A_COMECAR = "a começar"
+ENCERRADA = "encerrada"
+SEM_PERIODO = "sem período"
+
+
+@dataclass(frozen=True)
+class RespostaDisciplinas:
+    """Saída da ferramenta. As contagens saem daqui e não do texto porque quem
+    chama (a fronteira MCP, e o teste) não deveria ter de reabrir a prosa para
+    saber quantas matrículas foram resumidas."""
+
+    texto: str
+    total: int
+    em_andamento: int
+    encerradas: int
+    sem_periodo: int
+    vazio_por: str | None = None
+
+
+def situacao_de(disciplina: Disciplina, momento: datetime) -> str:
+    """Em que pé está uma matrícula, pelas datas que o e-Disciplinas declara.
+
+    Quatro desfechos e não dois, e os dois extras não são zelo:
+
+    - `enddate: 0` chega na resposta real (duas das 74 matrículas da fixture),
+      e chamar isso de encerrada seria inventar um fato sobre a vida acadêmica
+      de quem pergunta. "Não declarado" vira bloco próprio (DI7).
+    - matrícula para o semestre que vem existe antes de o semestre começar, e
+      ela não está em andamento nem encerrada (DI15).
+    """
+    if disciplina.fim is None:
+        return SEM_PERIODO
+    if disciplina.fim <= momento:
+        return ENCERRADA
+    if disciplina.inicio is not None and disciplina.inicio > momento:
+        return A_COMECAR
+    return EM_ANDAMENTO
+
+
+def _dia(quando: datetime | None) -> str:
+    """"03/08/2026" — e o ANO aqui não é excesso.
+
+    `texto.formatar_data` escreve prazo ("dom 06/09 23:59") e omite o ano de
+    propósito, porque prazo é de agora. Isto é vigência de matrícula, e uma
+    lista que cobre sete anos sem o ano não localiza nada: PMT3100 de 2023 e
+    PMT3100 de 2024 ficariam idênticas. São grafias diferentes porque são
+    coisas diferentes — J18 pede uma grafia só para a MESMA coisa.
+    """
+    return quando.strftime("%d/%m/%Y") if quando is not None else "?"
+
+
+def _periodo(disciplina: Disciplina) -> str:
+    return f"{_dia(disciplina.inicio)} a {_dia(disciplina.fim)}"
+
+
+def _linha_completa(disciplina: Disciplina) -> str:
+    # Sigla primeiro porque é ela que se digita na próxima pergunta; o rótulo
+    # ao lado porque é ele que desambigua duas matrículas da mesma sigla.
+    nome = f" — {disciplina.nome}" if disciplina.nome else ""
+    return f"  {disciplina.sigla} ({disciplina.rotulo}){nome} — {_periodo(disciplina)}"
+
+
+def _bloco_compacto(disciplinas) -> list[str]:
+    """As encerradas, agrupadas pelo ano em que terminaram, só o rótulo.
+
+    O rótulo e não a sigla: `PSI3322-2026` e `PSI3322-2026-REOF` são duas
+    matrículas da MESMA sigla, e uma lista deduplicada por sigla esconderia uma
+    delas — o corte é de detalhe, nunca de existência.
+    """
+    por_ano: dict[int, list[str]] = {}
+    for d in disciplinas:
+        por_ano.setdefault(d.fim.year, []).append(d.rotulo)
+    return [
+        f"  {ano}: " + ", ".join(sorted(rotulos))
+        for ano, rotulos in sorted(por_ano.items(), reverse=True)
+    ]
+
+
+_COMO_USAR = (
+    "Para perguntar sobre uma delas, use a SIGLA (a parte antes do primeiro "
+    "'-'): `material`, `notas`, `avisos`, `ja_entreguei` e `o_que_mudou` "
+    "aceitam a sigla."
+)
+
+_DE_ONDE_SAI = (
+    "'Em andamento' sai das datas que o e-Disciplinas declara para o espaço da "
+    "disciplina, e não da sua matrícula oficial: trancamento e cancelamento "
+    "não chegam até aqui, e uma disciplina que o professor não datou cai no "
+    "bloco sem período. A matrícula oficial é o JupiterWeb, que este servidor "
+    "não alcança com dado pessoal."
+)
+
+
+def minhas_disciplinas(
+    cliente, todas: bool = False, momento=None
+) -> RespostaDisciplinas:
+    """"Quais matérias eu tenho?" — e o que fazer com as de anos atrás.
+
+    **A decisão.** A conta do dono tem dezenas de matrículas e só um punhado é
+    do semestre corrente (74 e 10 na fixture real de 31/08; 45 ao vivo em
+    14/09 — os dois números discordam e nenhum dos dois muda o desenho). Quem
+    pergunta "quais matérias eu tenho" está perguntando do agora: despejar a
+    lista inteira com nome e período faria a resposta certa ficar enterrada em
+    dezenas de linhas de semestres que já acabaram, e um modelo lendo isso
+    escolhe a errada.
+
+    O que foi recusado, e por quê:
+
+    - **Filtrar as antigas fora.** Seria o corte mais limpo de ler e o único
+      que quebra o Invariante 7: a matrícula antiga sumiria da resposta, e
+      perguntar "e PMT3100?" devolveria "não achei" — que é indistinguível de
+      "você não cursou". Fora.
+    - **Paginar com teto.** Teto é a ferramenta certa quando o custo cresce com
+      o tamanho (`ja_entreguei` paga uma chamada por entrega). Aqui a lista já
+      está em memória, cacheada, e paginá-la cobraria uma segunda pergunta por
+      um dado que já foi buscado.
+
+    O que ficou: **corte de DETALHE, nunca de EXISTÊNCIA.** As do semestre
+    corrente saem completas; as encerradas saem só com o rótulo, agrupadas pelo
+    ano em que terminaram; e o corte é declarado com o parâmetro que o desfaz
+    (`todas`). Nenhuma matrícula some da resposta em nenhum modo.
+
+    `momento` é um DATETIME (o instante da pergunta) e o `agora` de `carregar` é
+    um RELÓGIO (`time.monotonic`, para o TTL) — nomes diferentes de propósito,
+    porque passar um no lugar do outro compila e erra calado (mesma armadilha
+    anotada em `ja_entreguei`).
+    """
+    momento = momento if momento is not None else datetime.now(FUSO_SAO_PAULO)
+    # Um erro do cliente sobe daqui sem ser capturado: token recusado e "você
+    # não tem matrícula nenhuma" são indistinguíveis para quem lê e têm curas
+    # opostas — é o bug do §9 de 28/08 (DI10).
+    lista = carregar(cliente)
+
+    if not lista:
+        # §9 de 28/08: `get_users_courses` com userid errado devolve `[]` com
+        # HTTP 200. Vazio mudo aqui seria exatamente aquele bug de volta.
+        return RespostaDisciplinas(
+            texto=(
+                "O e-Disciplinas não devolveu matrícula nenhuma para este "
+                "token.\n\nIsso costuma ser uma de duas coisas, e elas têm "
+                "curas diferentes: ou a conta realmente não tem disciplina "
+                "neste Moodle, ou o token perdeu o vínculo com o usuário. "
+                "`diagnostico` responde qual das duas é, com uma chamada."
+            ),
+            total=0,
+            em_andamento=0,
+            encerradas=0,
+            sem_periodo=0,
+            vazio_por="sem_matriculas",
+        )
+
+    por_situacao: dict[str, list[Disciplina]] = {
+        EM_ANDAMENTO: [],
+        A_COMECAR: [],
+        ENCERRADA: [],
+        SEM_PERIODO: [],
+    }
+    for d in lista:
+        por_situacao[situacao_de(d, momento)].append(d)
+
+    def _por_sigla(ds):
+        return sorted(ds, key=lambda d: (d.sigla, d.rotulo))
+
+    linhas = [f"As suas disciplinas no e-Disciplinas ({len(lista)} matrículas)."]
+
+    correntes = _por_sigla(por_situacao[EM_ANDAMENTO])
+    if correntes:
+        linhas.append(f"\nEm andamento agora ({len(correntes)}):")
+        linhas.extend(_linha_completa(d) for d in correntes)
+    else:
+        # Zero em andamento é resposta legítima (férias, ou lista inteira de
+        # semestres passados) e não pode sair como bloco ausente: quem lê
+        # concluiria que a ferramenta falhou em vez de que não há aula.
+        linhas.append(
+            "\nNenhuma matrícula em andamento agora, pelas datas do "
+            "e-Disciplinas."
+        )
+
+    futuras = _por_sigla(por_situacao[A_COMECAR])
+    if futuras:
+        linhas.append(f"\nAinda não começaram ({len(futuras)}):")
+        linhas.extend(_linha_completa(d) for d in futuras)
+
+    encerradas = por_situacao[ENCERRADA]
+    if encerradas:
+        if todas:
+            linhas.append(f"\nEncerradas ({len(encerradas)}):")
+            linhas.extend(
+                _linha_completa(d)
+                for d in sorted(encerradas, key=lambda d: (d.fim, d.sigla), reverse=True)
+            )
+        else:
+            linhas.append(
+                f"\nEncerradas ({len(encerradas)}) — só o rótulo, pelo ano em "
+                "que terminaram:"
+            )
+            linhas.extend(_bloco_compacto(encerradas))
+
+    sem_periodo = _por_sigla(por_situacao[SEM_PERIODO])
+    if sem_periodo:
+        # Minúsculo no começo da frase de propósito: é este o primeiro "sem
+        # período" do texto, e o bloco tem de vir antes do aviso que o explica.
+        linhas.append(
+            f"\nMatrículas sem período declarado no e-Disciplinas "
+            f"({len(sem_periodo)}) — não dá para dizer se estão em andamento:"
+        )
+        linhas.extend(f"  {d.sigla} ({d.rotulo})" for d in sem_periodo)
+
+    avisos = [_COMO_USAR, _DE_ONDE_SAI]
+    if encerradas and not todas:
+        # Invariante 7: o corte é declarado, com a contagem e com a cura — e
+        # dizendo o que exatamente ficou de fora, que aqui é detalhe e não
+        # matrícula.
+        avisos.insert(
+            0,
+            f"Das {len(encerradas)} encerradas saem só o rótulo e o ano; o "
+            "nome e o período de cada uma ficaram de fora. Peça de novo com "
+            "`todas` para vê-los. Nenhuma matrícula foi omitida desta lista.",
+        )
+
+    linhas.extend(f"\n⚠ {a}" for a in avisos)
+
+    return RespostaDisciplinas(
+        texto="\n".join(linhas),
+        total=len(lista),
+        em_andamento=len(correntes),
+        encerradas=len(encerradas),
+        sem_periodo=len(sem_periodo),
+    )

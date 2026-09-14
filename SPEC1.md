@@ -3139,3 +3139,80 @@ backlog, e a de fórum é a mais cara do projeto — 21% dos bytes de uma discus
 terceiro.
 
 ---
+
+### 14/09/2026 — `disciplinas`: a ferramenta mais barata do projeto, e o que fazer com 74 matrículas
+
+**Ela não estava no ROADMAP, e estava no Anexo A — que é a lista para ser confrontada, não
+seguida.** `minhas_disciplinas` é o primeiro nome daquela tabela de oito derivada da API, e
+entra aqui pela porta do §5 e não pela dela: a pergunta existe, é a primeira que alguém faz
+("quais matérias eu tenho?"), e até hoje o único jeito de respondê-la era **provocar um
+erro**. Pedir `material` de uma sigla inexistente faz o Invariante 7 de `resolver` cuspir a
+lista inteira no motivo. Funciona, e é constrangedor.
+
+**Nenhuma função nova.** `disciplinas.carregar` já busca `core_enrol_get_users_courses` e
+já a cacheia por um semestre para traduzir sigla em `courseid`. A allowlist fica em 11, o
+T7 não se move, o P5 não pede prefixo, e o D4 só ganhou a linha da ferramenta nova —
+apontando para as duas funções que todas as outras já exigiam. DI1 é a asserção que trava
+isso pelo lado das funções ENVIADAS, e DI2 registra o que ela custa na segunda pergunta:
+zero chamadas.
+
+**A decisão que este commit pede para julgar: o que fazer com as matrículas antigas.** A
+conta tem dezenas, e a minoria é do semestre corrente — 74 matrículas com 10 em andamento
+na fixture real de 31/08, e 45 matrículas com 7 notas lançadas na medição ao vivo de 14/09.
+Os dois números discordam entre si (a fixture é de agosto e pode ter sido capturada com
+outro filtro; fica para a verificação ao vivo) e **nenhum dos dois muda o desenho**: em
+qualquer um deles a maioria é de semestre passado, e despejar tudo com nome e período
+enterra a resposta certa.
+
+Duas saídas foram consideradas e recusadas:
+
+- **Filtrar as antigas fora.** É o corte mais limpo de ler e o único que quebra o
+  Invariante 7: a matrícula sumiria da resposta, e perguntar "e PMT3100?" devolveria "não
+  achei", indistinguível de "você não cursou".
+- **Paginar com teto declarado.** Teto é a ferramenta certa quando o custo cresce com o
+  tamanho — `ja_entreguei` paga uma chamada por entrega. Aqui a lista já está em memória e
+  cacheada: paginar cobraria uma segunda pergunta por um dado que já foi buscado.
+
+**O que ficou: corte de DETALHE, nunca de EXISTÊNCIA.** As em andamento saem completas
+(sigla, rótulo, nome, período); as encerradas saem só com o rótulo, agrupadas pelo ano em
+que terminaram; o corte é declarado com a contagem e com o parâmetro que o desfaz
+(`todas`), e a frase diz o que ficou de fora — *o nome e o período*, não a matrícula. DI4
+varre as 74 e reprova se qualquer rótulo sumir de qualquer modo.
+
+**Quatro desfechos de situação, e os dois extras vieram da fixture real.** `enddate: 0`
+existe: duas das 74 matrículas não declaram fim, e chamá-las de encerradas seria inventar
+um fato sobre a vida acadêmica de quem pergunta (DI7). Matrícula do semestre que vem
+também não é "em andamento" nem "encerrada" (DI15). Os dois casos saem em bloco próprio,
+com o motivo.
+
+**A grafia da data aqui NÃO é a de `texto.formatar_data`, e é de propósito.** J18 pede uma
+grafia só para a mesma coisa, e prazo e vigência não são a mesma coisa: `formatar_data`
+omite o ano porque prazo é de agora, e uma lista que cobre sete anos de matrícula sem o ano
+não localiza nada — PMT3100 de 2023 e PMT3100 de 2024 ficariam idênticas (DI9).
+
+**A projeção, medida — e o cru aqui é FIXTURE REAL, ao contrário das três irmãs:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 74 matrículas, modo padrão | 98.171 B (**fixture real higienizada**, `users_courses.json`) | 3.075 B | **31,9×** (3,1%) |
+| as mesmas 74 com `todas` | 98.171 B | 8.687 B | 11,3× |
+
+O que domina o cru é `summary` (a ementa repetida em cada matrícula), `courseimage`,
+`overviewfiles` e `progress`: 29 chaves por disciplina viram 5. `courseimage` é ainda uma
+URL de `pluginfile.php`, a família que o Invariante 3 mantém fora de toda resposta deste
+servidor (DI13). O `courseid` também não sai (DI14): quem lê responde a próxima pergunta
+com a **sigla**, e o número interno só existiria na saída para ser copiado para um lugar
+que não o aceita.
+
+**Uma coisa que a saída diz e a API não:** "em andamento" aqui é a data que o
+e-Disciplinas declara para o espaço da disciplina, e **não** a matrícula oficial.
+Trancamento e cancelamento não chegam até lá, e disciplina que o professor não datou cai no
+bloco sem período. Sem essa frase, a lista lê como se fosse o JupiterWeb (DI8).
+
+**O que fica sem verificação ao vivo:** a divergência 74 × 45 acima; se `enddate: 0`
+continua aparecendo na conta de hoje; e se alguma matrícula do semestre corrente fica de
+fora do bloco "em andamento" por `enddate` mal declarado pelo professor — que é o único
+modo de esta ferramenta errar calada, e o mais barato de checar, porque a resposta certa
+o dono sabe de cor.
+
+---

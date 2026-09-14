@@ -64,6 +64,7 @@ def test_t78_main_registra_todas_as_ferramentas(servidor_montado):
         "avisos",
         "baixar_arquivo",
         "diagnostico",
+        "disciplinas",
         "ja_entreguei",
         "material",
         "notas",

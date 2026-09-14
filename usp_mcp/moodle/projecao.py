@@ -88,18 +88,31 @@ class Resultado:
         }
 
 
-def _quando_de(timesort: object) -> datetime | None:
-    """`timesort` vira data só quando é um epoch positivo de verdade.
+def data_de(carimbo: object) -> datetime | None:
+    """Epoch do Moodle vira data só quando é um epoch positivo de verdade.
 
     Ausente, None, 0 ou não-inteiro (ex.: string) são tratados como "sem
     data", nunca como epoch 0 — que seria 1970 e criaria uma entrega
     "atrasada há 56 anos" no topo da lista (T19).
+
+    **Pública desde 14/09/2026, e pelo mesmo motivo de `texto.formatar_data`.**
+    Ela nasceu privada aqui (`_quando_de`), `ja_entreguei` precisou da mesma
+    regra e escreveu a segunda cópia, e `disciplinas` seria a terceira — que é
+    exatamente como as duas semânticas de casamento por nome nasceram e
+    custaram o T83. O campo muda de nome em cada função do Moodle (`timesort`,
+    `duedate`, `enddate`), a regra não.
     """
-    if isinstance(timesort, bool):  # bool é subclasse de int; não é epoch.
+    if isinstance(carimbo, bool):  # bool é subclasse de int; não é epoch.
         return None
-    if not isinstance(timesort, int) or timesort <= 0:
+    if not isinstance(carimbo, int) or carimbo <= 0:
         return None
-    return datetime.fromtimestamp(timesort, tz=FUSO_SAO_PAULO)
+    return datetime.fromtimestamp(carimbo, tz=FUSO_SAO_PAULO)
+
+
+def _quando_de(timesort: object) -> datetime | None:
+    """O nome antigo, mantido porque `projetar_eventos` e os testes de T19 o
+    chamam — a regra é uma só, e mora em `data_de`."""
+    return data_de(timesort)
 
 
 def projetar_eventos(bruto: dict) -> Resultado:
