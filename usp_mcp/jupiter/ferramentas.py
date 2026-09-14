@@ -125,6 +125,11 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
                 "nome": r["nomdisreq"],
                 "tipo": r["tipreq"],
                 "grupo": r.get("numgrpreq"),
+                # `stamtrrcp="S"` é o que a página do JupiterWeb chama de
+                # "Requisito fraco": dá para matricular devendo. Ficou fora da
+                # fatia de 31/08 por não ter sido medido, e a ferramenta
+                # anunciava exigência dura onde não havia (§9, 14/09).
+                "fraco": r.get("stamtrrcp") == "S",
             }
             for r in bruto
         ]

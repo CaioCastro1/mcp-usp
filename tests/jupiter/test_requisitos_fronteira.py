@@ -92,3 +92,34 @@ def test_t73_disciplina_sem_curso_aponta_para_requisitos(gravador, psi3323):
     saida = server.chamar_ferramenta("disciplina", {"sigla": "PSI3323"}, cliente=c)
 
     assert "requisitos" in saida
+
+
+@pytest.mark.parametrize(
+    "marca,fraco,esperado",
+    [('stamtrrcp:"S"', True, "devendo"), ('stamtrrcp:"N"', False, "pré-requisito")],
+)
+def test_t76_o_caminho_dwr_tambem_distingue_fraco_de_duro(
+    psi3323, requisito, marca, fraco, esperado
+):
+    """`disciplina` com curso lê `pubListarRequisitoDisciplina`, e ali o
+    discriminador é `stamtrrcp` — 'S' é o "Requisito fraco" da página.
+
+    Sem isto, a mesma exigência sai como "Pré-requisito" por uma ferramenta e
+    como "Requisito fraco" pela outra, para o mesmo par. Duas respostas
+    diferentes para a mesma pergunta é pior do que uma incompleta.
+
+    A fixture real de MAT2454 vem com `S` — MAT2453 é exigência FRACA dela. O
+    caso duro nasce trocando só essa letra, para as duas metades virem da mesma
+    forma de resposta e não de um envelope inventado.
+    """
+    from usp_mcp.jupiter import ferramentas
+
+    c = cliente.ClienteJupiter(
+        Gravador([psi3323, requisito.replace('stamtrrcp:"S"', marca)])
+    )
+
+    ficha = ferramentas.disciplina("PSI3323", ("3032", "0"), cliente=c)
+    saida = server.formatar(ficha)
+
+    assert ficha["pre_requisito"][0]["fraco"] is fraco
+    assert esperado in saida.lower()
