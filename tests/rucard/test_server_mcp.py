@@ -189,3 +189,46 @@ def test_r46c_o_texto_semanal_tem_teto(gravador, respostas_da_fatia, refeicao, t
     )
     assert len(texto.encode()) <= teto, f"{refeicao}: {len(texto.encode())} B"
     assert len(texto.splitlines()) < 80
+
+
+@pytest.mark.contrato
+def test_r48_horario_constante_na_semana_sobe_pro_cabecalho_do_ru(
+    gravador, respostas_da_fatia
+):
+    # Medido em 14/09/2026: o horário é igual em todos os dias abertos para 6
+    # dos 7 pares RU+refeição da fixture — só o jantar do 9 varia (dia útil até
+    # 19:45, sábado até 19:00). Repetir um horário constante 5 a 7 vezes por
+    # semana é o mesmo desperdício que a fatoração de itens já corrigia.
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "todas"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    (cabecalho_central,) = [l for l in texto.splitlines() if l.startswith("CENTRAL · almoço")]
+    assert "11:15 às 14:15" in cabecalho_central
+    linha_segunda = next(
+        l for l in texto.splitlines() if l.strip().startswith("seg 24/08") and "Iscas" in l
+    )
+    assert "11:15" not in linha_segunda, "horário constante não repete na linha do dia"
+
+
+@pytest.mark.contrato
+def test_r48b_horario_que_varia_entre_dia_util_e_sabado_continua_na_linha_do_dia(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "todas"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    (cabecalho_jantar_quimicas,) = [
+        l for l in texto.splitlines() if l.startswith("QUÍMICAS · jantar")
+    ]
+    assert "17:30" not in cabecalho_jantar_quimicas, (
+        "o jantar do 9 varia entre dia útil e sábado: um horário só no "
+        "cabeçalho mentiria no sábado (§ design, R48b)"
+    )
+    linha_sabado = next(
+        l for l in texto.splitlines() if l.strip().startswith("sáb 29/08") and "19:00" in l
+    )
+    assert "17:30 às 19:00" in linha_sabado

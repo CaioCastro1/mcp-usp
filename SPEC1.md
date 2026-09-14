@@ -2686,3 +2686,11 @@ de um dia, porque o `/menu` já devolve a semana e o cache é por RU (teste R45b
 8.381 B; tetos 6.500 B e 11.000 B (R46c). O único item comum à semana inteira é
 `Minipão / refresco` — o arroz varia (`feijão preto`), e por isso a fatoração é estrita
 (interseção), não "na maioria". Testes R43–R47.
+
+**Mesma sessão, achado adicional:** o horário também se repetia igual em toda a
+semana para 6 dos 7 pares RU+refeição — só o jantar do 9 varia (19:45 em dia útil,
+19:00 no sábado, o motivo já registrado acima para não fixá-lo no cabeçalho por
+padrão). `_horario_comum` sobe o horário pro cabeçalho quando é o MESMO em todo dia
+aberto da semana e o mantém na linha do dia quando varia — mesma regra estrita da
+fatoração de itens, aplicada ao horário. Medido: semana/almoço caiu para 4.560 B,
+semana/almoço+jantar para 8.018 B (~5% menor). Teste R48/R48b.
