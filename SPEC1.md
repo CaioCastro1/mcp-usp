@@ -2686,11 +2686,11 @@ T77 travam o conjunto novo; D4 exigiu a linha de `ja_entreguei` em `FUNCOES_POR_
 
 | | bytes |
 |---|---|
-| `mod_assign_get_assignments` de PTC3314 (cru, fixture real) | 8.571 |
-| 2 × `mod_assign_get_submission_status` (cru, forma documentada) | 7.549 |
-| **cru total** | **16.120** |
-| **texto devolvido pela ferramenta** | **810** |
-| razão | 19,9× (5,0%) |
+| `mod_assign_get_assignments` de PTC3314 (cru, fixture real) | 7.975 |
+| 2 × `mod_assign_get_submission_status` (cru, **medido ao vivo em 14/09**) | 4.022 |
+| **cru total** | **11.997** |
+| **texto devolvido pela ferramenta** | **699** |
+| razão | **17,2×** |
 
 Os dois campos que o corte existe para descartar são o `plugins[].editorfields[].text` — o
 texto inteiro que o aluno entregou, 1.470 B só ele na amostra — e o
@@ -2699,15 +2699,17 @@ entreguei isso?": o primeiro é o trabalho, o segundo já é resposta de `materi
 `fileurl` sai o **nome** do arquivo e não o endereço, pela mesma regra de `material`
 (Invariante 3).
 
-**O que NÃO foi verificado ao vivo, e é a parte que dói.** A resposta de
-`mod_assign_get_submission_status` usada na suíte é **escrita à mão** a partir da forma
-documentada no core do Moodle 5.0 e do que o catálogo registra — a worktree onde isto foi
-feito não tem token e não devia obter um. A lista de entregas, essa, é a fixture real. Em
-consequência: a razão de 19,9× mede o que a nossa projeção descarta de uma resposta
-**desta forma**, e não o tamanho do que o e-Disciplinas devolve de fato. Quem rodar ao
-vivo primeiro captura, higieniza (§3.3) e troca o dublê por fixture — e confere de uma vez
-o único comportamento que nenhum teste offline alcança: se `assignid` de uma entrega de
-outra disciplina responde erro legível ou silêncio.
+**A suíte ainda usa resposta escrita à mão, e a medição acima não.** A fixture de
+`mod_assign_get_submission_status` que os testes exercitam foi escrita a partir da forma
+documentada no core 5.0, porque a worktree onde a ferramenta nasceu não tem token e não
+devia obter um. Os números da tabela vieram depois, de uma execução real de 14/09 contra a
+conta do dono, e são estes que valem. Trocar o dublê por fixture capturada e higienizada
+(§3.3) segue pendente, e está no backlog.
+
+**Duas perguntas que a execução ao vivo fechou.** `assignid` que não pertence à conta
+responde **erro legível**, não silêncio: `invalidrecordunknown` em 150 B, com mensagem em
+português. E a resposta real traz três chaves de topo — `assignmentdata`, `lastattempt` e
+`warnings` — com `lastattempt.submission.status` no lugar que a ferramenta espera.
 
 **Encaixe com `o_que_vence`, e ele é decisão e não acabamento.** As duas respondem a mesma
 véspera partida em duas. A grafia da data passou a morar em `texto.formatar_data` (era
@@ -2770,16 +2772,25 @@ cache, atrás de `userid_do_token`.
 
 | visão | cru | texto devolvido | razão |
 |---|---|---|---|
-| geral, 74 matrículas com 3 notas lançadas | 5.965 B | 431 B | 13,8× |
-| uma disciplina, 5 itens de nota | 4.819 B | 493 B | 9,8× |
+| geral, 45 matrículas com 7 notas lançadas | 2.240 B | 470 B | **4,8×** |
+| PTC3314, 20 itens de nota, 24 campos cada | 10.815 B | 1.408 B | **7,7×** |
+
+Medido ao vivo em 14/09/2026, contra a conta do dono. A primeira versão desta tabela dizia
+13,8× e 9,8×, sobre resposta escrita à mão, e as duas estavam erradas — a de cima para
+mais do que o dobro.
 
 O campo gordo da visão de disciplina é o `feedback` — o comentário do professor em HTML,
 **1.084 B dos 4.819** (22,5%) numa amostra de cinco itens. Ele é descartado, e a decisão
 não é "é grande": é que ele responde *o que eu errei*, que é outra pergunta. O corte é
 declarado com a contagem, porque sumir com ele calado esconderia que existe texto para ler.
-Saem também `userfullname` e `useridnumber` (o número USP — §3.3), `rank`/`maxrank` e
-`averageformatted`, que são desempenho de TERCEIROS, e `percentageformatted`, que é
-`graderaw/grademax` já calculado.
+Saem também `userfullname` e `useridnumber` (o número USP — §3.3) e `percentageformatted`,
+que é `graderaw/grademax` já calculado.
+
+**Correção de 14/09, pela mesma execução ao vivo:** a resposta real de
+`gradereport_overview_get_course_grades` traz **três campos por item** — `courseid`,
+`grade` e `rawgrade` — e mais nada. O `rank`/`maxrank` e o `averageformatted` que este
+parágrafo dizia descartar **não existem lá**; eles vieram da resposta escrita à mão. O
+descarte real acontece na outra função, a de disciplina, cujos itens têm 24 campos.
 
 **Duas coisas que a saída diz e a API não:** nota **ocultada pelo professor**
 (`gradeishidden`) não vira "sem nota lançada", porque "ainda não corrigiram" e "corrigiram
