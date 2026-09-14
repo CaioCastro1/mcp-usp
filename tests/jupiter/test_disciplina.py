@@ -10,7 +10,7 @@ viraria erro de setup em vez de falha.
 """
 import pytest
 
-from usp_mcp.jupiter import cliente, dwr, ferramentas
+from usp_mcp.jupiter import cliente, dwr, erros, ferramentas
 
 pytestmark = pytest.mark.contrato
 
@@ -40,7 +40,7 @@ def test_t27_carga_horaria_e_calculada_nunca_lida(
 
 def test_t28_ementa_e_conteudo_programatico_nao_estao_trocados(gravador, psi3323):
     c = cliente.ClienteJupiter(gravador([psi3323]))
-    d = ferramentas.disciplina("PSI3323", cliente=c)
+    d = ferramentas.disciplina("PSI3323", cliente=c, secoes=("ementa", "programa"))
     cru = dwr.decodificar(psi3323)
 
     assert d["ementa"] == cru["pgmrsudis"]
@@ -52,7 +52,7 @@ def test_t29_vazios_e_espanhol_omitidos_ingles_sob_pedido(gravador, psi3323):
     c = cliente.ClienteJupiter(gravador([psi3323]))
     d = ferramentas.disciplina("PSI3323", cliente=c)
     assert not [k for k in d if k.endswith(("_en", "_es"))]
-    assert not [k for k, v in d.items() if v in ("", None) and k != "pre_requisito"]
+    assert not [k for k, v in d.items() if v in ("", None)]
 
     c2 = cliente.ClienteJupiter(gravador([psi3323]))
     d_en = ferramentas.disciplina("PSI3323", cliente=c2, idiomas=("pt", "en"))
@@ -62,40 +62,17 @@ def test_t29_vazios_e_espanhol_omitidos_ingles_sob_pedido(gravador, psi3323):
     )
 
 
-def test_t30_sem_curso_a_ferramenta_diz_o_que_nao_sabe(gravador, psi3323):
+def test_t30_a_ferramenta_diz_onde_esta_o_pre_requisito_em_vez_de_calar(gravador, psi3323):
     g = gravador([psi3323])
     d = ferramentas.disciplina("PSI3323", cliente=cliente.ClienteJupiter(g))
 
-    assert d["pre_requisito"] is None
-    assert len(g.chamadas) == 1, "consultou o pré-requisito sem ter curso"
+    assert len(g.chamadas) == 1, "uma ficha é UMA chamada"
+    assert "pre_requisito" not in d, "o pré-requisito é da ferramenta `requisitos` desde 14/09"
 
     avisos = " ".join(d["avisos"]).lower()
-    assert "requisito" in avisos and "curso" in avisos, (
-        "Invariante 7: o pré-requisito é condicional ao curso. Omitir calado "
-        "é o que o invariante proíbe."
-    )
+    assert "requisitos" in avisos, "Invariante 7: diz onde está, em vez de omitir calado"
     for mentira in ("sem pré-requisito", "não tem pré-requisito", "nenhum pré-requisito"):
         assert mentira not in avisos, f"afirmou {mentira!r} sem ter consultado"
-
-
-def test_t31_com_curso_duas_chamadas_e_requisito_estruturado(gravador, psi3323, requisito):
-    # As duas respostas são stubs: a Fase 1 nunca capturou disciplina e
-    # pré-requisito da MESMA disciplina, então o que este teste cobre offline
-    # é a COMPOSIÇÃO de duas chamadas, não o pareamento.
-    # O pareamento foi verificado AO VIVO em 31/08 — MAT2454 no curso 3033-0
-    # devolve MAT2453 — e está no §9. Trazer isso para cá exigiria capturar
-    # as duas fixtures pareadas; enquanto não houver, este teste não o cobre.
-    g = gravador([psi3323, requisito])
-    d = ferramentas.disciplina("PSI3323", curso=("3033", "0"), cliente=cliente.ClienteJupiter(g))
-
-    assert len(g.chamadas) == 2
-    assert g.chamadas[1]["corpo"].count("c0-e") >= 3, "requisito exige coddis+codcur+codhab"
-
-    req = d["pre_requisito"]
-    assert isinstance(req, list) and len(req) == 1
-    assert req[0]["sigla"] == "MAT2453"
-    assert req[0]["tipo"] == "PR"
-    assert req[0]["nome"] == "Cálculo Diferencial e Integral I"
 
 
 def test_t32_erro_da_usp_em_portugues_sem_stacktrace(gravador, erro):
@@ -106,25 +83,76 @@ def test_t32_erro_da_usp_em_portugues_sem_stacktrace(gravador, erro):
     assert "br.usp" not in str(exc.value)
 
 
-def test_t33_discrepancia_codcur_e_declarada_nao_resolvida(gravador, psi3323, requisito):
-    # §5.1 do recon: o Ciclo Básico Elétrica é 3033 no DWR e 3032 no HTML de
-    # listarCursosRequisitos. Comportamento travado desde 31/08: usar o código
-    # recebido SEM TRADUZIR e avisar — é isso que este teste protege, e segue
-    # valendo.
-    #
-    # O que mudou em 14/09: a relação deixou de ser desconhecida. Foi medida —
-    # são gerações do mesmo currículo, 3033 tem a grade e 3032 tem os
-    # requisitos (§9). O aviso que dizia "não verificada" virou texto obsoleto,
-    # e um teste que exigisse aquela frase estaria travando a ignorância em vez
-    # do comportamento.
-    c = cliente.ClienteJupiter(gravador([psi3323, requisito]))
-    d = ferramentas.disciplina("PSI3323", curso=("3032", "0"), cliente=c)
+# --- T80: a ficha por seção (14/09/2026) -------------------------------------
 
-    avisos = " ".join(d["avisos"])
-    assert "3032" in avisos and "3033" in avisos
-    assert "geraç" in avisos, "a relação medida em 14/09 não é declarada"
-    assert "sem traduzir" in avisos, "o invariante de 31/08: não traduzir o código"
 
-    # E o código enviado continua sendo o recebido, não o "corrigido".
-    corpo_do_requisito = c._transporte.chamadas[-1]["corpo"]
-    assert "3032" in corpo_do_requisito and "3033" not in corpo_do_requisito
+def test_t80_por_padrao_vem_o_cabecalho_e_a_ementa_e_mais_nada(gravador, ptc3314):
+    d = ferramentas.disciplina("PTC3314", cliente=cliente.ClienteJupiter(gravador([ptc3314])))
+
+    assert d["creditos_aula"] == 4 and d["carga_horaria_total"] == 60
+    assert "ementa" in d
+    for fora in ("objetivos", "programa", "bibliografia",
+                 "metodo_avaliacao", "criterio_avaliacao", "norma_recuperacao"):
+        assert fora not in d, f"{fora} veio sem ser pedido"
+    assert d["secoes"] == ["ementa"]
+    assert d["secoes_omitidas"] == ["objetivos", "programa", "bibliografia", "avaliacao"]
+    assert d["avisos"] == [ferramentas.AVISO_PRE_REQUISITO]
+
+
+def test_t80b_avaliacao_junta_os_tres_campos(gravador, ptc3314):
+    d = ferramentas.disciplina(
+        "PTC3314", cliente=cliente.ClienteJupiter(gravador([ptc3314])), secoes=("avaliacao",)
+    )
+    assert {"metodo_avaliacao", "criterio_avaliacao", "norma_recuperacao"} <= set(d)
+    assert "ementa" not in d
+    assert d["secoes_omitidas"] == ["ementa", "objetivos", "programa", "bibliografia"]
+
+
+def test_t80c_todas_traz_as_cinco_e_nao_omite_nada(gravador, ptc3314):
+    d = ferramentas.disciplina(
+        "PTC3314", cliente=cliente.ClienteJupiter(gravador([ptc3314])), secoes=ferramentas.SECOES
+    )
+    for dentro in ("ementa", "objetivos", "programa", "bibliografia", "metodo_avaliacao"):
+        assert dentro in d
+    assert d["secoes_omitidas"] == []
+
+
+@pytest.mark.parametrize(
+    "pedido,esperado",
+    [
+        (None, ("ementa",)),
+        ([], ("ementa",)),
+        (["programa", "ementa"], ("ementa", "programa")),  # ordem da ficha, não do pedido
+        (["TODAS"], ferramentas.SECOES),
+        (["todas", "ementa"], ferramentas.SECOES),
+        (["Avaliacao", "avaliacao"], ("avaliacao",)),
+    ],
+)
+def test_t80d_resolver_secoes(pedido, esperado):
+    assert ferramentas.resolver_secoes(pedido) == esperado
+
+
+def test_t80e_secao_desconhecida_e_erro_legivel_citando_as_validas():
+    with pytest.raises(erros.ErroJupiter) as exc:
+        ferramentas.resolver_secoes(["horario"])
+    mensagem = str(exc.value)
+    assert "horario" in mensagem and "ementa" in mensagem and "todas" in mensagem
+
+
+def test_t80f_paragrafo_repetido_na_fonte_sai_uma_vez(gravador, ptc3314):
+    d = ferramentas.disciplina(
+        "PTC3314", cliente=cliente.ClienteJupiter(gravador([ptc3314])), secoes=("bibliografia",)
+    )
+    assert d["bibliografia"].count("Mariotto") == 1
+    cru = dwr.decodificar(ptc3314)
+    assert cru["dscbbgdis"].count("Mariotto") == 2, (
+        "a fixture mudou e a dedupe perdeu o caso que a motivou; refaça a medição"
+    )
+
+
+def test_t80g_a_ferramenta_nao_aceita_curso():
+    import inspect
+
+    parametros = inspect.signature(ferramentas.disciplina).parameters
+    assert "curso" not in parametros and "codcur" not in parametros
+    assert "secoes" in parametros
