@@ -147,12 +147,18 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
 
 # --- a fatia de 14/09: o requisito pela sigla, não pelo curso ---------------
 
+# Zero currículo tem DUAS causas, e a página devolve a mesma coisa para as duas.
+# Ranquear uma delas foi o que a pergunta de aceite P8 pegou: MAT2453 é Cálculo
+# I, primeira do currículo, e recebia a explicação sobre ênfase e 7º semestre.
 _SEM_CURRICULO = (
-    "O JupiterWeb não lista requisito para {sigla} em curso nenhum. Isso NÃO "
-    "quer dizer que não há exigência: da ênfase (7º semestre) e do módulo (9º) "
-    "em diante, estruturas que viram curso novo, esse endpoint costuma não ter "
-    "registro — medido em PTC3313, que devolve 26 kB e nenhum currículo. "
-    "Confira na coordenação antes de concluir; não conclua daqui."
+    "O JupiterWeb não lista nenhum currículo com exigência para {sigla}. Isso "
+    "tem duas causas possíveis, e desta página não dá para saber qual é: (a) a "
+    "disciplina realmente não exige nada — é o caso das primeiras do currículo, "
+    "como Cálculo I; ou (b) existe exigência e ela não está registrada aqui — "
+    "acontece da ênfase (7º semestre) e do módulo (9º) em diante, estruturas "
+    "que viram curso novo. NÃO conclua 'não precisa de nada' a partir deste "
+    "silêncio: se a disciplina for de meio ou fim de curso, confirme na "
+    "coordenação ou na grade do seu currículo."
 )
 
 _FORA_DO_INGRESSO = (
