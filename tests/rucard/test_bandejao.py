@@ -400,3 +400,61 @@ def test_r42d_o_mesmo_comunicado_duas_vezes_na_refeicao_sai_uma_vez():
         "**Tragam suas canecas para o almoço de hoje.**"
     )
     assert avisos == ["Tragam suas canecas para o almoço de hoje."]
+
+
+SEGUNDA_14_09 = datetime.date(2026, 9, 14)  # semana da fixture `menu_7_avisos`
+
+COMUNICADO_CANECAS = (
+    "Os Restaurantes Universitários não fornecem copos descartáveis. "
+    "Tragam suas canecas."
+)
+
+
+def test_r42e_o_comunicado_vira_um_aviso_nomeando_o_ru(
+    gravador, chamar, respostas_da_fatia
+):
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/7"] = texto("menu_7_avisos")
+    resposta, _ = chamar(
+        transporte=gravador(respostas), hoje=SEGUNDA_14_09,
+        restaurantes=["7"], refeicao="almoco",
+    )
+
+    almoco = refeicao_de(resposta, "7", "almoco")
+    assert almoco["situacao"] == "aberto"
+    assert not [i for i in almoco["itens"] if "canecas" in i or "**" in i], (
+        "o comunicado continua na lista de pratos"
+    )
+    assert almoco["itens"][-1] == "Minipão / refresco"
+    assert almoco["avisos_publicados"] == [COMUNICADO_CANECAS]
+
+    (aviso,) = [a for a in resposta["avisos"] if "canecas" in a]
+    assert "PUSP-CB" in aviso and "**" not in aviso
+
+
+def test_r42f_o_mesmo_comunicado_em_dois_rus_e_um_aviso_com_os_dois_nomes(
+    gravador, chamar, respostas_da_fatia
+):
+    # O payload do /menu não carrega o id do RU, então a mesma fixture serve
+    # para o 7 e para o 8: é exatamente o caso real de 14/09, em que três RUs
+    # publicaram o mesmo texto.
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/7"] = texto("menu_7_avisos")
+    respostas["menu/8"] = texto("menu_7_avisos")
+    resposta, _ = chamar(
+        transporte=gravador(respostas), hoje=SEGUNDA_14_09,
+        restaurantes=["7", "8"], refeicao="almoco",
+    )
+
+    com_canecas = [a for a in resposta["avisos"] if "canecas" in a]
+    assert len(com_canecas) == 1, com_canecas
+    assert "PUSP-CB" in com_canecas[0] and "FÍSICA" in com_canecas[0]
+
+
+def test_r42g_refeicao_sem_comunicado_tem_a_lista_vazia_e_nenhum_aviso(chamar):
+    resposta, _ = chamar(hoje=SEGUNDA)
+    for ru in resposta["restaurantes"]:
+        for dados in ru["refeicoes"].values():
+            if dados["situacao"] == "aberto":
+                assert dados["avisos_publicados"] == []
+    assert not [a for a in resposta["avisos"] if "publicado no cardápio" in a]

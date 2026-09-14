@@ -48,7 +48,7 @@ CAMPOS_SAIDA = ("data", "dia_semana", "refeicoes", "restaurantes", "avisos")
 CAMPOS_RESTAURANTE = ("id", "nome", "campus", "endereco", "refeicoes")
 CAMPOS_REFEICAO = (
     "situacao", "detalhe", "itens", "opcao", "opcao_vegetariana_marcada",
-    "calorias", "horario", "preco_aluno",
+    "calorias", "horario", "preco_aluno", "avisos_publicados",
 )
 
 # datetime.weekday() é 0=segunda … 6=domingo. Sem strftime("%a"): ele depende do
@@ -228,6 +228,10 @@ def _projetar_refeicao(ficha, dia: date, qual: str, bruto_do_dia: dict) -> dict:
         "calorias": cru.get("calories"),
         "horario": hora,
         "preco_aluno": ficha.precos_aluno.get(qual),
+        # Comunicado que veio dentro do cardápio (14/09/2026). Fica aqui por
+        # refeição para a projeção ser fiel; quem agrega e nomeia os RUs é
+        # `bandejao`, que enxerga os quatro.
+        "avisos_publicados": avisos_publicados,
     }
 
 
@@ -269,6 +273,10 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
     falhas = 0
     sem_horario: list[str] = []
     sem_o_dia: list[tuple[str, str, str]] = []
+    # {texto do comunicado: [nomes dos RUs em que apareceu]} — um aviso por texto
+    # distinto, e não um por RU por refeição: em 14/09 o mesmo texto veio em
+    # três RUs e sairia três vezes.
+    publicados: dict[str, list[str]] = {}
 
     for id_ru in ids:
         ficha = fichas.get(id_ru)
@@ -324,6 +332,11 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
         for q, projetada in refeicoes_projetadas.items():
             if projetada["situacao"] == "aberto" and projetada.get("horario") is None:
                 sem_horario.append(f"{ficha.nome} ({_ROTULO_REFEICAO[q]})")
+        for projetada in refeicoes_projetadas.values():
+            for comunicado in projetada.get("avisos_publicados") or ():
+                nomes = publicados.setdefault(comunicado, [])
+                if ficha.nome not in nomes:
+                    nomes.append(ficha.nome)
         saida.append(_ficha_para_saida(ficha, refeicoes_projetadas))
 
     if falhas and falhas == len(ids):
@@ -362,6 +375,11 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
             "cardápio publicado sem horário publicado em: "
             f"{', '.join(sem_horario)}. Os dois vêm de rotas diferentes; "
             "considerei o cardápio, que é a evidência mais forte de que serve."
+        )
+
+    for comunicado, nomes in publicados.items():
+        avisos.append(
+            f"aviso publicado no cardápio de {', '.join(nomes)}: {comunicado}"
         )
 
     return {
