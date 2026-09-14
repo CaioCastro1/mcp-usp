@@ -8,9 +8,9 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 "está público" não equivale a "liberado para redistribuir" — ver Invariante 8 do
 `SPEC1.md`.
 
-## Estado — 09/09/2026
+## Estado — 14/09/2026
 
-**Três servidores MCP rodando, cinco ferramentas, todas verificadas contra a USP.**
+**Três servidores MCP rodando, sete ferramentas, todas verificadas contra a USP.**
 
 | Servidor | Ferramenta | Responde |
 |---|---|---|
@@ -18,6 +18,7 @@ não documentadas, descobertas por observação. Elas podem mudar ou sumir sem a
 | `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
 | `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina — regras, listas, provas antigas |
 | `usp-moodle` | `baixar_arquivo` | Baixa um desses arquivos e devolve o caminho dele no disco |
+| `usp-moodle` | `diagnostico` | Se este servidor funciona no Moodle configurado, e o que o seu token alcança lá |
 | `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e programa, pela sigla |
 | `usp-jupiter` | `requisitos` | O que é preciso ter cursado antes, **por currículo** — e o que dá para cursar junto |
 
@@ -52,12 +53,11 @@ a USP.
 histórico de cardápio, saldo do cartão, horário, sala ou vagas. `material` diz o nome, o
 tipo e o tamanho de cada arquivo, mas **não** emite a URL interna dele: endereço sem a
 credencial não abre, e é `baixar_arquivo` que resolve isso sem nunca pôr o token numa URL.
-Instalar deixou de ser `git clone` + venv: o projeto é um **pacote com um entry point
-por servidor** — `usp-mcp-moodle`, `usp-mcp-jupiter`, `usp-mcp-rucard` —, e os três sobem
-de qualquer pasta, sem checkout na frente. Verificado em 14/09/2026 num venv limpo, com
-cliente MCP real a partir de `/tmp`. Empacotar como MCP Bundle (`.mcpb`) segue **não**
-testado: ele está pesquisado no §6.1 por leitura de documentação, e é o degrau *seguinte*
-a este. Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
+O projeto é um pacote com um entry point por servidor — `usp-mcp-moodle`,
+`usp-mcp-jupiter`, `usp-mcp-rucard` —, e os três sobem de qualquer pasta, sem checkout na
+frente. Medido em 14/09/2026 num venv limpo, com cliente MCP real a partir de `/tmp`.
+Empacotar como MCP Bundle (`.mcpb`) segue **não** testado: o §6.1 o descreve por leitura
+de documentação, e ele é o degrau seguinte a este. Nenhuma ferramenta nasce por conveniência: o critério está no §5, e as questões
 abertas do §4 fecham com dado registrado no §9.
 
 Comece por `SPEC1.md` — ele é a autoridade do projeto, e o §9 registra cada decisão
@@ -70,42 +70,50 @@ tomada, com o dado que a fechou e o que foi descartado.
 - `scripts/` — chamadores da descoberta e o gate de pré-commit
 - `docs/decisions/BACKLOG-correcoes.md` — a dívida que está em aberto
 
-## Rodando
+## Como funciona
 
-```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-cp .env.example .env
-./scripts/gate.sh
-```
+Cada servidor é um processo que fala **MCP por stdio**: o cliente sobe o processo, os dois
+trocam JSON-RPC pela entrada e saída padrão, e ninguém abre porta de rede. Não há prompt,
+não há interface. Rodar `usp-mcp-rucard` no terminal e ver a tela parada é o comportamento
+certo.
 
-O `-e ".[dev]"` substitui os dois `-r` de antes e entrega uma coisa a mais: além do SDK e
-do `pytest`, ele põe `usp-mcp-moodle`, `usp-mcp-jupiter` e `usp-mcp-rucard` em
-`.venv/bin/`. O `-e` aponta para **este checkout**, então editar o código muda o que os
-comandos sobem, sem reinstalar. Os `requirements*.txt` continuam válidos e instalam o
-mesmo — menos os três comandos, que são o ponto.
+Quem escolhe a ferramenta é o modelo, lendo a descrição dela diante de uma pergunta em
+português. Por isso as descrições usam o vocabulário de quem pergunta ("o que vence",
+"que arquivos tem") e não o nome da função do Moodle por trás. Uma ferramenta bem nomeada
+com descrição ruim é uma ferramenta que o modelo não acha.
 
-O `cp` vem **antes** do gate porque sem `.env` ele reprova: a hash do RUCard é o único
-valor que o gate precisa, e ela já vem preenchida no exemplo — é a chave embutida no
-app oficial, pública e compartilhada, não credencial de ninguém. O token do Moodle
-nasce vazio e **não** precisa ser preenchido para o gate passar: ele roda offline e não
-toca a USP. Para de fato usar o servidor do Moodle, veja *Configuração*.
+Entre o modelo e a USP existem duas travas. A primeira é uma **allowlist**: só as funções
+nomeadas nela saem daqui, por igualdade exata de nome, e o default é negar. A segunda é o
+**bloqueio permanente** do §2.2, que vale mesmo com a flag de escrita ligada e cobre o que
+não deve ser chamado por este projeto em hipótese nenhuma — começar tentativa de prova,
+entregar trabalho, cunhar credencial, falar com terceiros em nome de quem usa. As duas
+existem porque o token alcança 447 funções neste site, e quem escolhe qual chamar é um
+modelo interpretando linguagem ambígua.
 
-O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente
-MCP neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e é
-o script que resolve a raiz do checkout — não o cliente.
+A credencial do Moodle é pessoal e fica no `.env` da máquina de quem usa. Ela não viaja
+para servidor hospedado nem para sandbox em nuvem, e é por isso que o Moodle é entrypoint
+local por desenho, não por falta de trabalho. O RUCard e o Jupiter não usam credencial
+nenhuma.
 
-### Sem checkout: o pacote instalado
+Cada resposta é **projetada** antes de chegar ao modelo: a lista de disciplinas sai de
+104.712 bytes para 7.816, e o resto do transporte fica no servidor. Isso não é economia
+cosmética. Payload cru enche a janela de contexto com metadado que não responde a pergunta
+nenhuma, e o §9 registra a medição de cada corte.
 
-O bloco acima é o caminho de quem vai **mexer no código**. Quem só quer usar não precisa
-de venv nem de `cd` em lugar nenhum: instale o pacote e chame o comando.
+## Instalando
+
+Há dois caminhos, e eles servem a pessoas diferentes. Quem só quer **usar** os servidores
+não precisa de checkout nenhum. Quem vai **mexer no código** precisa, porque os scripts e
+a suíte moram nele.
+
+### Só usar
 
 ```bash
 pipx install <CAMINHO-OU-URL-DO-REPOSITORIO>
 usp-mcp-rucard   # sobe o servidor stdio; ele fala JSON-RPC, não tem prompt
 ```
 
-E o cliente MCP aponta para o comando, sem `args` e sem caminho de projeto:
+O cliente MCP aponta para o comando, sem `args` e sem caminho de projeto:
 
 ```json
 {
@@ -117,19 +125,42 @@ E o cliente MCP aponta para o comando, sem `args` e sem caminho de projeto:
 }
 ```
 
-São **três comandos e não um com argumento** de propósito: o nome de cada um é o mesmo
-`serverInfo.name` que o servidor responde no `initialize`, e o porquê está escrito no
+São três comandos e não um com argumento de propósito: o nome de cada um é o mesmo
+`serverInfo.name` que o servidor responde no `initialize`. O porquê está escrito no
 `pyproject.toml`, ao lado da tabela.
 
-**O que foi medido e o que não foi.** Medido em 14/09/2026: `pip install -e` num venv
+Cuidado com o que foi de fato exercitado. Medido em 14/09/2026: `pip install -e` num venv
 limpo, e os três comandos subindo a partir de `/tmp`, com cliente MCP real, cada um se
-anunciando com o próprio nome. **Não** medidos: `pipx`, `uvx` e instalar direto da URL do
-repositório. São as portas que o `pyproject.toml` abre, e a distinção entre "abre" e
-"foi usado" é a mesma que o §6.1 faz sobre o `.mcpb` — quem rodar primeiro, registre.
+anunciando com o próprio nome. `pipx`, `uvx` e instalar direto da URL do repositório são
+portas que o `pyproject.toml` abre e que **ninguém atravessou ainda**. A distinção entre
+"abre" e "foi usado" é a mesma que o §6.1 faz sobre o `.mcpb`: quem rodar primeiro,
+registre.
 
-Este caminho **não** dispensa a *Configuração* abaixo: o pacote traz o código, não o
-`.env`. E ele não substitui o `scripts/servidor.sh`, que segue sendo como o `.mcp.json`
-versionado sobe os servidores deste checkout.
+Só o código vem no pacote. O `.env` é seu, e a *Configuração* abaixo continua valendo.
+
+### Mexer no código
+
+```bash
+git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
+python3 -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
+cp .env.example .env
+./scripts/gate.sh
+```
+
+O `-e` aponta para **este checkout**: nada é copiado para o site-packages, editar o código
+muda o que os comandos sobem, e `usp-mcp-moodle`, `usp-mcp-jupiter` e `usp-mcp-rucard`
+passam a existir em `.venv/bin/`. O extra `[dev]` acrescenta o `pytest`, que não é
+dependência do produto.
+
+O `cp` vem **antes** do gate porque sem `.env` ele reprova. A hash do RUCard é o único
+valor que o gate precisa, e ela já vem preenchida no exemplo: é a chave embutida no app
+oficial, pública e compartilhada, não credencial de ninguém. O token do Moodle nasce
+vazio e não precisa ser preenchido para o gate passar, porque o gate roda offline.
+
+O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente MCP
+neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e quem
+resolve a raiz do checkout é o script, não o cliente.
 
 ### Cliente que não faz `cd`
 
@@ -176,19 +207,9 @@ O token é **seu**, não de quem te convidou — cada pessoa traz o seu. Isso n�
 acidental: é o Invariante 4, e é o que permite este projeto existir sem ninguém confiar
 credencial a ninguém.
 
-**1. Clone e monte o ambiente.** O `.venv` é por diretório e não vem no git.
-
-```bash
-git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-```
-
-O `-e` instala o pacote **apontando para este checkout**: nada é copiado para o
-site-packages, editar o código muda o que roda, e `usp-mcp-moodle`, `usp-mcp-jupiter` e
-`usp-mcp-rucard` passam a existir em `.venv/bin/`. Os passos 2 a 4 abaixo usam o
-checkout, então ele continua sendo o caminho daqui — quem só quer usar o servidor pode
-pular o clone inteiro, ver *Sem checkout: o pacote instalado*.
+**1. Monte o ambiente.** Siga *Mexer no código*, acima. Os passos 2 a 4 usam o checkout,
+então ele é o caminho daqui em diante. Quem só quer usar o servidor pula o clone inteiro
+e vai por *Só usar*.
 
 **2. Pegue seu token do e-Disciplinas.** Um comando, com o navegador logado na Senha Única:
 
@@ -196,17 +217,27 @@ pular o clone inteiro, ver *Sem checkout: o pacote instalado*.
 ./scripts/token.sh
 ```
 
-Ele abre o `launch.php` para você. O Moodle mostra uma página com um link — o **endereço
-desse link é o token**. Botão direito nele, "copiar endereço do link", volta no terminal e
-aperta Enter: o script lê do clipboard. Sem DevTools, sem decodificar nada à mão. Uns 20
-segundos.
+Ele abre o `launch.php` e a página do Moodle aparece com três coisas. Duas são chamariz:
+a caixa verde "O seu cadastro foi confirmado" e o botão cinza "Ambientes". A que interessa
+é o link azul escrito *"Clique aqui se a aplicação não abrir automaticamente"* — o texto
+promete plano B e mente, porque o **endereço** dele é o único lugar da página onde o token
+existe.
+
+Botão **direito** nesse link, "copiar endereço do link", volta no terminal e aperta Enter.
+Não clique com o esquerdo: clicar tenta abrir o app do Moodle e não copia nada. Uns 20
+segundos, sem DevTools e sem decodificar nada à mão.
+
+Antes de decodificar, o script confere o que chegou. Se você copiou a URL da página em vez
+da do link — o erro mais comum, e o que aconteceu na primeira passagem de 12/09/2026 —, ele
+para ali, explica a diferença entre a URL de ida e a de volta, e deixa o `.env` intocado.
+A conferência mostra no máximo `moodlemobile://token=` e nunca um byte do que vem depois.
 
 Daí ele decodifica, **confirma o token contra a USP em uma chamada** e só então grava no
-`.env` — um token que não autentica não chega ao arquivo, e o `userid` sai da mesma
-resposta. **Nunca imprime o valor do token**, só diagnóstico de forma (Invariante 3).
+`.env`. Um token que não autentica não chega ao arquivo, e o `userid` sai da mesma
+resposta. O valor do token nunca é impresso, nem parcial (Invariante 3).
 
 Se você já tinha colado a URL no `.env` à mão e ela ficou torta, `./scripts/fix-token.sh`
-normaliza — é idempotente e detecta quando já está nos 32 hex.
+normaliza. É idempotente e detecta quando já está nos 32 hex.
 
 Existe um `--auto` que tenta capturar o redirect sozinho, com um handler temporário para
 um esquema próprio. Funciona contra servidor de teste e **nunca entregou contra o
@@ -229,8 +260,6 @@ pasta, registre no escopo de usuário:
 ```bash
 R=$(pwd); for m in moodle jupiter rucard; do claude mcp add --scope user "usp-$m" -- $R/scripts/servidor.sh $m; done
 ```
-
-O `-e PYTHONPATH=` que esta linha carregava saiu junto: ele existia porque o comando antigo rodava o interpretador de fora do checkout, e o lançador entra nele antes de subir o servidor.
 
 **Onde isso NÃO vai funcionar, e não é configuração:** sandbox em nuvem (a rede da USP não
 sai de lá, §1.1) e conector remoto (o token não pode viajar, Invariante 4 — e o
