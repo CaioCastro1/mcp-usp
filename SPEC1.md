@@ -2343,3 +2343,61 @@ mais conferido vira mapa errado**. O custo aqui foi menor porque o backlog não 
 começo de toda sessão — mas ele é o que responde "o que atacar primeiro", e ele apontava
 para duas ruas sem dívida. Não há cura estrutural registrada; fica o hábito de conferir a
 linha contra o código antes de agir sobre ela.
+
+### 14/09/2026 — Jupiter: o curso descobrível é o que não responde
+
+Desenho em `docs/superpowers/specs/2026-09-14-jupiter-requisitos-design.md`. A fatia
+aberta era "resolver curso", para destravar o pré-requisito do `disciplina`. Onze
+chamadas à mão (dado público, sem credencial) mataram o desenho óbvio antes de ele
+existir.
+
+**O caminho DWR de descoberta entrega o código errado.** `pubListarCursoEntrada
+{codclg:3}` devolve **3033** para a Elétrica. Com 3033, `pubListarRequisitoDisciplina`
+responde **0 linhas** para PSI3323 e PTC3314; com **3032** — que não aparece em lista
+nenhuma — responde PSI3322 `[CR]` e PTC3213+PSI3213 `[PR]`. A grade de 3033 tem 67
+registros e vai até o 5º semestre; a de 3032 vem **vazia**. São duas metades do mesmo
+programa sob códigos diferentes, o que fecha parcialmente a discrepância do §5.1 do
+recon: não é erro de digitação nem de superfície, é **geração de currículo**.
+
+**Filtrar por "vigente" piorava a resposta, e isso foi medido.** Em `MAT2455` (23
+currículos), os cursos que constam como ingresso hoje — 3023, 3073, 3084, 3093, 3123,
+3201, 3251 — são justamente os que trazem **zero linha**; os antigos é que têm o
+requisito cadastrado. Currículo novo (projeto piloto) existe antes de o requisito ser
+cadastrado, então cortar o que não é ingresso devolveria "nada" para as turmas recentes.
+Os pares 3021/3022/**3023**, 3072/**3073**, 3092/**3093** são a mesma coisa em gerações
+diferentes.
+
+**A ausência tem quatro formas e nenhuma é "não precisa de nada":** bloco com zero linhas
+(MAT2455 em 3023), zero blocos na página inteira (**PTC3313: 26.623 B, nenhum curso**),
+curso não informado, e sigla inexistente. PTC3314, PTC3360 e PTC3361 aparecem só sob 3032,
+6º período — da ênfase (7º) e do módulo (9º) em diante, estruturas que viram curso novo,
+esse endpoint não registra nada.
+
+**Três tipos de exigência, e o `stamtrrcp` é o discriminador.** Cruzando HTML e DWR no
+mesmo par: `PR`+`stamtrrcp=N` = "Requisito" (duro), `PR`+`stamtrrcp=S` = "Requisito fraco"
+(matricula devendo), `CR`+`N` = "Indicação de Conjunto" (cursa junto). **Mapeamento de 3
+pontos, não lei.** O tipo é propriedade do currículo, não do par: MAT2454 é duro em 3250
+(Minas) e fraco em 3032 (Elétrica). O `formatar()` que está na `main` imprime os três sob
+"Pré-requisito:" e descarta `stamtrrcp` — o correquisito vira exigência prévia, e "fraco"
+some. Dois defeitos, um deles resposta errada.
+
+**Dois "não verificado" do §8 do recon fecham:** `pubObterInfoCurso {3033,0}` devolve
+**objeto vazio** (196 B) e não serve de fonte de vigência — nenhum payload do Jupiter tem
+campo de vigência, e a lista de ingresso é a única âncora que existe.
+
+**Hipótese rejeitada, registrada para ninguém tentar de novo:** `codclg` como prefixo de
+`codcur`. Oito dos 47 colegiados (`1 2 3 5 6 7 8 9`) são prefixo de outro, então `27223`
+pode ser da unidade `2` ou da `27`. Derivar unidade de código de curso é chute. Testar
+*pertencimento* nos ≤2 candidatos, não.
+
+**Decisão:** a pergunta passa a ser respondida pela **sigla**, não pelo curso — ferramenta
+`requisitos(sigla)` sobre `listarCursosRequisitos`, que devolve todos os currículos com
+tipo e período, cada um rotulado como curso de ingresso ou não. A ferramenta `curso` de
+navegação unidade→curso **sai desta fatia**: a medição mostrou que ela não destrava o
+pré-requisito, destrava a grade curricular, que é outra pergunta.
+
+**Erro de método desta sessão.** O primeiro script de recon colapsou todo rótulo que não
+fosse "Conjunto" em `PR`, e por isso eu não vi o terceiro tipo — "Requisito fraco", que é
+30 das 33 linhas das fixtures. O que o revelou foi rodar o parser contra a fixture salva e
+**ler a saída**, não a suposição. Classificar antes de olhar a distribuição dos valores
+apaga exatamente a categoria que não se esperava.
