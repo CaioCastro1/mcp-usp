@@ -3216,3 +3216,90 @@ modo de esta ferramenta errar calada, e o mais barato de checar, porque a respos
 o dono sabe de cor.
 
 ---
+
+### 14/09/2026 — `atrasadas`: a primeira resposta que acusa alguém, e o que ela não pode dizer
+
+Este é o par invertido de `o_que_vence`: ela olha para a frente, esta olha para trás **e**
+cruza com o estado da entrega. As duas funções já estavam na allowlist desde `ja_entreguei`
+(12 e 14/09) — **nenhuma função nova**, allowlist parada em 11, T7/P5/D4 sem mexer além da
+linha da ferramenta nova em `FUNCOES_POR_FERRAMENTA`, e AT18 travando isso pelo lado do
+que é chamado.
+
+**A decisão que este commit pede para julgar é o TOM, e ela é técnica.** A saída diz que
+algo não foi entregue, e o e-Disciplinas conhece esse fato pela metade: ele sabe o que foi
+REGISTRADO nele. Entrega no papel, por e-mail, num sistema do laboratório, ou que o
+professor recebeu e nunca lançou, é invisível daqui. Cinco regras saíram disso, e as cinco
+têm teste:
+
+1. **Nunca "você não entregou"** (AT7). A frase é sempre sobre o registro — *"o
+   e-Disciplinas não registra envio seu"* —, e a resposta inteira, inclusive a que não
+   acusa ninguém, carrega a ressalva e manda confirmar. Não é diplomacia: uma frase é
+   afirmação sobre a pessoa, a outra é sobre o sistema, e só a segunda é verificável daqui.
+2. **Nota lançada sem envio registrado NÃO é falta** (AT8). `gradingstatus: "graded"` sem
+   `submission` é, quase sempre, entrega feita fora do Moodle e nota posta à mão pelo
+   professor. É o único desmentido que a própria API oferece, e ele é usado: essas saem em
+   bloco próprio, com a leitura explícita, e não entram na conta do que falta.
+3. **Prorrogação individual ainda válida não é atraso** (AT10) — o J8 um passo adiante.
+4. **`nosubmissions` nunca vira acusação** (AT5): a prova presencial que o professor criou
+   só para ter data não tem como ser entregue pelo site. Aparece, com o motivo, sem gastar
+   chamada.
+5. **Warning da API vira aviso** (AT13). A fixture REAL traz dois `warnings` de "sem
+   direito de acesso": dizer "nada em atraso" sobre uma lista que o próprio Moodle avisou
+   estar incompleta é o falso vazio do Invariante 7 no lugar em que ele custa mais caro —
+   é esta resposta que faz alguém parar de procurar.
+
+**A segunda decisão é o escopo.** `disciplina` é OPCIONAL, ao contrário de `ja_entreguei`:
+"o que eu devo?" é pergunta de todas as matérias de uma vez, e obrigar a sigla faria repetir
+a pergunta dez vezes — que é exatamente o que `ja_entreguei` já faz bem. Sem sigla, o escopo
+são as disciplinas **em andamento**, que `disciplinas.situacao_de` (nascida hoje) responde
+sem gastar chamada, porque a lista está cacheada. Escopo vazio não é opção: sem `courseids`
+a função devolve as 74 matrículas, 1 MB, ~251k tokens (§9, 28/08).
+
+**Dois tetos, e eles são de naturezas diferentes:**
+
+- `TETO_CONSULTAS` (10, importado de `ja_entreguei`) é de LATÊNCIA e de log da conta: uma
+  ida por entrega vencida. O corte fica com as de prazo mais recente — o que venceu ontem
+  ainda dá para correr atrás — e é declarado com a contagem e a cura (AT11).
+- `TETO_DISCIPLINAS` (10) é de BYTES: a chamada é uma só, mas o payload cresce com o número
+  de `courseid`. O que fica de fora é **nomeado**, não contado (AT12).
+
+**A projeção, e as duas metades do cru têm procedências diferentes:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| PTC3314, uma entrega vencida com rascunho salvo | 10.956 B | 1.250 B | **8,8×** |
+
+Dos 10.956 B, **8.571 B são fixture REAL** (`assign_ptc3314.json`, 12/09, a mesma medida
+como JSON compacto que o §9 de `ja_entreguei` usa; 7.975 B em disco) e **2.385 B são
+escritos à mão** (uma resposta de `mod_assign_get_submission_status`, forma documentada do
+core 5.0, ressalva inteira no `conftest`). A razão é menor que a das irmãs porque o cru
+aqui é pequeno: a projeção descarta os mesmos dois campos gordos de `ja_entreguei` — o
+texto que o aluno entregou e o enunciado em HTML — e o que sobra já é quase todo resposta.
+
+O número de dez disciplinas — ~86 kB de payload cru — é **aritmética sobre uma disciplina
+medida**, e não medição: a única captura desta função que existe cobre um curso. Está dito
+assim no módulo e no teste.
+
+**Dois defeitos de `ja_entreguei` apareceram ao reusar a projeção dela, e os dois são do
+mesmo ramo — o retorno rápido de "nada enviado":**
+
+- ele descartava `gradingstatus`, que é justamente o campo do item 2 acima;
+- ele descartava `extensionduedate`, e por isso `ja_entreguei` imprimia **"PRAZO VENCIDO"**
+  para quem tinha prorrogação e ainda não tinha enviado. Nenhum teste de lá via, porque
+  todos os casos de prorrogação da suíte tinham envio.
+
+Os dois foram corrigidos na projeção compartilhada, que é o motivo de ela ser
+compartilhada. Junto vieram `Entrega.courseid` (a resposta cobre várias disciplinas e "EP1"
+sem a matéria não é resposta) e o predicado público `envio_registrado` — `RASCUNHO` e
+`REABERTA` parecem entrega na tela do Moodle e não são, e uma segunda cópia dessa regra é
+uma cópia que alguém atualiza sozinha.
+
+**O que fica sem verificação ao vivo:** se `warnings` de `get_assignments` aparece mesmo
+quando há entrega escondida (a fixture real tem dois, mas não se sabe o que eles escondem);
+se `mod_assign_get_assignments` com dez `courseid` responde na mesma forma e em quanto
+tempo — é a única suposição estrutural desta ferramenta, e a mais barata de checar; e o par
+"nota lançada sem envio registrado", que é plausível pela forma do core e nunca foi visto
+neste site. As três saem de uma execução só, junto com a captura que troca a fixture de
+status por uma de verdade.
+
+---

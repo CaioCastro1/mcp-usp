@@ -76,12 +76,19 @@ class Entrega:
     `aceita_envio` é `nosubmissions == 0` invertido no nome de propósito: o
     campo do Moodle é uma negativa, e uma negativa lida ao contrário num `if`
     faria a ferramenta consultar exatamente as entregas que não existem.
+
+    `courseid` entrou em 14/09 com `atrasadas`, que pergunta por várias
+    disciplinas na mesma chamada: sem ele, a resposta traria "EP1" sem dizer
+    de qual matéria. Aqui ele não é usado — esta ferramenta já tem a
+    disciplina no cabeçalho —, e é opcional para que a projeção continue
+    montável a partir de um `assign` solto.
     """
 
     assignid: int
     nome: str
     prazo: datetime | None
     aceita_envio: bool
+    courseid: int | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +142,7 @@ def projetar_entregas(bruto) -> tuple[Entrega, ...]:
             nome=a.get("name") or "",
             prazo=_data(a.get("duedate")),
             aceita_envio=not a.get("nosubmissions"),
+            courseid=curso.get("id"),
         )
         for curso in (bruto or {}).get("courses") or ()
         for a in curso.get("assignments") or ()
@@ -168,7 +176,22 @@ def projetar_status(bruto, entrega: Entrega) -> Situacao:
     if not submissao or status == "new":
         # Ausente e `new` são a mesma resposta para quem pergunta — "não tem
         # nada lá" — e separá-las na saída seria vocabulário do Moodle vazando.
-        return Situacao(entrega=entrega, estado=_NADA)
+        #
+        # `corrigida` e `prorrogacao` sobrevivem a este retorno desde 14/09, e
+        # são as duas coisas que este ramo NÃO pode jogar fora. Nota lançada
+        # sem envio registrado é quase sempre entrega feita fora do Moodle, e
+        # `atrasadas` usa exatamente isso para não acusar quem já entregou
+        # (AT8). E a prorrogação existe justamente para quem ainda NÃO enviou:
+        # descartá-la aqui fazia esta ferramenta imprimir "PRAZO VENCIDO" para
+        # quem tinha prazo até semana que vem — defeito encontrado ao reusar
+        # a projeção em `atrasadas`, e que nenhum teste de `ja_entreguei` via
+        # porque todos os casos de prorrogação tinham envio.
+        return Situacao(
+            entrega=entrega,
+            estado=_NADA,
+            corrigida=ultima.get("gradingstatus") == "graded",
+            prorrogacao=_data(ultima.get("extensionduedate")),
+        )
 
     quando = _data(submissao.get("timemodified"))
     prorrogacao = _data(ultima.get("extensionduedate"))
@@ -201,6 +224,18 @@ def projetar_status(bruto, entrega: Entrega) -> Situacao:
     )
 
 
+def envio_registrado(situacao: Situacao) -> bool:
+    """O e-Disciplinas recebeu a entrega para correção?
+
+    Público desde 14/09 porque `atrasadas` faz a mesma pergunta e a resposta
+    não pode ser escrita duas vezes: `RASCUNHO` e `REABERTA` parecem entrega
+    na tela do Moodle e não são, e é essa exata distinção que as duas
+    ferramentas existem para não deixar passar. Uma segunda cópia da regra é
+    uma cópia que alguém atualiza sozinha.
+    """
+    return situacao.estado == _ENTREGUE
+
+
 def _formatar_linha(s: Situacao, agora: datetime) -> str:
     prazo = formatar_data(s.entrega.prazo) if s.entrega.prazo else "sem prazo"
     linha = f"{prazo}  {s.entrega.nome}: {s.estado}"
@@ -225,7 +260,7 @@ def _formatar_linha(s: Situacao, agora: datetime) -> str:
     return linha
 
 
-_COBERTURA = (
+COBERTURA = (
     "Esta resposta cobre só TAREFA (`assign`) do e-Disciplinas. Questionário "
     "não passa por aqui, e prova presencial que o professor não lançou no "
     "Moodle não existe em lugar nenhum — use `o_que_vence` para ver o que tem "
@@ -270,7 +305,7 @@ def ja_entreguei(
         # Vazio é comum aqui, e vazio mudo seria o falso "não tem nada".
         return RespostaJaEntreguei(
             texto=f"{cabecalho}\n\nEsta disciplina não tem nenhuma tarefa de "
-            f"entrega no e-Disciplinas.\n\n⚠ {_COBERTURA}",
+            f"entrega no e-Disciplinas.\n\n⚠ {COBERTURA}",
             total=0,
             consultadas=0,
             truncado=False,
@@ -326,7 +361,7 @@ def ja_entreguei(
     consultadas = sum(1 for s in situacoes if s.entrega.aceita_envio)
     linhas = [cabecalho, "", *(_formatar_linha(s, agora) for s in situacoes)]
 
-    avisos = [_COBERTURA, _SEM_NOTA]
+    avisos = [COBERTURA, _SEM_NOTA]
     if truncado:
         # Invariante 7: o corte é dito, com a contagem e com a cura.
         avisos.insert(

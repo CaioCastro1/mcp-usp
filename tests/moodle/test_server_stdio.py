@@ -61,6 +61,7 @@ def test_t78_main_registra_todas_as_ferramentas(servidor_montado):
     ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
 
     assert sorted(f.name for f in ferramentas) == [
+        "atrasadas",
         "avisos",
         "baixar_arquivo",
         "diagnostico",

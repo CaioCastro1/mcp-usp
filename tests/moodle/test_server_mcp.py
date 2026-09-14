@@ -25,9 +25,10 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — nove ferramentas. Cada crescimento é decisão registrada no §9:
+    """T42 — dez ferramentas. Cada crescimento é decisão registrada no §9:
     `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico`,
-    `ja_entreguei`, `notas`, `avisos`, `o_que_mudou` e `disciplinas` em 14/09.
+    `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas` e
+    `atrasadas` em 14/09.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma
@@ -44,6 +45,7 @@ def test_expoe_exatamente_uma_ferramenta():
         "avisos",
         "o_que_mudou",
         "disciplinas",
+        "atrasadas",
     ]
 
 
@@ -248,3 +250,55 @@ def test_T112_chamar_ferramenta_roteia_disciplinas_com_cliente_injetado():
         "core_enrol_get_users_courses",
     ]
     assert str(brutos[0]["id"]) not in saida
+
+
+def test_T113_o_descritor_de_atrasadas_nao_acusa_e_declara_o_custo():
+    """A descrição é lida pelo modelo antes de ele decidir chamar, e é o único
+    lugar onde ele aprende as duas coisas que esta ferramenta exige dele: que a
+    resposta é sobre o REGISTRO do e-Disciplinas (e não sobre o que a pessoa
+    fez), e que ela custa uma chamada por entrega vencida.
+
+    Sem a primeira, um modelo lê a lista e escreve "você não entregou X" — que
+    é exatamente a frase que a ferramenta inteira foi desenhada para não dizer.
+    """
+    f = [x for x in server.listar_ferramentas() if x["name"] == "atrasadas"][0]
+
+    assert "submission_status" not in f["description"]
+    assert "registra" in f["description"].lower(), "não disse que é o registro"
+    assert "chamada" in f["description"].lower(), "não declarou o custo"
+    assert "ja_entreguei" in f["description"]
+    props = f["inputSchema"]["properties"]
+    assert set(props) == {"disciplina"}
+    assert f["inputSchema"]["required"] == []
+    assert all(p.get("description") for p in props.values())
+
+
+def test_T114_chamar_ferramenta_roteia_atrasadas_com_cliente_injetado(
+    disciplinas_brutas, entregas_ptc3314
+):
+    """A fronteira inteira, offline, no caminho que acusa: uma entrega vencida
+    sem envio registrado atravessa até o texto, e nenhuma URL vai junto."""
+    from usp_mcp.moodle import disciplinas as dis
+
+    from .conftest import ClienteFalso, status_de_entrega
+
+    dis.limpar_cache()
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 8214},
+            "core_enrol_get_users_courses": disciplinas_brutas,
+            "mod_assign_get_assignments": entregas_ptc3314,
+            "mod_assign_get_submission_status": lambda p: status_de_entrega(
+                com_lastattempt=False
+            ),
+        }
+    )
+
+    saida = server.chamar_ferramenta(
+        "atrasadas", {"disciplina": "PTC3314"}, cliente=cliente
+    )
+
+    dis.limpar_cache()
+    assert "PTC3314" in saida
+    assert "não entregou" not in saida.lower()
+    assert "pluginfile.php" not in saida

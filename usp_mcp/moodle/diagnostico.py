@@ -65,6 +65,16 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "core_webservice_get_site_info",
         "core_enrol_get_users_courses",
     ),
+    # `atrasadas` (14/09) exige exatamente o mesmo que `ja_entreguei`, e é de
+    # propósito: ela é a outra pergunta sobre o mesmo par de funções — "o que
+    # venceu e não consta entregue" em vez de "o que já entreguei". Um site que
+    # responde uma responde a outra.
+    "atrasadas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
+    ),
     # `notas` (14/09) exige as DUAS visões, e é o único caso da tabela em que a
     # ferramenta não usa as duas na mesma invocação: ela escolhe uma conforme a
     # pergunta tenha ou não disciplina. Declarar as duas é o certo mesmo assim —
