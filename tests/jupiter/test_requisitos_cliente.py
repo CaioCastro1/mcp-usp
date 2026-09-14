@@ -118,4 +118,4 @@ def test_t66_pagina_sem_curriculo_avisa_em_vez_de_devolver_lista_vazia(
     ficha = ferramentas.requisitos("PTC3313", cliente=c)
 
     assert ficha["curriculos"] == []
-    assert any("não conclua" in a for a in ficha["avisos"])
+    assert any("não conclua" in a.lower() for a in ficha["avisos"])

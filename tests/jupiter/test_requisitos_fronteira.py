@@ -123,3 +123,33 @@ def test_t76_o_caminho_dwr_tambem_distingue_fraco_de_duro(
 
     assert ficha["pre_requisito"][0]["fraco"] is fraco
     assert esperado in saida.lower()
+
+
+def test_t77_o_silencio_nao_escolhe_a_causa_que_nao_sabe(
+    ptc3313_html, ingresso_poli, colegiados
+):
+    """Zero currículo tem DUAS causas possíveis e elas são indistinguíveis daqui.
+
+    MAT2453 é Cálculo I, primeira do currículo: o silêncio dela é ausência real.
+    PTC3313 é de ênfase: o silêncio é falta de registro. A página devolve a
+    mesma coisa para as duas, e a saída dizia "da ênfase em diante esse endpoint
+    costuma não ter registro" — explicação absurda para Cálculo I, e é o que
+    uma pergunta de aceite pegou.
+
+    O Invariante 7 não pede que a ferramenta saiba: pede que ela não invente
+    qual das duas é.
+    """
+    c = cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]),
+        transporte_get=GravadorGet(ptc3313_html),
+    )
+    saida = server.chamar_ferramenta("requisitos", {"sigla": "PTC3313"}, cliente=c)
+
+    # As duas causas aparecem, e nenhuma é apresentada como a provável.
+    assert "não conclua" in saida.lower()
+    for causa in ("ênfase", "primeira"):
+        assert causa in saida.lower(), f"a causa {causa!r} não é oferecida"
+    for ranking in ("provavelmente", "costuma", "mais provável"):
+        assert ranking not in saida.lower(), (
+            f"{ranking!r} rankeia uma causa que a ferramenta não consegue medir"
+        )
