@@ -114,3 +114,33 @@ def test_r41b_o_texto_declara_o_que_nao_sabe(gravador, respostas_da_fatia):
     )
     assert "⚠" in texto, "o aviso do Invariante 7 sumiu na formatação"
     assert "24/08/2026" in texto
+
+
+@pytest.mark.contrato
+def test_r47_item_comum_a_todas_as_refeicoes_sai_uma_vez_no_rodape(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta("bandejao", {"dia": "24/08/2026"}, cliente=cliente)
+
+    # Em 24/08 os sete pratos abertos têm "Minipão / refresco" e o arroz: uma vez cada.
+    assert texto.count("Minipão / refresco") == 1
+    assert texto.count("Arroz / feijão / arroz integral") == 1
+    (rodape,) = [l for l in texto.splitlines() if l.startswith("Em todas as refeições acima:")]
+    assert "Minipão / refresco" in rodape and "Arroz / feijão / arroz integral" in rodape
+    assert "Iscas de tilápia empanadas" in texto, "o que varia continua na linha"
+
+
+@pytest.mark.contrato
+def test_r47b_com_uma_refeicao_so_nao_ha_rodape_e_a_linha_fica_inteira(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao",
+        {"dia": "24/08/2026", "refeicao": "almoco", "restaurantes": ["central"]},
+        cliente=cliente,
+    )
+    assert "Em todas as refeições" not in texto
+    linha = next(l for l in texto.splitlines() if "Iscas de tilápia" in l)
+    assert "Minipão / refresco" in linha and "Arroz / feijão / arroz integral" in linha
