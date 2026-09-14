@@ -28,6 +28,11 @@ palavra "FECHADO" como item de comida em três dos quatro RUs.
 **A opção do dia não é chamada de vegetariana sem a marca.** 100% das refeições
 abertas nas duas semanas têm uma linha `Opção: …`; só algumas trazem `(V)`.
 Rotular todas de vegetarianas é afirmar o que a fonte não diz.
+
+**Comunicado não é prato.** Em 14/09/2026 o campo de cardápio passou a terminar
+com um aviso em negrito ("Tragam suas canecas") em três RUs. Ele sai da lista de
+itens e volta como UM aviso na resposta, nomeando os RUs — nunca some, e nunca
+aparece como comida (§9, 14/09).
 """
 from __future__ import annotations
 
