@@ -1,135 +1,176 @@
 # usp-mcp
 
-Ferramentas para responder perguntas sobre a vida acadêmica na USP: cardápio dos
-bandejões, prazos e material do e-Disciplinas, catálogo de disciplinas do JupiterWeb.
+Um jeito de perguntar, em português, coisas da vida acadêmica na USP: o que tem no
+bandejão hoje, o que você tem para entregar essa semana, que arquivos o professor subiu no
+e-Disciplinas, quantos créditos vale uma disciplina e qual é o pré-requisito dela.
 
-Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo. Usa APIs não
-documentadas, descobertas por observação. Elas podem mudar ou sumir sem aviso, e "está
-público" não equivale a "liberado para redistribuir" (ver Invariante 8 do `SPEC1.md`).
+Você não usa isto direto. Ele se liga num assistente (o Claude, por exemplo) e passa a ser
+uma coisa que o assistente sabe consultar. Aí você pergunta normal, como perguntaria para
+um amigo, e a resposta vem do sistema da USP de verdade.
 
-## Estado (14/09/2026)
+Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 
-Três servidores MCP rodando, sete ferramentas, todas verificadas contra a USP.
+## O que ele responde
 
-| Servidor | Ferramenta | Responde |
-|---|---|---|
-| `usp-rucard` | `bandejao` | O que tem no bandejão hoje, e onde vale a pena comer |
-| `usp-moodle` | `o_que_vence` | O que tenho para entregar nos próximos N dias |
-| `usp-moodle` | `material` | Que arquivos tem no espaço da disciplina: regras, listas, provas antigas |
-| `usp-moodle` | `baixar_arquivo` | Baixa um desses arquivos e devolve o caminho dele no disco |
-| `usp-moodle` | `diagnostico` | Se este servidor funciona no Moodle configurado, e o que o seu token alcança lá |
-| `usp-jupiter` | `disciplina` | Créditos, carga horária, ementa e programa, pela sigla |
-| `usp-jupiter` | `requisitos` | O que é preciso ter cursado antes, por currículo, e o que dá para cursar junto |
+| Pergunta que você faz | Onde ele busca |
+|---|---|
+| "O que tem no bandejão hoje?" | Cardápio dos quatro restaurantes, com horário e preço |
+| "O que eu tenho para entregar essa semana?" | Tarefas e questionários do e-Disciplinas, com prazo |
+| "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
+| "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
+| "Quantos créditos vale MAC0110?" | Créditos, carga horária, ementa e programa, pelo JupiterWeb |
+| "O que preciso ter feito antes de MAT2454?" | Pré-requisitos, pelo seu currículo |
 
-`baixar_arquivo` entrega o caminho, não o conteúdo. Quem lê o PDF é o agente que chamou,
-com a ferramenta de leitura dele. Um blob em base64 custaria cerca de 302k tokens no PDF
-médio, e extrair o texto no servidor perderia as figuras. Pior: numa lista manuscrita
-escaneada isso devolveria 9 bytes e chamaria de sucesso (§9, 01/09 e 03/09). O arquivo cai
-em `~/.cache/usp-mcp/moodle/`, fora do repositório.
-
-### O que o projeto não responde, e por quê
-
-Nota, histórico escolar, evolução do curso e saldo do RUCard ficam de fora. O motivo é
-falta de caminho, não de trabalho. Medido em 14/09:
-
-- A superfície pública estruturada do JupiterWeb é o catálogo de entrada. A grade
-  curricular dos cursos de ingresso da Poli para no 5º semestre (medido em quatro cursos),
-  e da ênfase (7º) e do módulo (9º) em diante não há grade, requisito nem código de curso
-  alcançável.
-- Dado pessoal exige a área logada, que não oferece token como o Moodle. Só sessão de
-  navegador, com dois cookies e timeout de inatividade ainda não medido.
-
-O roteiro para medir isso está em
-`docs/superpowers/plans/2026-09-14-jupiter-sessao-recon.md`, com as regras que valem desde
-a primeira requisição. Nada dele foi executado até agora.
-
-Também não existem: notas, "já entreguei?", aviso de professor, histórico de cardápio,
-saldo do cartão, horário, sala e vagas. `material` diz o nome, o tipo e o tamanho de cada
-arquivo, mas não emite a URL interna dele. Endereço sem a credencial não abre, e quem
-resolve isso é `baixar_arquivo`, sem nunca pôr o token numa URL.
-
-Empacotar como MCP Bundle (`.mcpb`) segue sem teste. O §6.1 o descreve por leitura de
-documentação, e ele é o degrau seguinte ao pacote que já existe.
-
-Ferramenta não nasce por conveniência: o critério está no §5, e as questões abertas do §4
-fecham com dado registrado no §9. Comece por `SPEC1.md`. Ele é a autoridade do projeto, e
-o §9 registra cada decisão tomada, com o dado que a fechou e o que foi descartado.
-
-- `usp_mcp/`, os servidores, um pacote por sistema
-- `tests/`, três camadas: política e contrato offline, `live` atrás de env var
-- `notas/`, análise por sistema, com custo medido em bytes e tokens
-- `fixtures/`, respostas cruas capturadas (as do Moodle ficam fora do git, porque têm dado pessoal)
-- `scripts/`, chamadores da descoberta e o gate de pré-commit
-- `docs/decisions/BACKLOG-correcoes.md`, a dívida que está em aberto
-
-## Como funciona
-
-Cada servidor é um processo que fala MCP por stdio. O cliente sobe o processo, os dois
-trocam JSON-RPC pela entrada e saída padrão, e ninguém abre porta de rede. Se você rodar
-`usp-mcp-rucard` no terminal e a tela ficar parada, é isso mesmo: não há prompt nem
-interface.
-
-Quem escolhe a ferramenta é o modelo, lendo a descrição dela diante de uma pergunta em
-português. Por isso as descrições usam o vocabulário de quem pergunta ("o que vence",
-"que arquivos tem") e não o nome da função do Moodle por trás. Descrição ruim faz o modelo
-não achar a ferramenta, por melhor que ela seja.
-
-Entre o modelo e a USP existem duas travas. A primeira é uma allowlist: só saem daqui as
-funções nomeadas nela, por igualdade exata, e o default é negar. A segunda é o bloqueio
-permanente do §2.2, que vale mesmo com a flag de escrita ligada. Ele cobre o que não deve
-ser chamado em hipótese nenhuma, como começar tentativa de prova, entregar trabalho ou
-falar com terceiros em nome de quem usa. As duas existem porque o token alcança 447
-funções neste site, e quem escolhe qual chamar é um modelo interpretando linguagem
-ambígua.
-
-A credencial do Moodle é pessoal e fica no `.env` da máquina de quem usa. Ela não viaja
-para servidor hospedado nem para sandbox em nuvem, e é por isso que o Moodle roda local.
-O RUCard e o Jupiter não usam credencial nenhuma.
-
-Cada resposta é projetada antes de chegar ao modelo. A lista de disciplinas sai de 104.712
-bytes para 7.816, e o resto do transporte fica no servidor. Payload cru enche a janela de
-contexto com metadado que não responde a pergunta nenhuma, e o §9 registra a medição de
-cada corte.
+Bandejão e JupiterWeb funcionam para qualquer pessoa. O e-Disciplinas mostra as **suas**
+disciplinas, então ele precisa de uma chave sua, e obter essa chave dá um pouco mais de
+trabalho. A seção *Configuração* explica.
 
 ## Instalando
 
-### Só usar
+Duas coisas antes de começar. Isto roda no Terminal do seu computador, Mac ou Linux, e
+não tem tela nem botão. E você precisa de um assistente que aceite conectar ferramentas,
+como o Claude Desktop ou o Claude Code.
 
-Quem só quer rodar os servidores não precisa de checkout.
+Abra o Terminal e cole estes dois comandos, um de cada vez:
 
 ```bash
-pipx install <CAMINHO-OU-URL-DO-REPOSITORIO>
-usp-mcp-rucard   # sobe o servidor stdio; ele fala JSON-RPC, não tem prompt
+python3 -m venv ~/usp-mcp
+~/usp-mcp/bin/pip install git+https://github.com/CaioCastro1/mcp-usp.git
 ```
 
-O cliente MCP aponta para o comando, sem `args` e sem caminho de projeto:
+O primeiro cria uma pastinha isolada na sua conta, para não bagunçar nada que já esteja no
+computador. O segundo baixa o programa lá dentro.
+
+Se o Terminal responder que não conhece o comando `python3`, é porque ele ainda não está
+instalado na sua máquina. Instale primeiro, pelo site python.org, e repita os dois
+comandos.
+
+Para conferir se deu certo:
+
+```bash
+ls ~/usp-mcp/bin | grep usp
+```
+
+Tem que aparecer `usp-mcp-jupiter`, `usp-mcp-moodle` e `usp-mcp-rucard`.
+
+Agora avise o assistente que eles existem. No Claude Desktop, abra as configurações de
+conectores e cole isto, trocando `SEU-USUARIO` pelo nome da sua conta no computador (se
+não souber, o comando `whoami` no Terminal responde):
 
 ```json
 {
   "mcpServers": {
-    "usp-rucard": { "command": "usp-mcp-rucard" },
-    "usp-jupiter": { "command": "usp-mcp-jupiter" },
-    "usp-moodle": { "command": "usp-mcp-moodle" }
+    "usp-rucard": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-rucard" },
+    "usp-jupiter": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-jupiter" },
+    "usp-moodle": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-moodle" }
   }
 }
 ```
 
-São três comandos, e não um com argumento, de propósito: o nome de cada um é o mesmo
-`serverInfo.name` que o servidor responde no `initialize`. O porquê está escrito no
-`pyproject.toml`, ao lado da tabela.
+Feche e abra o assistente. Pronto: bandejão e JupiterWeb já respondem. O e-Disciplinas
+ainda vai reclamar que falta a chave, e é a próxima seção.
 
-Nem todo caminho acima foi exercitado. O que foi medido em 14/09/2026: `pip install -e`
-num venv limpo, e os três comandos subindo a partir de `/tmp` com cliente MCP real, cada
-um se anunciando com o próprio nome. `pipx`, `uvx` e instalar direto da URL do repositório
-são portas que o `pyproject.toml` abre e que ninguém atravessou ainda. A distinção entre
-"abre" e "foi usado" é a mesma que o §6.1 faz sobre o `.mcpb`. Se você rodar primeiro,
-registre.
+Se algo não funcionar, peça ao assistente para rodar a ferramenta `diagnostico`. Ela diz o
+que está no lugar e o que não está.
 
-Só o código vem no pacote. O `.env` é seu, e a *Configuração* abaixo continua valendo.
+## Configuração
 
-### Mexer no código
+Só o e-Disciplinas precisa disto. Bandejão e JupiterWeb funcionam sem nada.
 
-Aqui o checkout é necessário, porque os scripts e a suíte moram nele.
+A chave é sua e pessoal, e cada pessoa obtém a dela. Ela nunca sai do seu computador, e é
+por isso que ninguém pode te dar uma pronta.
+
+Para obtê-la você precisa do projeto baixado inteiro, e não só do programa instalado
+acima, porque o script que faz isso não vem junto no pacote. Siga *Mexer no código* até o
+fim do primeiro bloco de comandos, e depois rode:
+
+```bash
+./scripts/token.sh
+```
+
+Ele abre uma página do e-Disciplinas no seu navegador. Você precisa já estar logado na
+Senha Única. A página mostra três coisas, e duas são distração: a caixa verde "O seu
+cadastro foi confirmado" e o botão cinza "Ambientes". O que importa é o link azul escrito
+"Clique aqui se a aplicação não abrir automaticamente".
+
+Clique nele com o **botão direito** e escolha "copiar endereço do link". Não clique com o
+esquerdo: isso tenta abrir o aplicativo do Moodle e não copia nada. Volte no Terminal e
+aperte Enter.
+
+O script confere o que você copiou, testa a chave contra a USP e só então guarda. Se você
+copiou o endereço errado, ele avisa e não estraga nada. A chave nunca aparece na tela.
+
+Ela fica guardada num arquivo chamado `.env`, na linha `MOODLE_TOKEN`. Você não precisa
+abrir esse arquivo, mas se um dia abrir, é essa a linha.
+
+Ela vence com o tempo e pode ser cancelada em `edisciplinas.usp.br`, em gerenciar tokens.
+Se um dia o e-Disciplinas parar de responder, rode `./scripts/token.sh` de novo.
+
+## Usando
+
+Depois de conectado, é só perguntar. Alguns exemplos do que funciona:
+
+- "o que tem no bandejão da Física hoje no jantar?"
+- "tem alguma coisa vencendo nos próximos 3 dias?"
+- "quais arquivos tem em PTC3314?"
+- "baixa o EP1 de PTC3314 e me explica o que ele pede"
+- "quantos créditos vale MAC0110 e qual é a ementa?"
+
+A última é a que mostra a graça da coisa: ele baixa o PDF e o próprio assistente lê o
+arquivo para te responder.
+
+Se você pedir algo que ele não sabe, a resposta diz o que faltou em vez de inventar. Vale
+ler a seção *O que o projeto não responde* antes de concluir que quebrou.
+
+## Como funciona
+
+Cada um dos três comandos é um programinha que fica esperando o assistente perguntar. Eles
+não abrem site, não abrem porta de rede e não têm tela. Se você rodar um deles no Terminal
+e não acontecer nada, é assim mesmo.
+
+Quem decide qual ferramenta usar é o assistente, lendo a descrição de cada uma diante da
+sua pergunta. Por isso as descrições são escritas na linguagem de quem pergunta, e não com
+o nome técnico da função por trás.
+
+O acesso à USP é limitado de propósito. De todas as operações que a sua chave permitiria,
+só um punhado está liberado aqui, e todas são de leitura. Coisas como começar uma prova,
+entregar um trabalho ou mandar mensagem em seu nome estão bloqueadas e continuam
+bloqueadas mesmo se alguém ligar a permissão de escrita. O motivo é simples: quem escolhe
+o que chamar é um assistente interpretando uma frase ambígua, e "manda ver a lista de
+exercícios" não pode ter caminho até entregar o trabalho.
+
+A sua chave do e-Disciplinas fica só no seu computador. Ela não vai para nenhum servidor,
+nem para a nuvem. É por isso que o e-Disciplinas só funciona rodando local.
+
+As respostas da USP são enxugadas antes de chegar ao assistente. A lista de disciplinas,
+por exemplo, sai de 104.712 bytes para 7.816: o resto é metadado que não responde pergunta
+nenhuma e só ocuparia espaço.
+
+## O que o projeto não responde, e por quê
+
+Nota, histórico escolar, evolução do curso e saldo do RUCard ficam de fora. O motivo é
+falta de caminho, não de trabalho. Medido em 14/09/2026:
+
+- A parte pública e organizada do JupiterWeb é o catálogo de entrada. A grade dos cursos de
+  ingresso da Poli para no 5º semestre (verificado em quatro cursos), e da ênfase (7º) e do
+  módulo (9º) em diante não há grade, requisito nem código de curso alcançável.
+- Dado pessoal exige a área logada, que não oferece chave como o Moodle. Só sessão de
+  navegador, com dois cookies e um tempo de expiração ainda não medido.
+
+O roteiro para medir isso está em
+`docs/superpowers/plans/2026-09-14-jupiter-sessao-recon.md`. Nada dele foi executado.
+
+Também não existem: aviso de professor, "já entreguei isso?", histórico de cardápio, saldo
+do cartão, horário, sala e vagas.
+
+Uma limitação que costuma confundir: ao listar material, o projeto diz o nome, o tipo e o
+tamanho de cada arquivo, mas não devolve o endereço dele. Endereço sem a credencial não
+abre, e quem baixa de fato é a ferramenta de download, sem nunca pôr a sua chave num
+endereço.
+
+## Mexer no código
+
+Daqui para baixo é para quem vai contribuir.
 
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
@@ -139,30 +180,16 @@ cp .env.example .env
 ./scripts/gate.sh
 ```
 
-O `-e` aponta para este checkout. Nada é copiado para o site-packages, editar o código
-muda o que os comandos sobem, e `usp-mcp-moodle`, `usp-mcp-jupiter` e `usp-mcp-rucard`
-passam a existir em `.venv/bin/`. O extra `[dev]` acrescenta o `pytest`, que não é
-dependência do produto.
-
 O `cp` vem antes do gate porque sem `.env` ele reprova. A hash do RUCard é o único valor
 que o gate precisa, e ela já vem preenchida no exemplo: é a chave embutida no app oficial,
-pública e compartilhada, não credencial de ninguém. O token do Moodle nasce vazio e não
-precisa ser preenchido para o gate passar, porque o gate roda offline.
+pública e compartilhada, não credencial de ninguém. O gate roda offline e não toca a USP.
 
-O `.mcp.json` versionado já registra os três servidores, sem segredo. Abra um cliente MCP
-neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e quem
+O `.mcp.json` versionado registra os três servidores sem segredo nenhum. Abra um cliente
+MCP neste diretório e pergunte. Cada entrada chama `scripts/servidor.sh <sistema>`, e quem
 resolve a raiz do checkout é o script, não o cliente.
 
-### Cliente que não faz `cd`
-
-O `.mcp.json` é relativo de propósito: ele é versionado e compartilhado, e caminho
-absoluto de máquina não entra em arquivo rastreado (Invariante 3 aplicado a caminho).
-Relativo funciona em cliente que roda o servidor com o diretório de trabalho na raiz do
-projeto, como o Claude Code faz. O Claude Desktop e afins não fazem, e lá o caminho
-relativo falha com `no such file or directory`.
-
-Para esses, aponte para o caminho absoluto do lançador. Ele é o único absoluto que
-aparece, e mora no arquivo de config da sua máquina, não aqui:
+Cliente que não faz `cd` no diretório do projeto, como o Claude Desktop, precisa do
+caminho absoluto do lançador:
 
 ```json
 {
@@ -170,95 +197,49 @@ aparece, e mora no arquivo de config da sua máquina, não aqui:
     "usp-rucard": {
       "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
       "args": ["rucard"]
-    },
-    "usp-jupiter": {
-      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
-      "args": ["jupiter"]
-    },
-    "usp-moodle": {
-      "command": "<CAMINHO-DO-CHECKOUT>/scripts/servidor.sh",
-      "args": ["moodle"]
     }
   }
 }
 ```
 
-Troque `<CAMINHO-DO-CHECKOUT>` pela saída de `pwd` neste diretório. O `cd` de dentro do
-script resolve o resto, inclusive achar o `.venv`, que é por diretório e não vem no git.
+O `.mcp.json` é relativo de propósito, porque é versionado e caminho absoluto de máquina
+não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua máquina.
 
-## Configuração
+### Detalhes técnicos
 
-O `cp .env.example .env` da seção acima é o passo, e é um só. `RUCARD_HASH` já vem
-preenchida. `MOODLE_TOKEN` nasce vazio e é o único valor a obter: é credencial pessoal,
-nunca sai da máquina de quem usa (Invariante 4), e quem busca ele é `./scripts/token.sh`.
+Três servidores MCP, sete ferramentas, todas verificadas contra a USP. Comunicação por
+stdio, JSON-RPC, um processo por servidor.
 
-## Para quem acabou de ganhar acesso
+| Servidor | Ferramentas |
+|---|---|
+| `usp-rucard` | `bandejao` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico` |
+| `usp-jupiter` | `disciplina`, `requisitos` |
 
-O token é seu, não de quem te convidou. Cada pessoa traz o seu. Esse atrito não é
-acidental: é o Invariante 4, e é o que permite este projeto existir sem ninguém confiar
-credencial a ninguém.
+A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de
+nome, e o default é negar. Sobre ela existe o bloqueio permanente do §2.2, que vale mesmo
+com `USP_MCP_ALLOW_WRITES` ligada. A sua chave alcança 447 funções neste site, e é esse
+número que faz as duas camadas existirem.
 
-**1. Monte o ambiente.** Siga *Mexer no código*, acima. Os passos 2 a 4 usam o checkout,
-então ele é o caminho daqui em diante. Quem só quer usar o servidor pula o clone inteiro e
-vai por *Só usar*.
+`baixar_arquivo` entrega o caminho e não o conteúdo. Um blob em base64 custaria cerca de
+302k tokens no PDF médio, e extrair o texto no servidor perderia as figuras. Numa lista
+manuscrita escaneada isso devolveria 9 bytes e chamaria de sucesso (§9, 01/09 e 03/09). O
+arquivo cai em `~/.cache/usp-mcp/moodle/`.
 
-**2. Pegue seu token do e-Disciplinas.** Um comando, com o navegador logado na Senha Única:
+São três comandos e não um com argumento: o nome de cada um é o mesmo `serverInfo.name`
+que o servidor responde no `initialize`. O porquê está no `pyproject.toml`.
 
-```bash
-./scripts/token.sh
-```
+Medido em 14/09/2026: instalação num venv limpo a partir da URL do repositório, e os três
+comandos subindo de `/tmp` com cliente MCP real. `pipx` e `uvx` não foram exercitados, e
+`pip install --user` é barrado pelo PEP 668 no Python do Homebrew. Empacotar como MCP
+Bundle (`.mcpb`) segue sem teste, descrito no §6.1 por leitura de documentação.
 
-Ele abre o `launch.php` e a página do Moodle aparece com três coisas. Duas são chamariz: a
-caixa verde "O seu cadastro foi confirmado" e o botão cinza "Ambientes". A que interessa é
-o link azul escrito *"Clique aqui se a aplicação não abrir automaticamente"*. O texto
-sugere que ele é um plano B dispensável, mas o endereço dele é o único lugar da página
-onde o token existe.
+Ferramenta não nasce por conveniência: o critério está no §5, e as questões abertas do §4
+fecham com dado registrado no §9. O `SPEC1.md` é a autoridade do projeto.
 
-Botão direito nesse link, "copiar endereço do link", volta no terminal e aperta Enter. Não
-clique com o esquerdo: clicar tenta abrir o app do Moodle e não copia nada. Leva uns 20
-segundos, sem DevTools e sem decodificar nada à mão.
-
-Antes de decodificar, o script confere o que chegou. Se você copiou a URL da página em vez
-da do link, que é o erro mais comum e o que aconteceu na primeira passagem de 12/09/2026,
-ele para ali, explica a diferença entre a URL de ida e a de volta, e deixa o `.env`
-intocado. A conferência mostra no máximo `moodlemobile://token=` e nunca um byte do que
-vem depois.
-
-Daí ele decodifica, confirma o token contra a USP em uma chamada e só então grava no
-`.env`. Um token que não autentica não chega ao arquivo, e o `userid` sai da mesma
-resposta. O valor do token nunca é impresso, nem parcial (Invariante 3).
-
-Se você já tinha colado a URL no `.env` à mão e ela ficou torta, `./scripts/fix-token.sh`
-normaliza. É idempotente e detecta quando já está nos 32 hex.
-
-Existe um `--auto` que tenta capturar o redirect sozinho, com um handler temporário para
-um esquema próprio. Ele funciona contra servidor de teste e nunca entregou contra o
-e-Disciplinas, então não é o padrão (§9 do `SPEC1.md`, 11/09/2026).
-
-**3. Confira sem gastar chamada nenhuma da sua conta.**
-
-```bash
-./scripts/gate.sh
-.venv/bin/python -m usp_mcp.moodle.server --auto-verificar
-```
-
-O `--auto-verificar` diz se o `.env` foi achado, se o token está presente (sem mostrá-lo),
-se o SDK está instalado e se os schemas casam. Nada disso toca a rede da USP.
-
-**4. Ligue num cliente MCP.** O `.mcp.json` versionado já registra os três servidores sem
-segredo nenhum: abra o Claude Code nesta pasta e pergunte. Para que valham em qualquer
-pasta, registre no escopo de usuário:
-
-```bash
-R=$(pwd); for m in moodle jupiter rucard; do claude mcp add --scope user "usp-$m" -- $R/scripts/servidor.sh $m; done
-```
-
-Dois lugares onde nada disso funciona, e não é questão de configuração: sandbox em nuvem,
-porque a rede da USP não sai de lá (§1.1), e conector remoto, porque o token não pode
-viajar (Invariante 4) e o e-Disciplinas não oferece OAuth. O Moodle é local por desenho. O
-RUCard e o Jupiter não usam credencial e poderiam ser hospedados, mas não estão (§6).
-
-Seu token expira e é revogável em `edisciplinas.usp.br`, em gerenciar tokens. Se algo
-parar de responder com `invalidtoken`, é isso: rode `./scripts/token.sh` de novo. Não há
-caminho sem sessão de navegador, porque a conta autentica por Senha Única e o Moodle não
-tem senha local para comparar (§1.3).
+- `usp_mcp/`, os servidores, um pacote por sistema
+- `tests/`, três camadas: política e contrato offline, `live` atrás de env var
+- `notas/`, análise por sistema, com custo medido em bytes e tokens
+- `fixtures/`, respostas cruas capturadas (as do Moodle ficam fora do git, porque têm dado pessoal)
+- `scripts/`, chamadores da descoberta e o gate de pré-commit
+- `docs/decisions/BACKLOG-correcoes.md`, a dívida que está em aberto
