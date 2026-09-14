@@ -65,6 +65,7 @@ def test_t78_main_registra_todas_as_ferramentas(servidor_montado):
         "diagnostico",
         "ja_entreguei",
         "material",
+        "notas",
         "o_que_vence",
     ]
     assert servidor_montado["transporte"] == "stdio", (

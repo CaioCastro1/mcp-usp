@@ -57,6 +57,17 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "mod_assign_get_assignments",
         "mod_assign_get_submission_status",
     ),
+    # `notas` (14/09) exige as DUAS visões, e é o único caso da tabela em que a
+    # ferramenta não usa as duas na mesma invocação: ela escolhe uma conforme a
+    # pergunta tenha ou não disciplina. Declarar as duas é o certo mesmo assim —
+    # um site com só uma delas responde metade das perguntas, e "OK" aí seria
+    # promessa que quebra na segunda pergunta.
+    "notas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "gradereport_overview_get_course_grades",
+        "gradereport_user_get_grade_items",
+    ),
 }
 
 
