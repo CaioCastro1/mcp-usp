@@ -43,6 +43,9 @@ CONSULTAS_FORA_DA_FATIA = [
     "pubObterInfoCursoWeb",
     "pubListarDiscipResp",
     "recuperarProjetoPedagogico",
+    # Saiu da fatia em 14/09 (§9): exigia um `codcur` que a API não deixa
+    # descobrir corretamente, e `requisitos(sigla)` responde sem ele.
+    "pubListarRequisitoDisciplina",
 ]
 
 # §4.1 do recon: os métodos genéricos do bean. executarBatch é o análogo
@@ -102,15 +105,13 @@ def test_t15_valor_string_e_percent_encoded():
 
 
 @pytest.mark.contrato
-def test_t16_roteamento_do_metodo(gravador, psi3323, requisito):
+def test_t16_roteamento_do_metodo(gravador, psi3323, ingresso_poli):
     g1 = gravador([psi3323])
     cliente.ClienteJupiter(g1).obter_disciplina("PSI3323")
     assert g1.chamadas[0]["url"].endswith("ControlePublicoDWR.obter.dwr")
 
-    g2 = gravador([requisito])
-    cliente.ClienteJupiter(g2).listar_requisito(
-        coddis="MAT2454", codcur="3033", codhab="0"
-    )
+    g2 = gravador([ingresso_poli])
+    cliente.ClienteJupiter(g2).listar_cursos_entrada("3")
     assert g2.chamadas[0]["url"].endswith("ControlePublicoDWR.listar.dwr")
 
 
@@ -217,16 +218,15 @@ def test_t22_requisicoes_nao_se_sobrepoem(psi3323):
     [("listar", q) for q in CONSULTAS_FORA_DA_FATIA]
     + [(m, "pubObterDisciplina") for m in METODOS_GENERICOS],
 )
-def test_t23_superficie_travada_em_quatro_consultas(grav, metodo, consulta):
+def test_t23_superficie_travada_em_tres_consultas(grav, metodo, consulta):
     c = cliente.ClienteJupiter(grav)
     with pytest.raises(cliente.ConsultaNegada):
         c._chamar(metodo=metodo, consulta=consulta, params={})
     assert set(cliente.CONSULTAS_PERMITIDAS) == {
         "pubObterDisciplina",
-        "pubListarRequisitoDisciplina",
         "pubListarCursoEntrada",
         "pubListarColegiado",
-    }, "a fatia tem quatro consultas; uma quinta precisa de decisão registrada"
+    }, "a fatia tem três consultas; uma quarta precisa de decisão registrada no §9"
 
 
 @pytest.mark.politica
