@@ -64,6 +64,31 @@ _MARCA_VEGETARIANA = re.compile(r"\(\s*v\s*\)", re.IGNORECASE)
 _PREFIXO_OPCAO = re.compile(r"^op[çc][ãa]o\s*:?\s*", re.IGNORECASE)
 _TAG_HTML = re.compile(r"<[^>]+>")
 
+# Comunicado dentro do campo de cardápio — medido em 14/09/2026 no RU 7
+# (`fixtures/rucard/menu_7_semana_14-09.json`): a linha inteira vem em negrito
+# markdown, separada por linha em branco, nos cinco almoços de dia útil. Duas
+# regras reconhecem comunicado, e as duas são declaradas aqui: negrito de ponta
+# a ponta, ou frase de 6+ palavras terminada em ponto/exclamação — nome de prato
+# não termina em ponto em nenhuma das ~120 refeições de fixture.
+_AVISO_NEGRITO = re.compile(r"^\*\*(.+?)\*\*$")
+_FIM_DE_FRASE = (".", "!")
+_MINIMO_PALAVRAS_DE_FRASE = 6
+
+
+def _comunicado(linha: str) -> str | None:
+    """Texto do comunicado se a linha for aviso e não prato; `None` se for prato.
+
+    Não descarta nada: quem chama põe o texto nos avisos da resposta. A regra é
+    a medida, não a imaginada — um comunicado sem negrito e sem ponto final
+    passa como prato, e esse é o limite declarado.
+    """
+    casou = _AVISO_NEGRITO.match(linha)
+    if casou:
+        return casou.group(1).strip()
+    if linha.endswith(_FIM_DE_FRASE) and len(linha.split()) >= _MINIMO_PALAVRAS_DE_FRASE:
+        return linha
+    return None
+
 
 def resolver_dia(bruto: str, hoje: date) -> date:
     """"hoje", "amanhã", `DD/MM/AAAA` ou `AAAA-MM-DD` → data.
@@ -92,13 +117,19 @@ def resolver_dia(bruto: str, hoje: date) -> date:
     )
 
 
-def _itens_e_opcao(bruto: str) -> tuple[list[str], str | None, bool]:
-    """Texto livre do cardápio → itens, opção do dia, e se a opção é marcada.
+def _itens_e_opcao(bruto: str) -> tuple[list[str], str | None, bool, list[str]]:
+    """Texto livre do cardápio → itens, opção do dia, se a opção é marcada, e os
+    comunicados que vieram misturados.
 
     O §1.2 registra que o texto às vezes vem com HTML e às vezes com ` - ` no
-    lugar do `\\n`. Nenhuma das duas apareceu em duas semanas de captura, então
+    lugar do `\\n`. Nenhuma das duas apareceu em três semanas de captura, então
     o tratamento aqui é tolerância, não teste: HTML sai, e ` - ` só é usado como
     separador quando não há quebra de linha nenhuma para usar.
+
+    O que APARECEU, em 14/09/2026, foi comunicado em negrito no fim do cardápio
+    ("Tragam suas canecas"). Ele sai da lista de itens e volta como aviso — a
+    lista de pratos não pode ter um prato que não existe, e o comunicado não
+    pode sumir (Invariante 7).
     """
     limpo = html.unescape(_TAG_HTML.sub(" ", bruto or ""))
     linhas = [l.strip() for l in limpo.splitlines() if l.strip()]
@@ -106,15 +137,21 @@ def _itens_e_opcao(bruto: str) -> tuple[list[str], str | None, bool]:
         linhas = [p.strip() for p in linhas[0].split(" - ") if p.strip()]
 
     itens: list[str] = []
+    avisos: list[str] = []
     opcao: str | None = None
     for linha in linhas:
+        comunicado = _comunicado(linha)
+        if comunicado is not None:
+            if comunicado not in avisos:
+                avisos.append(comunicado)
+            continue
         if opcao is None and _PREFIXO_OPCAO.match(linha):
             opcao = _PREFIXO_OPCAO.sub("", linha).strip()
             continue
         itens.append(re.sub(r"\s{2,}", " ", linha))
 
     marcada = bool(opcao and _MARCA_VEGETARIANA.search(opcao))
-    return itens, opcao, marcada
+    return itens, opcao, marcada, avisos
 
 
 def _esta_fechado(bruto: str) -> bool:
@@ -181,7 +218,7 @@ def _projetar_refeicao(ficha, dia: date, qual: str, bruto_do_dia: dict) -> dict:
             ),
         }
 
-    itens, opcao, marcada = _itens_e_opcao(cru.get("menu", ""))
+    itens, opcao, marcada, avisos_publicados = _itens_e_opcao(cru.get("menu", ""))
     return {
         "situacao": "aberto",
         "itens": itens,

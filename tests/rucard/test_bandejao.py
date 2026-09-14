@@ -356,3 +356,47 @@ def test_r27b_ru_que_nao_publicou_o_dia_nao_desaparece_calado(gravador, chamar):
         "e o aviso tem que dizer qual semana ele publicou, senão 'faltou' não "
         "diz o que fazer."
     )
+
+
+# --- R42: comunicado no cardápio não é prato (14/09/2026) -------------------
+
+
+def test_r42_itens_e_opcao_separa_comunicado_em_negrito_de_prato():
+    itens, opcao, marcada, avisos = ferramentas._itens_e_opcao(
+        "Arroz / feijão\nOpção: Falafel (V)\nMinipão / refresco\n\n"
+        "**Os Restaurantes Universitários não fornecem copos descartáveis. "
+        "Tragam suas canecas.**"
+    )
+    assert itens == ["Arroz / feijão", "Minipão / refresco"]
+    assert opcao == "Falafel (V)" and marcada is True
+    assert avisos == [
+        "Os Restaurantes Universitários não fornecem copos descartáveis. "
+        "Tragam suas canecas."
+    ], "o comunicado tem que sair SEM os asteriscos e sem sumir"
+
+
+def test_r42b_frase_longa_com_ponto_final_e_comunicado_mesmo_sem_negrito():
+    itens, _, _, avisos = ferramentas._itens_e_opcao(
+        "Arroz / feijão\n"
+        "Os restaurantes estarão fechados na sexta-feira por causa do feriado.\n"
+        "Maçã"
+    )
+    assert itens == ["Arroz / feijão", "Maçã"]
+    assert avisos == [
+        "Os restaurantes estarão fechados na sexta-feira por causa do feriado."
+    ]
+
+
+def test_r42c_prato_curto_com_ponto_nao_vira_comunicado():
+    # A regra de frase exige 6+ palavras: um prato com ponto no fim continua prato.
+    itens, _, _, avisos = ferramentas._itens_e_opcao("Bife à rolê.\nSalada de alface")
+    assert itens == ["Bife à rolê.", "Salada de alface"]
+    assert avisos == []
+
+
+def test_r42d_o_mesmo_comunicado_duas_vezes_na_refeicao_sai_uma_vez():
+    _, _, _, avisos = ferramentas._itens_e_opcao(
+        "Arroz\n**Tragam suas canecas para o almoço de hoje.**\n"
+        "**Tragam suas canecas para o almoço de hoje.**"
+    )
+    assert avisos == ["Tragam suas canecas para o almoço de hoje."]
