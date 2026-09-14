@@ -181,10 +181,25 @@ _SITUACAO_CURTA = {
 }
 
 
+def _horario_comum(dias: list[dict], id_ru: str, qual: str) -> str | None:
+    """O horário sobe pro cabeçalho do RU quando é o MESMO em todo dia aberto da
+    semana — é o mesmo desperdício que a fatoração de itens corrige, e a mesma
+    regra estrita: só com um único valor entre os abertos. O jantar do 9 varia
+    (19:45 em dia útil, 19:00 no sábado) e por isso continua na linha do dia."""
+    horarios = {
+        ru["refeicoes"][qual]["horario"]
+        for d in dias
+        for ru in d["restaurantes"]
+        if ru["id"] == id_ru and ru["refeicoes"].get(qual, {}).get("situacao") == "aberto"
+    }
+    return horarios.pop() if len(horarios) == 1 else None
+
+
 def formatar_semana(resposta: dict) -> str:
     """Texto da semana para o modelo ler: um bloco por RU e refeição, um dia por
-    linha. Horário fica na linha do dia, não no cabeçalho do RU — o 9 fecha o
-    jantar às 19:45 em dia útil e às 19:00 no sábado, e um horário só mentiria."""
+    linha. Horário sobe pro cabeçalho quando é o mesmo em toda a semana; quando
+    varia entre dias (o 9 fecha o jantar às 19:45 em dia útil e às 19:00 no
+    sábado) continua na linha do dia — um valor só no cabeçalho mentiria."""
     linhas = [f"Bandejão — semana de {resposta['inicio']} a {resposta['fim']}"]
     dias = resposta["dias"]
     refeicoes_pedidas = resposta["refeicoes"]
@@ -217,7 +232,10 @@ def formatar_semana(resposta: dict) -> str:
                 ),
                 None,
             )
+            horario_comum = _horario_comum(dias, id_ru, qual)
             cabecalho = f"{nome} · {_ROTULO[qual]}"
+            if horario_comum:
+                cabecalho += f" · {horario_comum}"
             if preco:
                 cabecalho += f" · R$ {preco} (aluno)"
             linhas.append(cabecalho)
@@ -236,7 +254,7 @@ def formatar_semana(resposta: dict) -> str:
                     linhas.append(f"  {rotulo_dia}: {curta}")
                     continue
                 partes = [rotulo_dia]
-                if dados.get("horario"):
+                if dados.get("horario") and not horario_comum:
                     partes.append(dados["horario"])
                 if dados.get("calorias"):
                     partes.append(f"{dados['calorias']} kcal")
