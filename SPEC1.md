@@ -2647,3 +2647,21 @@ passar a oferecer OAuth no e-Disciplinas, o Claude passar a entregar segredo por
 sem OAuth, ou a decisão de custódia mudar. Nenhuma das três depende de trabalho nosso.
 
 ---
+### 14/09/2026 — o RUCard passou a publicar comunicado dentro do cardápio
+
+Chamada ao vivo `bandejao(hoje, almoco)` às 14h: três dos quatro RUs (7, 8 e 9)
+terminam o campo `lunch.menu` com `**Os Restaurantes Universitários não fornecem
+copos descartáveis. Tragam suas canecas.**` — negrito markdown, linha em branco antes,
+nos cinco dias úteis da semana. Fixture pública capturada:
+`fixtures/rucard/menu_7_semana_14-09.json` (2.784 B).
+
+A ferramenta imprimia a linha como prato, três vezes na mesma resposta (~75 tokens
+de lixo e um "prato" que não existe). É o caso que a docstring de `_itens_e_opcao`
+previa como "tolerância, não teste" — para HTML e ` - `, que nunca vieram; o que
+veio foi outro.
+
+**Decisão:** linha em negrito de ponta a ponta, ou frase de 6+ palavras terminada em
+ponto/exclamação, é comunicado: sai dos itens e entra em `avisos` **uma vez por texto
+distinto**, nomeando os RUs. Campo novo `avisos_publicados` por refeição (trava R36
+atualizada). Regra de 2 pontos medidos, não lei: comunicado sem negrito e sem ponto
+final passa como prato, e isso está escrito no código. Testes R42–R42g.

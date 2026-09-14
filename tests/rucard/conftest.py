@@ -28,6 +28,10 @@ FATIA = {
     # O 9 na semana seguinte: é o par que permite montar uma resposta em que um
     # RU publicou o dia pedido e outro ficou na semana anterior (R27b).
     "menu_9_semana_seguinte": "menu_9_semana_31-08.json",
+    # O 7 na semana de 14/09: a primeira captura em que o campo de cardápio traz
+    # um COMUNICADO em negrito markdown no fim de cada almoço. É a fixture do
+    # caso "comunicado não é prato".
+    "menu_7_avisos": "menu_7_semana_14-09.json",
     "restaurantes": "restaurants.json",
     "erro_500": "erro-500-get-menu6.html",
 }
