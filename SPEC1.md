@@ -3194,7 +3194,8 @@ não localiza nada — PMT3100 de 2023 e PMT3100 de 2024 ficariam idênticas (DI
 
 | | cru | texto devolvido | razão |
 |---|---|---|---|
-| 74 matrículas, modo padrão | 98.171 B (**fixture real higienizada**, `users_courses.json`) | 3.075 B | **31,9×** (3,1%) |
+| 47 matrículas, modo padrão (**medido ao vivo em 14/09**) | 71.805 B | 2.433 B | **29,5×** |
+| 74 matrículas da fixture de 31/08, modo padrão | 98.171 B | 3.075 B | 31,9× |
 | as mesmas 74 com `todas` | 98.171 B | 8.687 B | 11,3× |
 
 O que domina o cru é `summary` (a ementa repetida em cada matrícula), `courseimage`,
@@ -3209,7 +3210,23 @@ e-Disciplinas declara para o espaço da disciplina, e **não** a matrícula ofic
 Trancamento e cancelamento não chegam até lá, e disciplina que o professor não datou cai no
 bloco sem período. Sem essa frase, a lista lê como se fosse o JupiterWeb (DI8).
 
-**O que fica sem verificação ao vivo:** a divergência 74 × 45 acima; se `enddate: 0`
+**A divergência 74 × 47 × 45 foi resolvida ao vivo em 14/09, e não era bug.** Três números,
+três causas:
+
+- **74** é a fixture de 31/08, e ela está **velha**. Comparando os `id`, 40 matrículas
+  saíram e 13 entraram em duas semanas. Os ids da fixture são **reais**: `id` não está em
+  nenhuma lista do `scripts/higienizar.py`, e o `142036` de PTC3314 aparece lá igual ao
+  que a conta devolve hoje.
+- **47** é o que `core_enrol_get_users_courses` devolve agora.
+- **45** é o que `gradereport_overview_get_course_grades` devolveu na mesma sessão. As
+  duas funções não cobrem o mesmo conjunto, e quem for usar uma no lugar da outra precisa
+  saber disso.
+
+Consequência para quem ler as tabelas de projeção deste §9: **razão calculada sobre a
+fixture de 31/08 superestima**, porque a fixture é 57% maior que a conta de hoje. A linha
+medida ao vivo é a que vale.
+
+**O que fica sem verificação ao vivo:** se `enddate: 0`
 continua aparecendo na conta de hoje; e se alguma matrícula do semestre corrente fica de
 fora do bloco "em andamento" por `enddate` mal declarado pelo professor — que é o único
 modo de esta ferramenta errar calada, e o mais barato de checar, porque a resposta certa
