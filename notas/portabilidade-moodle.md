@@ -83,9 +83,19 @@ Uma requisição não autenticada por site. `mobile` é
 | IFRS | `moodle.ifrs.edu.br` | 1 | **1** | 1 |
 | Open University (UK) | `learn2.open.ac.uk` | 1 | **1** | 3 |
 | Humboldt (Berlim) | `moodle.hu-berlin.de` | 1 | **1** | 3 |
+| UNESP | `moodle.unesp.br` | 1 | **1** | 1 |
+| UFABC | `moodle.ufabc.edu.br` | 1 | **1** | 1 |
+| UFES | `ava.ufes.br` | 1 | **1** | 1 |
+| UTFPR | `moodle.utfpr.edu.br` | 1 | **1** | 1 |
+| UFJF | `ead.ufjf.br` | 1 | **1** | **2** |
 | Moodle demo | `school.moodledemo.net` | 1 | **1** | 1 |
 | **Monash (Austrália)** | `learning.monash.edu` | 1 | **0** | 1 |
 | moodle.org | `moodle.org` | 1 | **1** | 1 |
+
+**Placar: 17 sites Moodle alcançados, 16 com o serviço ligado, 1 sem.**
+Ampliado em 14/09/2026 com mais 20 hosts brasileiros tentados (5 responderam, e
+todos os 5 com o serviço ligado). A UFJF trouxe `typeoflogin=2` — os três modos
+que o core define aparecem todos na amostra.
 
 **Monash é o contraexemplo, e ele é o dado importante:** o serviço mobile é uma
 decisão do administrador do site, não do Moodle. Onde ele está desligado, nada
@@ -132,8 +142,13 @@ existentes. Mas é a diferença entre portável e quase-portável.
 `projecao.FUSO_SAO_PAULO = timezone(timedelta(hours=-3))`, com justificativa
 boa **para o Brasil** na docstring. Em Berlim ou na Open University todo horário
 de entrega sai deslocado — e deslocado em silêncio, que é o modo de falhar que
-o Invariante 6 proíbe. Nem `get_site_info` nem `get_public_config` devolvem o
-fuso do usuário; a cura provável é env var, ou o fuso local da máquina.
+o Invariante 6 proíbe. **E este é o único dos quatro que não dá para derivar do token.** Conferido em
+14/09/2026 no core (`webservice/externallib.php`): `core_webservice_get_site_info`
+devolve `lang`, `sitecalendartype` e `usercalendartype`, e **nenhum campo de
+fuso** — o mesmo vale para `get_public_config`. Ou seja, a regra do §2 do
+`CONVENTIONS.md` ("derive, não configure", que fechou a questão do `userid`) não
+tem como valer aqui: a cura é env var ou o fuso local da máquina, e a diferença
+entre as duas é uma decisão, não uma medição.
 
 ### 4.3 `slasharguments` desligado quebra `baixar_arquivo` — em silêncio
 
@@ -168,7 +183,29 @@ fim, porém, monta `//webservice/pluginfile.php/` e faz a checagem de origem do
 
 ---
 
-## 5. O que NÃO foi verificado
+## 5. Como extrapolar para uma faculdade qualquer
+
+O probe do §3 virou `scripts/compatibilidade.sh` em 14/09/2026, porque ele é a
+única metade desta pergunta que se responde **sem credencial**:
+
+```
+./scripts/compatibilidade.sh https://moodle.ggte.unicamp.br
+```
+
+Uma requisição, sem token, e três desfechos distintos em vez de um "deu erro":
+transporte funciona (sai 0), serviço desligado no site (sai 1, e não há o que
+consertar do nosso lado), URL que não é raiz de Moodle (sai 2). Ele também diz
+qual caminho de token usar, derivado do `typeoflogin` — e **não** imprime esse
+passo a passo quando o serviço está desligado, porque mandar alguém buscar token
+numa porta que o próprio script acabou de medir como fechada seria o oposto do
+Invariante 6.
+
+O que ele deliberadamente **não** promete: verde ali é "o transporte existe e
+está ligado", nunca "as três ferramentas vão responder bem". Os quatro pontos do
+§4 continuam de pé, e três deles só aparecem com token na mão. Essa distinção é
+metade do valor do script.
+
+## 6. O que NÃO foi verificado
 
 - **Nenhuma execução real contra um Moodle não-USP.** Obter token exige
   autenticar, e isso é decisão e credencial do dono (Invariante 4). O que dá
