@@ -40,7 +40,7 @@ entender melhor".
 
 | passo | o que |
 |---|---|
-| 0.1 | `.env.example` ganha `JUPITER_SESSAO=` com comentário dizendo que é `JSESSIONID` de `/jupiterweb`, obtido no navegador do dono |
+| 0.1 | `.env.example` ganha `JUPITER_SESSAO=` — o **conjunto** de cookies da área logada, não um nome fixo: a Fase 1a é que diz quais importam (são dois, e um é `path=/`) |
 | 0.2 | `scripts/jupiter-sessao.sh`, espelho do `fix-token.sh`: aceita a linha crua colada do DevTools, extrai só o valor, grava, **nunca imprime**. Idempotente |
 | 0.3 | Gate ganha a checagem: valor de `JUPITER_SESSAO` em qualquer arquivo rastreado **reprova**. Verificada por sabotagem, como as outras três |
 | 0.4 | `usp_mcp/env.py` passa a saber ler a variável, com erro legível quando ausente |
@@ -48,7 +48,43 @@ entender melhor".
 **Nada disso toca a rede**, e tudo é testável hoje. Se a trilha morrer aqui, o custo foi
 um script e uma checagem — e a checagem serve a qualquer credencial futura.
 
-## Fase 1 — o mapa, e ele começa com você, não comigo
+## Fase 1a — **quais** cookies são a credencial, e por quanto tempo
+
+> Medido em 14/09, **sem credencial**, contra `webLogin.jsp` e `jupCarreira.jsp`: o
+> JupiterWeb entrega **dois** cookies a um visitante anônimo, e o recon de 31/08 só
+> registrava o primeiro.
+>
+> ```
+> JSESSIONID=…;      Path=/jupiterweb;  HttpOnly            (sem Secure)
+> UD_jupiterweb=…;   path=/;            secure;  httponly   (80 hex)
+> ```
+
+Três consequências, e a primeira desmonta uma suposição deste plano:
+
+1. **"Cole o `JSESSIONID`" pode ser insuficiente ou impreciso.** Talvez a credencial
+   autenticada seja o par, talvez seja só o `UD_`. Enquanto não se sabe, o script da
+   Fase 0 não deve prometer que sabe: ele aceita **o conjunto**, e a Fase 1a decide.
+2. **`path=/` é escopo de host, não de sistema.** O nome `UD_jupiterweb` sugere um
+   cookie por sistema; o path diz que ele viaja para todo `uspdigital.usp.br`. Os dois
+   sinais discordam, e **não se escolhe o mais confortável**. Até medir, trate o
+   conjunto como credencial de host — o que torna as regras acima mais importantes, não
+   menos.
+3. **Nenhum dos dois tem `Max-Age`/`Expires`** — morrem com o navegador. O timeout de
+   inatividade do servidor **não foi medido**; 30 min é o default do Tomcat, e default
+   de produto não é fato de deployment.
+
+**As duas medições da Fase 1a, nesta ordem:**
+
+| # | o que fazer | o que decide |
+|---|---|---|
+| 1a.1 | Uma página logada, pedida **três vezes**: com os dois cookies, só com `JSESSIONID`, só com `UD_jupiterweb` | qual é a credencial de verdade — e portanto o que o `.env` guarda e o que o gate protege |
+| 1a.2 | A mesma página em t=0, t+20min, t+45min, **sem nada entre elas** | o timeout de inatividade real. Três requisições, espalhadas, e a resposta vale para o desenho inteiro |
+
+A 1a.2 é o que decide se a trilha se paga: **se a sessão morre em 30 minutos de
+inatividade, dado consultado uma vez por semana não deve depender dela** — e o histórico
+em PDF passa de alternativa a resposta certa.
+
+## Fase 1b — o mapa, e ele começa com você, não comigo
 
 Eu **não sei** as URLs da área logada e **não vou adivinhar**: adivinhar nome de endpoint
 é o laço que o §4.6 do recon recusou, e ali era sistema público.
@@ -121,7 +157,7 @@ Na ordem em que devem ficar vermelhos:
 ## Seu roteiro, quando tiver o navegador aberto
 
 1. Entrar no JupiterWeb normalmente.
-2. DevTools → Application → Cookies → copiar `JSESSIONID` de `/jupiterweb`.
+2. DevTools → Application → Cookies → copiar **`JSESSIONID` e `UD_jupiterweb`** (são dois; qual deles autentica é a primeira coisa que vamos medir).
 3. `./scripts/jupiter-sessao.sh` e colar (a Fase 0 precisa estar pronta).
 4. Salvar o HTML do menu logado em `fixtures/jupiter/raw/menu-logado.html`.
 5. Me chamar. A partir daí eu trabalho da tabela, e cada requisição passa por você.
