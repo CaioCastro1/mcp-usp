@@ -2602,6 +2602,51 @@ rodar primeiro, registre aqui.
 declarar uma seria decidir por conta própria o que voltou para o dono. O A1 já registra
 que empacotar torna a lacuna mais visível, não menos.
 
+### 14/09/2026 — conector remoto descartado, e o que fechou a questão
+
+**Pergunta do dono:** dá para tudo funcionar no chat do Claude, no celular e no Cowork,
+por conta de cada pessoa? **Resposta: não, e a questão fica fechada.** Duas condições que
+ele pôs tornam o caminho inviável juntas: se for para o chat tem de ser **tudo**, não
+metade, e **token de ninguém será guardado**.
+
+**O que foi medido, em 14/09:**
+
+1. **O Claude não passa segredo por usuário fora de OAuth.** Os modos de autenticação de
+   conector remoto são `oauth_dcr`, `oauth_cimd`, `oauth_anthropic_creds`,
+   `custom_connection`, `static_headers` e `none`. O `static_headers` parece a saída
+   ("cada um cola a sua chave") e não é: a credencial é **do administrador da
+   organização, compartilhada por todos**. Credencial em query string é proibida pela
+   própria spec de autorização do MCP. Sobra OAuth, e OAuth contra um servidor **nosso**.
+2. **O e-Disciplinas não tem OAuth.** Medido por requisição não autenticada:
+   `/local/oauth/login.php` responde 404. O único OAuth da USP é o da Senha Única
+   (`uspdigital.usp.br/wsusuario/oauth`, OAuth 1.0a, o que as bibliotecas `uspdev/
+   senhaunica-*` usam). Ele identifica a pessoa e **não** dá acesso ao Moodle.
+3. **Nenhum servidor consegue cunhar o token sozinho.** O `launch.php` devolve por
+   esquema de URL próprio, e o §1.3 já mediu que trocar por `https` corrompe o valor (o
+   base64 cai na posição de host e o navegador minusculiza). E `/login/token.php`, que
+   resolveria com usuário e senha, não serve aqui: a USP é `typeoflogin=3`, SSO, sem
+   senha local para comparar (§1.3).
+
+**A conclusão que amarra os três:** para o Moodle responder por conta num servidor
+remoto, a pessoa teria de obter o token na máquina dela, como hoje, e **entregá-lo a
+nós**. Isso é custódia de credencial de terceiro, que a segunda condição do dono proíbe e
+que o Invariante 4 já proibia. Não existe arquitetura que evite, e foi procurada.
+
+**O que fica descartado por consequência, e não por falta de vontade:** o conector remoto
+autenticado. O §6 seguia registrando que para RUCard e Jupiter, que são dado público, o
+remoto "continua viável". Continua **tecnicamente** viável, e passa a estar fora de
+escopo pela primeira condição: um conector com três das sete ferramentas é o parcial que
+o dono recusou.
+
+**O que NÃO muda:** o entrypoint local segue sendo o caminho, e o `.mcpb` do §6.1 segue
+sendo o degrau seguinte do empacotamento. Ele é local por definição, então nada aqui o
+alcança.
+
+**Se a questão for reaberta um dia**, o que muda o resultado é uma destas três: a USP
+passar a oferecer OAuth no e-Disciplinas, o Claude passar a entregar segredo por usuário
+sem OAuth, ou a decisão de custódia mudar. Nenhuma das três depende de trabalho nosso.
+
+---
 ### 14/09/2026 — o RUCard passou a publicar comunicado dentro do cardápio
 
 Chamada ao vivo `bandejao(hoje, almoco)` às 14h: três dos quatro RUs (7, 8 e 9)
