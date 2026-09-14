@@ -2665,3 +2665,24 @@ ponto/exclamação, é comunicado: sai dos itens e entra em `avisos` **uma vez p
 distinto**, nomeando os RUs. Campo novo `avisos_publicados` por refeição (trava R36
 atualizada). Regra de 2 pontos medidos, não lei: comunicado sem negrito e sem ponto
 final passa como prato, e isso está escrito no código. Testes R42–R42g.
+
+### 14/09/2026 — `bandejao` entende "sexta", "semana" e "Prefeitura"
+
+Revisão de má prática nos dois servidores públicos. Medido na saída real: "que dia tem
+lasanha essa semana?" custava 5 a 7 chamadas de ferramenta (~1.000 B cada) porque `dia`
+só aceitava `hoje`/`amanhã`/data; "o que tem na sexta?" obrigava o modelo a calcular a
+data; e "bandejão da Prefeitura" exigia saber que Prefeitura = PUSP-CB = id `7`, que a
+descrição não dizia.
+
+**Decisão:** (a) `dia` aceita nome de dia da semana (resolve para o dia DESSA semana,
+passado ou futuro — é a única com cardápio), `depois de amanhã`, artigo na frente, e
+`semana`; (b) `restaurantes` tem `enum` de **nomes** (`central`, `prefeitura`, `fisica`,
+`quimicas`), traduzidos para id antes da política, que segue por id (§1.2); (c)
+`bandejao_semana` responde os sete dias numa chamada — **5 requisições HTTP**, as mesmas
+de um dia, porque o `/menu` já devolve a semana e o cache é por RU (teste R45b trava);
+(d) item presente em todas as refeições abertas sai uma vez, num rodapé, só no texto.
+
+**Medido (fixtures da Fase 1, 4 RUs):** semana/almoço 4.818 B, semana/almoço+jantar
+8.381 B; tetos 6.500 B e 11.000 B (R46c). O único item comum à semana inteira é
+`Minipão / refresco` — o arroz varia (`feijão preto`), e por isso a fatoração é estrita
+(interseção), não "na maioria". Testes R43–R47.

@@ -15,6 +15,11 @@ Quatro coisas que a implementação óbvia erra e que aqui estão certas de prop
 vira: em 31/08/2026 às 19:22 o índice 0 já era 31/08, não 24/08. Índice funciona
 até segunda-feira.
 
+**A semana é a mesma pergunta.** "Que dia tem lasanha?" não é outra ferramenta: é
+`bandejao` sete vezes, uma por dia, com o `/menu` vindo do cache — 5 requisições, as
+mesmas de um dia. Nome de dia ("sexta") resolve para o dia DESSA semana, porque é a
+única que existe no RUCard.
+
 **`FECHADO` não é uma coisa só.** O RU 7 devolve os 7 jantares fechados porque
 **nunca** serve jantar; o RU 6 devolve sábado fechado porque não serve nesse dia;
 e um feriado seria fechado num dia em que ele serve. As três leem igual no
