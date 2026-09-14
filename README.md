@@ -200,11 +200,16 @@ caminho normal do GitHub: abra uma issue, ou um fork com pull request.
 
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
-python3 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+uv venv
+uv pip install -e ".[dev]"
 cp .env.example .env
 ./scripts/gate.sh
 ```
+
+`uv` cria o mesmo `.venv/` que `python3 -m venv` criaria (é o que `scripts/servidor.sh` e o
+`.mcp.json` procuram), com uma diferença que importa neste Mac: instala por hardlink a partir
+de um cache único, então dez checkouts não custam dez cópias do SDK. Se não tiver `uv`,
+`python3 -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"` continua funcionando.
 
 O `cp` vem antes do gate porque sem `.env` ele reprova. A hash do RUCard é o único valor
 que o gate precisa, e ela já vem preenchida no exemplo: é a chave embutida no app oficial,
