@@ -2993,7 +2993,11 @@ porque é ela que diz o que o número vale:
 
 | | cru | texto devolvido | razão |
 |---|---|---|---|
-| 2 fóruns + 1 tópico em cada (payload **escrito à mão**) | 4.654 B | 1.660 B | **2,8×** (35,7% sobrando) |
+| 2 fóruns + os 4 tópicos de Avisos (**medido ao vivo em 14/09**) | 7.346 B | 2.390 B | **3,1×** |
+
+A primeira versão desta linha dizia 2,8× sobre payload escrito à mão, e a razão real ficou
+perto. Razão baixa aqui é o esperado e não defeito: em fórum o conteúdo **é** a resposta, e
+o que dá para descartar é pouco.
 
 Isto **não** é medição contra a conta do dono: a worktree não tem token e não devia obter
 um. A forma vem da declaração das duas funções no core 5.0 (`mod/forum/externallib.php`) e
@@ -3082,11 +3086,11 @@ mudança. M17 trava a ausência, para que a decisão não seja revertida por zel
 
 | | cru | texto devolvido | razão |
 |---|---|---|---|
-| 4 módulos mexidos, janela de 3 dias | 107.727 B | 801 B | **134,5×** |
+| 4 módulos mexidos, janela de 14 dias (**medido ao vivo em 14/09**) | 107.886 B | 922 B | **117,0×** |
 
 A ressalva é diferente da de `avisos`, e vale separar as duas metades: o
 `core_course_get_contents` desta conta é **fixture real** (PTC3314, 12/09, 107.113 B) e
-responde por 99,4% do cru — quem domina a razão é ele. O `updates_since` (614 B) é
+responde por 99,3% do cru — quem domina a razão é ele. O `updates_since` (773 B ao vivo) é
 **escrito à mão** a partir da forma documentada do core 5.0, com os `cmid` reais da mesma
 fixture. Ou seja: a razão mede sobretudo o que descartamos da resposta real e cara, que é a
 parte que importa aqui; o que fica inventado é a forma do ponteiro, que é pequeno por
@@ -3105,5 +3109,33 @@ então o pior caso medido é vocabulário estranho e nunca rótulo inventado (M6
 `since` no futuro devolve vazio em vez de erro, que é a hipótese por trás de recusar
 `dias <= 0`. As três são baratas de fechar: uma chamada cada, e a primeira já sai da mesma
 execução que capturar a fixture.
+
+---
+
+### 14/09/2026 — as quatro perguntas em aberto do P2, fechadas ao vivo
+
+Rodado contra a conta do dono, depois que `avisos` e `o_que_mudou` nasceram numa worktree
+sem token. **As quatro suposições que o desenho fez se confirmaram**, o que é registro tão
+útil quanto uma teria sido refutada.
+
+1. **`numdiscussions` chega**, e é o que sustenta a economia de chamada: em PTC3314 o
+   *Avisos* traz `4` e o *Discussão de Exercícios* traz `0`. Pular o fórum vazio economiza
+   uma chamada sem inventar ausência.
+2. **O fórum de avisos é `type: "news"`**, confirmando a ordenação que a ferramenta usa.
+3. **`since` no futuro devolve vazio com `warning`, não erro** — `instances: []`, 180 B,
+   um aviso. Este é o dado que valida a decisão de janela em DIAS e não carimbo: epoch
+   calculado por um modelo, errado para frente, produziria "nada mudou" e **ninguém
+   estranharia**. É o falso vazio do §9 de 28/08, e aqui ele é invisível por construção.
+4. **Os seis `name` de mudança** que o e-Disciplinas usa numa janela de 14 dias são
+   `gradeitems`, `submissions`, `grades`, `attempts`, `configuration` e `contentfiles` — os
+   seis que a ferramenta já traduzia. `contextlevel` vem só como `module`.
+
+As duas razões de projeção foram remedidas e estão corrigidas acima. A de `o_que_mudou`
+caiu de 134,5× para 117,0×, e a de `avisos` subiu de 2,8× para 3,1×.
+
+**As fixtures da suíte seguem escritas à mão**, e isso não mudou: o que foi medido aqui
+foram os payloads reais, não as fixtures. Trocá-las por captura higienizada continua no
+backlog, e a de fórum é a mais cara do projeto — 21% dos bytes de uma discussão são nome de
+terceiro.
 
 ---
