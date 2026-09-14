@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from .cliente import ClienteJupiter, transporte_http
 from .erros import ErroJupiter
-from .ferramentas import disciplina, requisitos
+from .ferramentas import agrupar_curriculos, disciplina, requisitos
 
 _NOME_FERRAMENTA = "disciplina"
 _NOME_REQUISITOS = "requisitos"
@@ -175,37 +175,50 @@ def formatar(ficha: dict) -> str:
     return "\n".join(linhas)
 
 
-def formatar_requisitos(ficha: dict) -> str:
-    """Texto para o modelo ler, agrupado por currículo.
+def _cabecalho_do_grupo(chave: tuple) -> str:
+    """As exigências de um grupo, agrupadas por rótulo: `Rótulo: A — nome; B — nome`."""
+    if not chave:
+        return "• (a página não traz linha de exigência para estes)"
+    por_rotulo: dict[str, list[str]] = {}
+    for sigla, nome, tipo, _rotulo in chave:
+        por_rotulo.setdefault(rotulo_de({"tipo": tipo}), []).append(f"{sigla} — {nome}")
+    return "• " + " | ".join(f"{r}: {'; '.join(itens)}" for r, itens in por_rotulo.items())
 
-    O agrupamento não é estética: o tipo da exigência é propriedade do
-    currículo (MAT2454 é duro em Minas e fraco em Elétrica), e uma lista
-    achatada apagaria justamente o que decide a matrícula.
-    """
-    # Sem currículo, o cabeçalho prometeria uma lista que não vem — e promessa
-    # não cumprida na primeira linha é o que faz o modelo preencher o resto.
-    linhas = (
-        [f"Exigências para cursar {ficha['sigla']}, por currículo:"]
-        if ficha["curriculos"]
-        else [f"Não há exigência listada para {ficha['sigla']} — leia o aviso:"]
+
+def _linha_do_curriculo(c: dict) -> str:
+    marca = " [curso de ingresso]" if c["ingresso"] else ""
+    return (
+        f"    {c['codcur']} {c['habilitacao']} "
+        f"({c['periodo']}, {c['periodo_ideal']}º período ideal){marca}"
     )
 
-    for c in ficha["curriculos"]:
-        marca = (
-            "curso de ingresso"
-            if c["ingresso"]
-            else "não consta na lista de ingresso"
-        )
-        linhas.append(
-            f"\n• {c['codcur']} — {c['habilitacao']} ({c['periodo']}), "
-            f"{c['periodo_ideal']}º período ideal [{marca}]"
-        )
-        if not c["exigencias"]:
-            linhas.append("    (a página não traz linha de exigência para este)")
-        for e in c["exigencias"]:
-            linhas.append(
-                f"    {rotulo_de(e)}: {e['sigla']} — {e['nome']}"
-            )
+
+def formatar_requisitos(ficha: dict) -> str:
+    """Texto para o modelo ler, agrupado por COMBINAÇÃO de exigências.
+
+    O agrupamento não é estética: o tipo da exigência é propriedade do currículo
+    (MAT2454 é dura em Minas e fraca em Elétrica), e a chave do grupo carrega o
+    tipo — 3250 fica sozinho justamente por isso. O que sai é a repetição: em
+    MAT2455, 18 dos 23 currículos tinham as mesmas duas linhas (§9, 14/09).
+    """
+    curriculos = ficha["curriculos"]
+    # Sem currículo, o cabeçalho prometeria uma lista que não vem — e promessa
+    # não cumprida na primeira linha é o que faz o modelo preencher o resto.
+    if not curriculos:
+        linhas = [f"Não há exigência listada para {ficha['sigla']} — leia o aviso:"]
+    else:
+        grupos = agrupar_curriculos(curriculos)
+        if len(curriculos) == 1:
+            linhas = [f"Exigências para cursar {ficha['sigla']}, por currículo:"]
+        else:
+            linhas = [
+                f"Exigências para cursar {ficha['sigla']} — {len(curriculos)} "
+                f"currículos, {len(grupos)} combinações diferentes:"
+            ]
+        for chave, membros in grupos:
+            linhas.append("")
+            linhas.append(_cabecalho_do_grupo(chave))
+            linhas.extend(_linha_do_curriculo(c) for c in membros)
 
     for aviso in ficha.get("avisos") or ():
         linhas.append(f"\n⚠ {aviso}")
