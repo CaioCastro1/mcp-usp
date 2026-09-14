@@ -22,6 +22,7 @@ from .arquivo import baixar_arquivo
 from .cliente import ClienteMoodle
 from .diagnostico import diagnostico
 from .erros import ErroMoodle
+from .ja_entreguei import ja_entreguei
 from .material import material
 from .o_que_vence import o_que_vence
 
@@ -30,13 +31,14 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Três ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09). Os nomes vêm das perguntas do dono, não das funções do
-# Moodle por trás.
+# Cinco ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, a quarta e a quinta em 14/09). Os nomes vêm das perguntas
+# do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
 _NOME_ARQUIVO = "baixar_arquivo"
 _NOME_DIAGNOSTICO = "diagnostico"
+_NOME_JA_ENTREGUEI = "ja_entreguei"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -186,6 +188,47 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_JA_ENTREGUEI,
+            "description": (
+                "Diz o que já foi entregue e o que ainda não foi nas tarefas de "
+                "uma disciplina do e-Disciplinas (Moodle da USP), e distingue "
+                "RASCUNHO SALVO de ENTREGA ENVIADA — que na tela do Moodle "
+                "parecem a mesma coisa. Use para 'já entreguei o EP1?', 'o que "
+                "falta entregar em PTC3314', 'minha entrega foi mesmo enviada', "
+                "'entreguei dentro do prazo?'. Diz também a data do envio, o "
+                "nome do arquivo enviado, se já foi corrigida e se houve "
+                "prorrogação de prazo para você. Cobre só TAREFA: questionário "
+                "e prova presencial não passam por aqui — para o que TEM prazo, "
+                "inclusive questionário, use `o_que_vence`. Não traz a nota. "
+                "Custa uma chamada ao Moodle por entrega consultada, então "
+                "pergunte por uma disciplina de cada vez."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
+                            "também com pedaço do nome."
+                        ),
+                    },
+                    "entrega": {
+                        "type": "string",
+                        "description": (
+                            "Pedaço do nome da entrega — 'EP1', 'EC-2', "
+                            "'relatório'. Opcional: sem ele vêm todas as "
+                            "entregas da disciplina, e a saída diz se alguma "
+                            "ficou de fora por teto de consultas."
+                        ),
+                    },
+                },
+                "required": ["disciplina"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -197,11 +240,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     porque "ferramenta não existe" e "ferramenta existe mas não achou nada"
     têm curas diferentes para quem lê o erro.
     """
-    if nome not in (_NOME_FERRAMENTA, _NOME_MATERIAL, _NOME_ARQUIVO, _NOME_DIAGNOSTICO):
+    conhecidas = tuple(f["name"] for f in listar_ferramentas())
+    if nome not in conhecidas:
         raise ErroMoodle(
             f"Ferramenta desconhecida: {nome!r}. As ferramentas expostas por "
-            f"este servidor são {_NOME_FERRAMENTA!r}, {_NOME_MATERIAL!r}, "
-            f"{_NOME_ARQUIVO!r} e {_NOME_DIAGNOSTICO!r}."
+            f"este servidor são {', '.join(repr(n) for n in conhecidas)}."
         )
 
     if cliente is None:
@@ -221,6 +264,13 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_DIAGNOSTICO:
         return diagnostico(cliente)
+
+    if nome == _NOME_JA_ENTREGUEI:
+        return ja_entreguei(
+            cliente,
+            argumentos["disciplina"],
+            entrega=argumentos.get("entrega"),
+        ).texto
 
     if nome == _NOME_MATERIAL:
         return material(
@@ -280,8 +330,18 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
 
     from usp_mcp.adaptador import anotar
 
-    porta_vence, porta_material, porta_arquivo, porta_diagnostico = listar_ferramentas()
-    descritor = porta_vence
+    # Indexado por NOME, e não desempacotado por posição. O desempacotamento
+    # posicional já matou este servidor uma vez: em 14/09 `main()` abria três
+    # descritores, `listar_ferramentas` passou a devolver quatro, e o processo
+    # morreu antes do handshake com a suíte verde em tudo que não fosse o T78.
+    # Um dicionário não tem essa forma de falhar — ferramenta nova só precisa
+    # ser registrada, nunca contada.
+    portas = {f["name"]: f for f in listar_ferramentas()}
+    porta_material = portas[_NOME_MATERIAL]
+    porta_arquivo = portas[_NOME_ARQUIVO]
+    porta_diagnostico = portas[_NOME_DIAGNOSTICO]
+    porta_ja_entreguei = portas[_NOME_JA_ENTREGUEI]
+    descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
     def _chamar(nome: str, argumentos: dict) -> str:
@@ -363,6 +423,24 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_diagnostico["name"], description=porta_diagnostico["description"]
     )(_diagnostico)
 
+    def _ja_entreguei(disciplina, entrega=None) -> str:
+        # `disciplina` SEM default: é a ausência de default que torna o
+        # parâmetro obrigatório no fio, e o `inputSchema` a declara em
+        # `required`. Com `=None` os dois divergiriam (H6, 31/08).
+        return _chamar(
+            porta_ja_entreguei["name"],
+            {"disciplina": disciplina, "entrega": entrega},
+        )
+
+    anotar(
+        _ja_entreguei,
+        porta_ja_entreguei["inputSchema"],
+        {"disciplina": str, "entrega": str | None},
+    )
+    servidor.tool(
+        name=porta_ja_entreguei["name"], description=porta_ja_entreguei["description"]
+    )(_ja_entreguei)
+
     servidor.run(transport="stdio")
 
 
@@ -425,11 +503,16 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_diagnostico() -> str:
         return ""
 
+    @servidor.tool(name="ja_entreguei", description="verificação")
+    def _sonda_ja_entreguei(disciplina: str, entrega: str | None = None) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
         "baixar_arquivo": _sonda_arquivo,
         "diagnostico": _sonda_diagnostico,
+        "ja_entreguei": _sonda_ja_entreguei,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():

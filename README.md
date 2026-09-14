@@ -19,6 +19,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | "O que eu tenho para entregar essa semana?" | Tarefas e questionários do e-Disciplinas, com prazo |
 | "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
+| "Já entreguei o EP1?" | O que você já enviou, o que ficou só como rascunho e se saiu no prazo |
 | "Quantos créditos vale MAC0110?" | Créditos, carga horária e ementa pela sigla; programa, bibliografia e avaliação sob pedido |
 | "O que preciso ter feito antes de MAT2454?" | Pré-requisitos, pelo seu currículo |
 
@@ -183,8 +184,11 @@ falta de caminho, não de trabalho. Medido em 14/09/2026:
 O roteiro para medir isso está em
 `docs/superpowers/plans/2026-09-14-jupiter-sessao-recon.md`. Nada dele foi executado.
 
-Também não existem: aviso de professor, "já entreguei isso?", histórico de cardápio, saldo
-do cartão, horário, sala e vagas.
+Também não existem: aviso de professor, histórico de cardápio, saldo do cartão, horário,
+sala e vagas.
+
+"Já entreguei o EP1?" responde só sobre tarefa. Questionário não entra, e prova marcada só
+no quadro da sala não existe em sistema nenhum. A resposta diz isso quando você pergunta.
 
 Uma limitação que costuma confundir: ao listar material, o projeto diz o nome, o tipo e o
 tamanho de cada arquivo, mas não devolve o endereço dele. Endereço sem a credencial não
@@ -239,13 +243,14 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, sete ferramentas, todas verificadas contra a USP. Comunicação por
-stdio, JSON-RPC, um processo por servidor.
+Três servidores MCP, oito ferramentas. Comunicação por
+stdio, JSON-RPC, um processo por servidor. Sete delas foram exercitadas contra a USP de
+verdade; `ja_entreguei` é de 14/09 e até agora só rodou contra resposta de mentira.
 
 | Servidor | Ferramentas |
 |---|---|
 | `usp-rucard` | `bandejao` |
-| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de

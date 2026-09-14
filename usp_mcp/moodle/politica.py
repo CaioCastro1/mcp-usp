@@ -35,6 +35,15 @@ from dataclasses import dataclass
 # `mod_assign_remove_submission` seguem no bloqueio permanente do §2.2. É
 # igualdade exata de nome que libera, nunca prefixo — por isso a proximidade
 # não as arrasta junto.
+#
+# A sexta entrou em 14/09/2026, e a decisão está no §9: `ja_entreguei` responde
+# "eu já entreguei isso?", e nenhuma das cinco acima sabe responder.
+# `mod_assign_get_assignments` diz o que EXISTE e quando vence; o que foi feito
+# só existe em `mod_assign_get_submission_status`, no campo
+# `lastattempt.submission.status` — onde `draft` (rascunho salvo, não enviado) e
+# `submitted` (entregue) são uma palavra de distância. Ela é de leitura pura: a
+# função que ENTREGA é `mod_assign_submit_for_grading`, e continua bloqueada
+# duas vezes, pela omissão da allowlist e pelo §2.2.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -42,6 +51,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         "core_enrol_get_users_courses",
         "core_course_get_contents",
         "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
     }
 )
 

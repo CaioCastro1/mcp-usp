@@ -48,6 +48,15 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "core_course_get_contents",
         "mod_assign_get_assignments",
     ),
+    # `ja_entreguei` (14/09) não pede `core_course_get_contents`: ela não lista
+    # arquivo nenhum. Precisa da resolução de sigla (as duas primeiras), da
+    # lista de entregas com prazo, e do status de cada uma.
+    "ja_entreguei": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
+    ),
 }
 
 

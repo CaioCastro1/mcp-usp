@@ -265,3 +265,161 @@ def entregas_ptc3314() -> dict:
     "sem direito de acesso", que é o que o Invariante 7 proíbe engolir.
     """
     return _obrigatoria(FIXTURE_ENTREGAS_PTC3314, "assign_ptc3314.json")
+
+
+# --------------------------------------------------------------------------
+# `mod_assign_get_submission_status` — ESCRITA À MÃO, e a procedência importa.
+#
+# **Não é captura.** A worktree onde isto foi escrito não tem token e não devia
+# obter um, então esta resposta foi montada a partir da forma documentada da
+# função no Moodle 5.0 (`mod/assign/externallib.php`, `get_submission_status_
+# returns`) e do que `notas/moodle-catalogo.md` §3.5 registra dela. A forma é
+# fiel; os VALORES são sintéticos, e o `assignid` 577509 é o do `EC-1` da
+# fixture real de PTC3314, para o par fechar.
+#
+# O que isso implica, dito aqui e não descoberto depois: a projeção medida
+# contra este payload mede o que a nossa projeção descarta de uma resposta
+# DESTA FORMA — não o tamanho da resposta que o e-Disciplinas devolve de fato.
+# O catálogo estima ~260 tokens por chamada e marca a estimativa como medida,
+# enquanto `notas/fase1-moodle.md` lista `submission_status` como não medida
+# (registrado em `docs/decisions/BACKLOG-correcoes.md`, 14/09). Quem rodar ao
+# vivo primeiro: capture, higienize (§3.3) e troque isto por fixture de verdade.
+#
+# Os dois campos gordos são de propósito e são o ponto da projeção: o
+# `editorfields[].text` carrega o TEXTO INTEIRO que o aluno entregou, e o
+# `assignmentdata.activity` carrega o enunciado inteiro em HTML — nenhum dos
+# dois responde "eu já entreguei isso?".
+_TEXTO_ENTREGUE = (
+    "<p dir=\"ltr\" style=\"text-align:left;\">Relatório do EC-1. A simulação do "
+    "transitório na linha de transmissão foi feita no ATP, com a linha modelada "
+    "por parâmetros distribuídos e passo de 1 us. Os gráficos de tensão no "
+    "terminal aberto estão no PDF anexo, junto da dedução do coeficiente de "
+    "reflexão.</p>"
+) * 4
+
+_ENUNCIADO_EM_HTML = (
+    "<p>Exercício Computacional 1 — Transitórios em Linhas de Transmissão. "
+    "Leia o roteiro anexo antes de começar. A entrega é individual e deve conter "
+    "o relatório em PDF e os arquivos de simulação.</p><ul><li>Prazo: 13/09, "
+    "23h59</li><li>Tolerância: 48 h com desconto</li></ul>"
+) * 6
+
+
+def status_de_entrega(
+    *,
+    status: str = "submitted",
+    timemodified: int = 1789300000,
+    gradingstatus: str = "notgraded",
+    extensionduedate: int = 0,
+    arquivos: tuple[str, ...] = ("EC1-relatorio.pdf",),
+    com_lastattempt: bool = True,
+    com_texto_online: bool = True,
+) -> dict:
+    """Uma resposta de `mod_assign_get_submission_status`, na forma documentada.
+
+    `status` aceita os quatro valores do core: `new` (nada começado), `draft`
+    (rascunho salvo e NÃO enviado), `submitted` e `reopened`. A distinção entre
+    `draft` e `submitted` é a razão de a ferramenta existir — quem tem rascunho
+    salvo acha que entregou.
+
+    `com_texto_online=False` produz a entrega SÓ DE ARQUIVO, que é a forma dos
+    quatro `assign` reais de PTC3314. As duas existem porque o tamanho do cru
+    depende inteiramente de qual delas é — e o lado projetado, não (J6).
+    """
+    plugin_texto = {
+        "type": "onlinetext",
+        "name": "Texto online",
+        "fileareas": [{"area": "submissions_onlinetext", "files": []}],
+        "editorfields": [
+            {
+                "name": "onlinetext",
+                "description": "",
+                "text": _TEXTO_ENTREGUE,
+                "format": 1,
+            }
+        ],
+    }
+
+    submissao = {
+        "id": 4120391,
+        "userid": 8214,
+        "attemptnumber": 0,
+        "timecreated": timemodified - 7200,
+        "timemodified": timemodified,
+        "timestarted": None,
+        "status": status,
+        "groupid": 0,
+        "assignment": 577509,
+        "latest": 1,
+        "gradingstatus": gradingstatus,
+        "plugins": [
+            *([plugin_texto] if com_texto_online else []),
+            {
+                "type": "file",
+                "name": "Envios de arquivo",
+                "fileareas": [
+                    {
+                        "area": "submission_files",
+                        "files": [
+                            {
+                                "filename": nome,
+                                "filepath": "/",
+                                "filesize": 218453,
+                                "fileurl": (
+                                    "https://edisciplinas.usp.br/webservice/"
+                                    f"pluginfile.php/9599793/assignsubmission_file/"
+                                    f"submission_files/4120391/{nome}"
+                                ),
+                                "timemodified": timemodified,
+                                "mimetype": "application/pdf",
+                                "isexternalfile": False,
+                            }
+                            for nome in arquivos
+                        ],
+                    }
+                ],
+            },
+        ],
+    }
+
+    return {
+        "lastattempt": {
+            # `submission` ausente é como o Moodle responde quando o aluno nunca
+            # abriu a entrega — não é `status: "new"` com objeto vazio.
+            **({"submission": submissao} if com_lastattempt else {}),
+            "teamsubmission": None,
+            "submissiongroup": None,
+            "submissiongroupmemberswhoneedtosubmit": [],
+            "submissionsenabled": True,
+            "locked": False,
+            "graded": gradingstatus == "graded",
+            "canedit": status in ("new", "draft"),
+            "caneditowner": status in ("new", "draft"),
+            "cansubmit": status in ("new", "draft"),
+            "extensionduedate": extensionduedate,
+            "blindmarking": False,
+            "gradingstatus": gradingstatus,
+            "usergroups": [],
+        },
+        "assignmentdata": {
+            "attachments": {
+                "intro": [
+                    {
+                        "filename": "EP1-2026.pdf",
+                        "filepath": "/",
+                        "filesize": 218453,
+                        "fileurl": (
+                            "https://edisciplinas.usp.br/webservice/pluginfile.php/"
+                            "9599801/mod_assign/introattachment/0/EP1-2026.pdf"
+                        ),
+                        "timemodified": 1787314800,
+                        "mimetype": "application/pdf",
+                        "isexternalfile": False,
+                    }
+                ],
+                "activity": [],
+            },
+            "activity": _ENUNCIADO_EM_HTML,
+        },
+        "warnings": [],
+    }
