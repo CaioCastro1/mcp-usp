@@ -101,7 +101,20 @@ def listar_ferramentas() -> list[dict]:
     ]
 
 
-def _linha_da_refeicao(nome_ru: str, qual: str, dados: dict) -> list[str]:
+def _itens_comuns(refeicoes: list[dict]) -> set[str]:
+    """Itens presentes em TODAS as refeições abertas — e só com duas ou mais.
+
+    Regra estrita de propósito: "na maioria" exigiria marcar exceções, e o ganho
+    medido (~20 B por refeição) não paga a complexidade. Com uma refeição só não
+    há o que fatorar. A projeção estruturada não muda: isto é só texto.
+    """
+    abertas = [r for r in refeicoes if r.get("situacao") == "aberto" and r.get("itens")]
+    if len(abertas) < 2:
+        return set()
+    return set.intersection(*(set(r["itens"]) for r in abertas))
+
+
+def _linha_da_refeicao(nome_ru: str, qual: str, dados: dict, comuns=frozenset()) -> list[str]:
     rotulo = _ROTULO[qual]
     situacao = dados["situacao"]
 
@@ -120,8 +133,9 @@ def _linha_da_refeicao(nome_ru: str, qual: str, dados: dict) -> list[str]:
     # Itens numa linha só, separados por ' · ': sete itens por refeição em
     # quatro RUs seriam 56 linhas, e o teto de custo (R37b) existe para impedir
     # que a formatação engorde sem ninguém ver.
-    if dados.get("itens"):
-        linhas.append("  " + " · ".join(dados["itens"]))
+    itens = [i for i in dados.get("itens") or () if i not in comuns]
+    if itens:
+        linhas.append("  " + " · ".join(itens))
     if dados.get("opcao"):
         marca = " [marcada como vegetariana]" if dados.get("opcao_vegetariana_marcada") else ""
         linhas.append(f"  Opção: {dados['opcao']}{marca}")
@@ -132,11 +146,22 @@ def formatar(resposta: dict) -> str:
     """Texto para o modelo ler. Compacto, e com o que não se sabe no fim."""
     linhas = [f"Bandejão — {resposta['dia_semana']} {resposta['data']}"]
 
+    refeicoes = [
+        ru["refeicoes"][qual]
+        for ru in resposta["restaurantes"]
+        for qual in resposta["refeicoes"]
+        if ru["refeicoes"].get(qual)
+    ]
+    comuns = _itens_comuns(refeicoes)
+
     for ru in resposta["restaurantes"]:
         for qual in resposta["refeicoes"]:
             dados = ru["refeicoes"].get(qual)
             if dados:
-                linhas.extend(_linha_da_refeicao(ru["nome"], qual, dados))
+                linhas.extend(_linha_da_refeicao(ru["nome"], qual, dados, comuns))
+
+    if comuns:
+        linhas.append("Em todas as refeições acima: " + " · ".join(sorted(comuns)))
 
     # Invariante 7: o que a ferramenta NÃO sabe vai junto, nunca por omissão.
     for aviso in resposta.get("avisos") or ():
