@@ -21,6 +21,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
 | "Já entreguei o EP1?" | O que você já enviou, o que ficou só como rascunho e se saiu no prazo |
 | "Como estou de nota?" | As notas que o professor lançou no e-Disciplinas, de todas as disciplinas ou item a item de uma |
+| "O professor avisou alguma coisa?" | Os recados nos fóruns da disciplina, o mural de avisos primeiro |
 | "Quantos créditos vale MAC0110?" | Créditos, carga horária e ementa pela sigla; programa, bibliografia e avaliação sob pedido |
 | "O que preciso ter feito antes de MAT2454?" | Pré-requisitos, pelo seu currículo |
 
@@ -250,15 +251,14 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, nove ferramentas. Comunicação por
-stdio, JSON-RPC, um processo por servidor. Sete delas foram exercitadas contra a USP de
-verdade; `ja_entreguei` e `notas` são de 14/09 e até agora só rodaram contra resposta de
-mentira.
+Três servidores MCP, dez ferramentas. Comunicação por
+stdio, JSON-RPC, um processo por servidor. Nove delas foram exercitadas contra a USP de
+verdade; `avisos` é de 14/09 e até agora só rodou contra resposta escrita à mão.
 
 | Servidor | Ferramentas |
 |---|---|
 | `usp-rucard` | `bandejao` |
-| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de

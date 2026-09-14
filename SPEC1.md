@@ -2923,3 +2923,106 @@ parte. A frase "cinco ferramentas" que o plano original mirava já não existia:
 tinha avançado para "sete ferramentas" (correto, e já batendo com a tabela) entre a
 escrita do plano e a execução — os pré-requisitos `rucard-semana-e-vocabulario` e
 `jupiter-disciplina-secoes` fecharam nesse intervalo.
+
+### 14/09/2026 — `avisos`: o fórum responde o que o calendário não sabe, e o nome da função importa
+
+**Por que a ferramenta existe, e a medição é anterior a ela.** A
+`notas/fase1-moodle.md` registra, da Fase 1, que o anúncio da *Prova Prática P1* de PSI3323
+estava no fórum **Avisos** e que a prova **não** estava no calendário da disciplina. O
+`o_que_vence` é honesto sobre isso desde 28/08 — a `cobertura` dele diz que prova
+presencial não lançada no Moodle não entra —, mas dizer "não sei" não era a única opção
+disponível: o dado existia, num lugar que ninguém lia. `avisos` é esse lugar. As duas
+ferramentas respondem a mesma véspera por dois caminhos: uma o que tem **prazo**, outra o
+que foi **dito**.
+
+**A decisão que este commit pede para julgar é o NOME da segunda função.** O comparável
+`loyaniu/moodle-mcp` chama `mod_forum_get_discussions`, e ela **não existe** no Moodle 5.0
+da USP — medido em 14/09/2026 contra o e-Disciplinas, junto com as outras três do P2. A
+função é `mod_forum_get_forum_discussions`. Copiar a lista do comparável sem conferir dá
+suíte verde e erro na primeira pergunta real, porque **um dublê responde a qualquer nome
+que o teste tenha previsto**: o nome errado no código e no teste é verde dos dois lados.
+A19 é a asserção que trava isso, e ela é sobre o nome ENVIADO.
+
+**Duas funções e não uma, e a primeira é tradução.**
+`mod_forum_get_forum_discussions` exige um `forumid`, que não é o `courseid` nem o `cmid`
+— os três chegam lado a lado na mesma resposta, e trocar um pelo outro produz uma chamada
+que o Moodle aceita e responde sobre outra coisa. Quem dá o `forumid` é
+`mod_forum_get_forums_by_courses`. É a mesma forma da tradução sigla → `courseid` que
+`disciplinas` já faz, um nível abaixo. A3 usa os ids reais dos dois fóruns de PTC3314
+(`301511`/`cmid 6372301` e `301513`/`cmid 6372305`, de `course_contents_ptc3314.json`)
+exatamente para que a troca seja visível.
+
+**Allowlist de 8 para 10, e um prefixo novo em P5 — de novo o prefixo do plugin não
+serve.** `mod_forum_` é a família mais perigosa que a allowlist já tocou: das 18 funções,
+**14 escrevem**, e quatro delas são dano público — `add_discussion` e
+`add_discussion_post` já estão no §2.2, `update_discussion_post` edita post alheio e
+`delete_post` **apaga a discussão inteira quando o post é o tópico** (§3.6 do catálogo).
+O prefixo declarado é `mod_forum_get_`, que não casa com nenhuma das 14; `mod_forum_`
+casaria com todas. Fica de fora também `mod_forum_can_add_discussion`, que é leitura mas
+não casa — e está certo, porque ela não responde pergunta nenhuma deste projeto.
+
+**Três decisões de custo, e a terceira é a incômoda:**
+
+1. **Fórum com `numdiscussions: 0` não gasta chamada.** É o `nosubmissions` de
+   `ja_entreguei`: consultar gastaria uma ida ao Moodle para receber lista vazia. Não
+   consultar **não é sumir** — o fórum aparece na saída com o motivo (A4). E ausência do
+   campo é **"não sei"**, nunca zero: o erro cai para o lado de gastar a chamada, porque o
+   outro lado é declarar vazio um fórum que ninguém leu (A4b).
+2. **Teto de 4 fóruns por invocação**, pelo mesmo motivo do teto de 10 de `ja_entreguei`:
+   latência e log da conta (Invariante 5). O corte fica com os ÚLTIMOS depois da ordenação,
+   e a ordenação põe o mural de avisos (`type: "news"`) na frente — então o que fica de
+   fora é fórum de discussão, e a saída diz isso.
+3. **Teto de 600 caracteres por tópico, declarado no texto.** Esta é diferente das outras
+   duas: aqui o corte remove **resposta**, não transporte. O catálogo (§3.6) registra o
+   fórum como a resposta que menos comprime do projeto inteiro, *"porque ali o payload é o
+   conteúdo"*. Descartar o corpo devolveria "o professor avisou alguma coisa" sem dizer o
+   quê, que não responde a pergunta; devolver inteiro faria um tópico longo comer a
+   resposta. O meio-termo só é honesto porque é dito, com a contagem e com onde está o
+   resto (A8).
+
+**Nome de terceiro não atravessa esta ferramenta.** O fórum é o único lugar deste projeto
+em que o payload é escrito por outras pessoas em quantidade: cada discussão chega com
+`userfullname`, `usermodifiedfullname`, `userid`, `usermodified` e **duas**
+`userpictureurl` — 338 B dos 1.610 B de uma discussão, 21%. Nenhum deles sai (§3.3, A6), e
+a omissão é **dita**: quem lê precisa saber que a autoria ficou de fora, senão atribui ao
+professor o que um colega escreveu. Dos anexos (263 B, 16%) não sai nem endereço
+(Invariante 3) nem nome de arquivo — quem responde "que arquivo tem aqui" é `material`.
+
+**A projeção, medida — e o payload é ESCRITO À MÃO.** A ressalva vem antes do número
+porque é ela que diz o que o número vale:
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 2 fóruns + 1 tópico em cada (payload **escrito à mão**) | 4.654 B | 1.660 B | **2,8×** (35,7% sobrando) |
+
+Isto **não** é medição contra a conta do dono: a worktree não tem token e não devia obter
+um. A forma vem da declaração das duas funções no core 5.0 (`mod/forum/externallib.php`) e
+do §3.6 do catálogo; os `id` e os `name` dos dois fóruns são reais, o resto é inventado. O
+que a razão mede é **o que a nossa projeção descarta de uma resposta desta forma**, não o
+tamanho do que o e-Disciplinas devolve. Vale dizer que 35,7% sobrando cai em cima dos "35%
+sobrando após projeção" que o catálogo registra para fórum — mas isso é coincidência de
+ordem de grandeza entre um número medido e um payload que escrevemos, e não confirmação de
+coisa nenhuma. A19 é a única asserção deste arquivo que não depende da fixture.
+
+**O que fica sem verificação ao vivo**, e é o que a próxima sessão com token deve conferir
+primeiro: se `numdiscussions` de fato vem em `get_forums_by_courses` neste site (a
+ferramenta inteira economiza chamada com base nele, e trata a ausência como "não sei"); o
+que `perpage [opt=0]` e `page [opt=-1]` fazem quando omitidos — mandamos os dois
+explícitos pela mesma razão do `userid` de `notas`, mas ninguém mediu o default; se o
+`type` do fórum *Avisos* do e-Disciplinas é mesmo `news` (a ordenação depende disso, e
+degrada para ordem alfabética se não for); e se o corpo do post vem em HTML com as
+entidades que `texto.sem_html` traduz. Capturar isto exige higienização do §3.3 mais
+pesada que a das outras: é o payload com mais nome de terceiro do projeto.
+
+**Uma coisa que a saída diz e a API não:** *fórum vazio* e *disciplina sem fórum* são
+rótulos diferentes (`sem_topico` e `sem_forum`), porque no primeiro caso vale voltar
+amanhã e no segundo não. E a diferença entre `numdiscussions` e o que `perpage` trouxe
+vira contagem na saída — custa zero chamada, porque as duas grandezas já estão em mãos.
+
+**`texto.sem_html` nasceu aqui e foi morar em `texto.py`**, pelo mesmo motivo que
+`formatar_data` mudou de casa em 14/09: é o caminho de volta — escrever o que a pessoa lê —
+e a segunda semântica de "tirar a marcação" neste servidor seria a repetição literal do que
+aconteceu com o casamento por nome, que nasceu duas vezes com regras diferentes e custou o
+T83.
+
+---

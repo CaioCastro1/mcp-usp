@@ -56,6 +56,22 @@ from dataclasses import dataclass
 # que dispara evento de log) e tem leitura de nota DE TERCEIROS
 # (`gradereport_grader_get_users_in_report`): nenhuma das três entra, e os
 # prefixos declarados em P5 são estreitos o bastante para não as arrastar.
+#
+# A nona e a décima entraram em 14/09/2026, com `avisos`, e a decisão do §9 é
+# sobre a SEGUNDA delas ter o nome que tem. O comparável `loyaniu/moodle-mcp`
+# chama `mod_forum_get_discussions`, que **não existe** no Moodle 5.0 da USP —
+# medido em 14/09. A função é `mod_forum_get_forum_discussions`, e a diferença
+# entre as duas é a diferença entre a ferramenta responder e dar erro na
+# primeira pergunta real. A primeira, `mod_forum_get_forums_by_courses`, existe
+# porque a segunda exige um `forumid` que nem o `courseid` nem o `cmid` são.
+#
+# A família `mod_forum_` é a mais perigosa da allowlist até aqui: quatorze das
+# dezoito funções escrevem, e quatro delas estão no §2.2 (`add_discussion`,
+# `add_discussion_post`) ou deveriam estar pelo mesmo motivo
+# (`update_discussion_post` edita post público, `delete_post` apaga a discussão
+# inteira quando o post é o tópico). Nenhuma começa por `mod_forum_get_`, que é
+# o prefixo estreito declarado em P5 — o do plugin, `mod_forum_`, casaria com
+# todas as quatorze.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -66,6 +82,8 @@ ALLOWLIST: frozenset[str] = frozenset(
         "mod_assign_get_submission_status",
         "gradereport_overview_get_course_grades",
         "gradereport_user_get_grade_items",
+        "mod_forum_get_forums_by_courses",
+        "mod_forum_get_forum_discussions",
     }
 )
 

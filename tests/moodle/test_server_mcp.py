@@ -25,9 +25,9 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — seis ferramentas. Cada crescimento é decisão registrada no §9:
+    """T42 — sete ferramentas. Cada crescimento é decisão registrada no §9:
     `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico`,
-    `ja_entreguei` e `notas` em 14/09.
+    `ja_entreguei`, `notas` e `avisos` em 14/09.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma
@@ -41,6 +41,7 @@ def test_expoe_exatamente_uma_ferramenta():
         "diagnostico",
         "ja_entreguei",
         "notas",
+        "avisos",
     ]
 
 

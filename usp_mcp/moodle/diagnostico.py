@@ -68,6 +68,16 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "gradereport_overview_get_course_grades",
         "gradereport_user_get_grade_items",
     ),
+    # `avisos` (14/09) exige as duas de fórum juntas, e não uma ou outra como
+    # `notas`: `get_forum_discussions` pede um `forumid`, e o único lugar de
+    # onde ele sai é `get_forums_by_courses`. Um site com só a segunda não
+    # responde meia pergunta — não responde nenhuma.
+    "avisos": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_forum_get_forums_by_courses",
+        "mod_forum_get_forum_discussions",
+    ),
 }
 
 
