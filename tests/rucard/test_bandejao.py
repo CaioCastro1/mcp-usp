@@ -528,3 +528,34 @@ def test_r44d_o_enum_declarado_e_exatamente_a_lista_de_nomes():
     assert set(ferramentas.ALIASES_RU.values()) == set(ferramentas.NOMES_RU_PARA_ID.values())
     for nome in ferramentas.NOMES_RU:
         assert nome in ferramentas.ALIASES_RU
+
+
+# --- R45: a semana inteira numa chamada --------------------------------------
+
+
+def test_r45_bandejao_semana_tem_sete_dias_e_avisos_sem_repeticao(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    semana = ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=QUARTA)
+
+    assert set(semana) == set(ferramentas.CAMPOS_SEMANA)
+    assert semana["inicio"] == "24/08/2026" and semana["fim"] == "30/08/2026"
+    assert [d["dia_semana"] for d in semana["dias"]] == [
+        "seg", "ter", "qua", "qui", "sex", "sáb", "dom"
+    ]
+    assert semana["refeicoes"] == ["almoco", "jantar"]
+    assert len(semana["avisos"]) == len(set(semana["avisos"])), "aviso repetido entre dias"
+    # O domingo do 9 tem almoço e não tem jantar (R29b), visto pela semana.
+    domingo = semana["dias"][6]
+    (ru9,) = [r for r in domingo["restaurantes"] if r["id"] == "9"]
+    assert ru9["refeicoes"]["almoco"]["situacao"] == "aberto"
+    assert ru9["refeicoes"]["jantar"]["situacao"] == "nao_serve"
+
+
+def test_r45b_a_semana_inteira_custa_cinco_requisicoes(gravador, respostas_da_fatia):
+    transporte = gravador(respostas_da_fatia)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+    ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=SEGUNDA)
+    # Invariante 5: o /menu já devolve a semana, e o cliente cacheia por RU.
+    assert sorted(transporte.rotas()) == ["menu/6", "menu/7", "menu/8", "menu/9", "restaurants"]

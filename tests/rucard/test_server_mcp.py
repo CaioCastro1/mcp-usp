@@ -144,3 +144,48 @@ def test_r47b_com_uma_refeicao_so_nao_ha_rodape_e_a_linha_fica_inteira(
     assert "Em todas as refeições" not in texto
     linha = next(l for l in texto.splitlines() if "Iscas de tilápia" in l)
     assert "Minipão / refresco" in linha and "Arroz / feijão / arroz integral" in linha
+
+
+@pytest.mark.contrato
+def test_r46_dia_semana_e_uma_chamada_de_ferramenta_com_os_sete_dias(
+    gravador, respostas_da_fatia
+):
+    transporte = gravador(respostas_da_fatia)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "almoco"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    assert texto.startswith("Bandejão — semana de 24/08/2026 a 30/08/2026")
+    assert "sex 28/08" in texto
+    assert "Lombo com molho de limão" in texto, "terça no Central: um dia que não é hoje"
+    assert "CENTRAL · almoço" in texto and "QUÍMICAS · almoço" in texto
+    assert "jantar" not in texto.lower()
+    assert sorted(transporte.rotas()) == ["menu/6", "menu/7", "menu/8", "menu/9", "restaurants"]
+
+
+@pytest.mark.contrato
+def test_r46b_dia_fechado_na_semana_e_uma_palavra_nao_um_paragrafo(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao",
+        {"dia": "semana", "refeicao": "almoco", "restaurantes": ["central"]},
+        cliente=cliente, hoje=SEGUNDA,
+    )
+    linha = next(l for l in texto.splitlines() if l.strip().startswith("sáb 29/08"))
+    assert linha.strip() == "sáb 29/08: não serve"
+
+
+@pytest.mark.contrato
+@pytest.mark.parametrize("refeicao,teto", [("almoco", 6_500), ("todas", 11_000)])
+def test_r46c_o_texto_semanal_tem_teto(gravador, respostas_da_fatia, refeicao, teto):
+    # Medido em 14/09/2026 sobre as fixtures da Fase 1: 4.818 B (almoço) e
+    # 8.381 B (almoço e jantar), 4 RUs × 7 dias. Folga de ~30%.
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": refeicao}, cliente=cliente, hoje=SEGUNDA
+    )
+    assert len(texto.encode()) <= teto, f"{refeicao}: {len(texto.encode())} B"
+    assert len(texto.splitlines()) < 80

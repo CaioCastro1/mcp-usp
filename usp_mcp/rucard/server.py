@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from .cliente import ClienteRucard, transporte_http
 from .erros import ErroRucard
-from .ferramentas import bandejao
+from .ferramentas import SEMANA, bandejao, bandejao_semana
 
 _NOME_FERRAMENTA = "bandejao"
 
@@ -170,7 +170,96 @@ def formatar(resposta: dict) -> str:
     return "\n".join(linhas)
 
 
-def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
+# Situação de refeição não aberta, numa palavra: na semana são até 28 linhas de
+# dia, e a frase inteira do `detalhe` em cada uma custaria mais que o cardápio.
+# O detalhe continua na projeção estruturada.
+_SITUACAO_CURTA = {
+    "nao_serve": "não serve",
+    "fechado": "fechado",
+    "indisponivel": "indisponível",
+    "sem_cardapio_publicado": "sem cardápio publicado",
+}
+
+
+def formatar_semana(resposta: dict) -> str:
+    """Texto da semana para o modelo ler: um bloco por RU e refeição, um dia por
+    linha. Horário fica na linha do dia, não no cabeçalho do RU — o 9 fecha o
+    jantar às 19:45 em dia útil e às 19:00 no sábado, e um horário só mentiria."""
+    linhas = [f"Bandejão — semana de {resposta['inicio']} a {resposta['fim']}"]
+    dias = resposta["dias"]
+    refeicoes_pedidas = resposta["refeicoes"]
+
+    todas = [
+        ru["refeicoes"][qual]
+        for d in dias
+        for ru in d["restaurantes"]
+        for qual in refeicoes_pedidas
+        if ru["refeicoes"].get(qual)
+    ]
+    comuns = _itens_comuns(todas)
+
+    # A ordem dos RUs é a do primeiro dia em que cada um aparece: um RU pode
+    # faltar num dia (semana não publicada) sem sumir do texto.
+    ordem: list[tuple[str, str]] = []
+    for d in dias:
+        for ru in d["restaurantes"]:
+            if (ru["id"], ru["nome"]) not in ordem:
+                ordem.append((ru["id"], ru["nome"]))
+
+    for id_ru, nome in ordem:
+        for qual in refeicoes_pedidas:
+            preco = next(
+                (
+                    ru["refeicoes"][qual].get("preco_aluno")
+                    for d in dias
+                    for ru in d["restaurantes"]
+                    if ru["id"] == id_ru and ru["refeicoes"].get(qual, {}).get("preco_aluno")
+                ),
+                None,
+            )
+            cabecalho = f"{nome} · {_ROTULO[qual]}"
+            if preco:
+                cabecalho += f" · R$ {preco} (aluno)"
+            linhas.append(cabecalho)
+
+            for d in dias:
+                rotulo_dia = f"{d['dia_semana']} {d['data'][:5]}"
+                ru = next((r for r in d["restaurantes"] if r["id"] == id_ru), None)
+                if ru is None:
+                    linhas.append(f"  {rotulo_dia}: sem cardápio publicado para este dia")
+                    continue
+                dados = ru["refeicoes"].get(qual)
+                if not dados:
+                    continue
+                if dados["situacao"] != "aberto":
+                    curta = _SITUACAO_CURTA.get(dados["situacao"], dados["situacao"])
+                    linhas.append(f"  {rotulo_dia}: {curta}")
+                    continue
+                partes = [rotulo_dia]
+                if dados.get("horario"):
+                    partes.append(dados["horario"])
+                if dados.get("calorias"):
+                    partes.append(f"{dados['calorias']} kcal")
+                itens = [i for i in dados.get("itens") or () if i not in comuns]
+                linha = "  " + " · ".join(partes) + ": " + " · ".join(itens)
+                if dados.get("opcao"):
+                    marca = (
+                        " [marcada como vegetariana]"
+                        if dados.get("opcao_vegetariana_marcada") else ""
+                    )
+                    linha += f" | Opção: {dados['opcao']}{marca}"
+                linhas.append(linha)
+
+    if comuns:
+        linhas.append("Em todas as refeições acima: " + " · ".join(sorted(comuns)))
+
+    for aviso in resposta.get("avisos") or ():
+        linhas.append(f"⚠ {aviso}")
+
+    return "\n".join(linhas)
+
+
+def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None, hoje=None) -> str:
     """Despacha para a ferramenta pedida, ou levanta erro legível.
 
     Nome desconhecido levanta `ErroRucard` citando o nome pedido: "ferramenta
@@ -179,7 +268,8 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     `cliente` é injetável — e, como no Jupiter e diferente do Moodle, a
     fronteira inteira roda offline contra fixture, porque não falta credencial
-    nenhuma para isso.
+    nenhuma para isso. `hoje` é injetável só para os testes da semana: sem ele,
+    "semana" seria a de quem roda o teste.
     """
     if nome != _NOME_FERRAMENTA:
         raise ErroRucard(
@@ -193,12 +283,21 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
         # ambiente (§1.2), e o cliente falha legível se ela não estiver lá.
         cliente = ClienteRucard(transporte_http)
 
+    dia = argumentos.get("dia", "hoje")
+    refeicao = argumentos.get("refeicao", "todas")
+    restaurantes = argumentos.get("restaurantes")
+
+    if (dia or "hoje").strip().lower() == SEMANA:
+        return formatar_semana(
+            bandejao_semana(
+                refeicao=refeicao, restaurantes=restaurantes, cliente=cliente, hoje=hoje
+            )
+        )
+
     return formatar(
         bandejao(
-            dia=argumentos.get("dia", "hoje"),
-            refeicao=argumentos.get("refeicao", "todas"),
-            restaurantes=argumentos.get("restaurantes"),
-            cliente=cliente,
+            dia=dia, refeicao=refeicao, restaurantes=restaurantes,
+            cliente=cliente, hoje=hoje,
         )
     )
 
