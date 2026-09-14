@@ -88,3 +88,41 @@ def erro():
 @pytest.fixture
 def gravador():
     return Gravador
+
+
+# --- A fatia de requisitos (14/09). HTML, não DWR: outra superfície, outro
+# transporte, e por isso fixtures próprias. Todas de dado público — o §5 do
+# design mediu 0 ocorrência de nome de docente nas três.
+REQUISITOS = {
+    "psi3323_html": "html-listarCursosRequisitos-PSI3323.html",
+    "mat2455_html": "html-listarCursosRequisitos-MAT2455.html",
+    "ptc3313_html": "html-listarCursosRequisitos-PTC3313.html",
+    "ingresso_poli": "dwr-pubListarCursoEntrada-codclg3.txt",
+}
+
+
+def html(chave):
+    """O JupiterWeb serve ISO-8859-1, e ler como UTF-8 estoura no primeiro
+    acento. A decodificação é responsabilidade de quem lê o fio, então o teste
+    passa BYTES adiante — é o que o transporte real entrega."""
+    return (FIXTURES / REQUISITOS[chave]).read_bytes()
+
+
+@pytest.fixture
+def psi3323_html():
+    return html("psi3323_html")
+
+
+@pytest.fixture
+def mat2455_html():
+    return html("mat2455_html")
+
+
+@pytest.fixture
+def ptc3313_html():
+    return html("ptc3313_html")
+
+
+@pytest.fixture
+def ingresso_poli():
+    return (FIXTURES / REQUISITOS["ingresso_poli"]).read_text(encoding="utf-8")
