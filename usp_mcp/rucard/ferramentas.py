@@ -481,6 +481,45 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
     }
 
 
+CAMPOS_SEMANA = ("inicio", "fim", "refeicoes", "dias", "avisos")
+
+
+def bandejao_semana(refeicao: str = "todas", restaurantes=None, *, cliente,
+                    hoje: date | None = None) -> dict:
+    """Os sete dias da semana corrente, segunda a domingo, numa resposta só.
+
+    É a mesma pergunta do §5 ("o que tem, e onde vale a pena") com outro recorte
+    de tempo — "que dia tem lasanha?" — e por isso não é outra ferramenta. Chama
+    `bandejao` uma vez por dia; o cliente cacheia o `/menu` por RU, então a semana
+    inteira custa as mesmas 5 requisições de um dia (há teste que trava isso).
+    Avisos iguais entre dias saem uma vez.
+    """
+    hoje = hoje if hoje is not None else datetime.now(FUSO_SAO_PAULO).date()
+    respostas = [
+        bandejao(
+            dia=d.strftime("%d/%m/%Y"), refeicao=refeicao, restaurantes=restaurantes,
+            cliente=cliente, hoje=hoje,
+        )
+        for d in dias_da_semana(hoje)
+    ]
+
+    avisos: list[str] = []
+    for resposta in respostas:
+        for aviso in resposta["avisos"]:
+            if aviso not in avisos:
+                avisos.append(aviso)
+
+    return {
+        "inicio": respostas[0]["data"],
+        "fim": respostas[-1]["data"],
+        "refeicoes": respostas[0]["refeicoes"],
+        "dias": [
+            {k: r[k] for k in ("data", "dia_semana", "restaurantes")} for r in respostas
+        ],
+        "avisos": avisos,
+    }
+
+
 def _ficha_para_saida(ficha, refeicoes: dict) -> dict:
     return {
         "id": ficha.id,
