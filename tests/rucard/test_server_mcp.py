@@ -31,7 +31,7 @@ def test_r38_descricao_fala_a_lingua_de_quem_pergunta():
             f"{vazamento!r} na descrição: o modelo escolhe a ferramenta lendo "
             "isto, e ninguém pergunta em nome de rota."
         )
-    for vocabulario in ("bandejão", "almoço", "jantar", "hoje"):
+    for vocabulario in ("bandejão", "almoço", "jantar", "hoje", "prefeitura", "sexta", "semana"):
         assert vocabulario in descricao.lower()
 
     # Invariante 7 na própria descrição: o que a ferramenta NÃO tem evita que o
@@ -52,11 +52,13 @@ def test_r38b_o_schema_declara_os_quatro_rus_e_nao_convida_a_inventar_id():
     assert propriedades["dia"].get("default") == "hoje"
 
     enumerado = propriedades["restaurantes"]["items"]["enum"]
-    assert enumerado == ["6", "7", "8", "9"], (
-        "o schema é onde o modelo aprende que só existem quatro RUs aqui. Sem "
-        "enum, ele inventa id e recebe negativa da allowlist — erro certo pela "
-        "via mais cara."
+    assert enumerado == ["central", "prefeitura", "fisica", "quimicas"], (
+        "o schema é onde o modelo aprende que só existem quatro RUs aqui, e "
+        "pelo NOME que a pessoa fala — id numérico é detalhe da API. Sem enum, "
+        "ele inventa e recebe negativa da allowlist: erro certo pela via mais cara."
     )
+    descricao_do_dia = propriedades["dia"]["description"].lower()
+    assert "sexta" in descricao_do_dia and "semana" in descricao_do_dia
     assert set(propriedades["refeicao"]["enum"]) == {
         "almoco", "jantar", "cafe", "todas"
     }
