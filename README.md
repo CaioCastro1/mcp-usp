@@ -1,12 +1,11 @@
 # usp-mcp
 
-Um jeito de perguntar, em português, coisas da vida acadêmica na USP: o que tem no
-bandejão hoje, o que você tem para entregar essa semana, que arquivos o professor subiu no
-e-Disciplinas, quantos créditos vale uma disciplina e qual é o pré-requisito dela.
+Consulta em português a sistemas acadêmicos da USP: o cardápio dos bandejões, os prazos e
+o material do e-Disciplinas, e o catálogo de disciplinas do JupiterWeb.
 
-Você não usa isto direto. Ele se liga num assistente (o Claude, por exemplo) e passa a ser
-uma coisa que o assistente sabe consultar. Aí você pergunta normal, como perguntaria para
-um amigo, e a resposta vem do sistema da USP de verdade.
+Ele não tem interface própria. Você o conecta a um assistente, como o Claude, e passa a
+poder perguntar em linguagem comum. A resposta vem dos sistemas da USP, no momento da
+pergunta.
 
 Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 
@@ -27,19 +26,40 @@ trabalho. A seção *Configuração* explica.
 
 ## Instalando
 
-Duas coisas antes de começar. Isto roda no Terminal do seu computador, Mac ou Linux, e
-não tem tela nem botão. E você precisa de um assistente que aceite conectar ferramentas,
-como o Claude Desktop ou o Claude Code.
+Este é um MCP: um conjunto de ferramentas que um assistente passa a saber usar. Ele
+funciona tanto no terminal quanto no aplicativo do Claude, na função Code, que é onde a
+maioria das pessoas vai usar.
 
-Abra o Terminal e cole estes dois comandos, um de cada vez:
+### O caminho rápido
+
+Se você já tem o Claude Code, mande a mensagem abaixo para ele e pule o resto desta seção.
+Ele instala, configura e te guia no único passo que precisa da sua mão.
+
+```text
+Instale o usp-mcp neste computador e me conecte a ele.
+
+1. Clone https://github.com/CaioCastro1/mcp-usp em ~/usp-mcp, crie um venv lá dentro e
+   instale com `pip install -e ".[dev]"`. Copie o `.env.example` para `.env` e rode
+   `./scripts/gate.sh` para confirmar que ficou tudo certo.
+2. Registre os três servidores (moodle, jupiter, rucard) no meu Claude Code, no escopo
+   de usuário.
+3. O e-Disciplinas precisa de uma chave pessoal minha. Rode `./scripts/token.sh` e me
+   explique, passo a passo, o que eu preciso fazer no navegador. Não tente fazer esse
+   passo sozinho: ele exige que eu clique.
+4. No fim, chame a ferramenta `diagnostico` e me diga o que ficou funcionando.
+```
+
+### O caminho manual
+
+Abra o terminal e cole estes dois comandos, um de cada vez:
 
 ```bash
 python3 -m venv ~/usp-mcp
 ~/usp-mcp/bin/pip install git+https://github.com/CaioCastro1/mcp-usp.git
 ```
 
-O primeiro cria uma pastinha isolada na sua conta, para não bagunçar nada que já esteja no
-computador. O segundo baixa o programa lá dentro.
+O primeiro cria um ambiente isolado dentro da sua pasta pessoal, sem alterar o Python nem
+os programas já instalados no computador. O segundo instala o projeto nesse ambiente.
 
 Se o Terminal responder que não conhece o comando `python3`, é porque ele ainda não está
 instalado na sua máquina. Instale primeiro, pelo site python.org, e repita os dois
@@ -116,17 +136,17 @@ Depois de conectado, é só perguntar. Alguns exemplos do que funciona:
 - "baixa o EP1 de PTC3314 e me explica o que ele pede"
 - "quantos créditos vale MAC0110 e qual é a ementa?"
 
-A última é a que mostra a graça da coisa: ele baixa o PDF e o próprio assistente lê o
-arquivo para te responder.
+A última encadeia duas coisas: o projeto baixa o PDF e o assistente lê o arquivo para
+responder.
 
 Se você pedir algo que ele não sabe, a resposta diz o que faltou em vez de inventar. Vale
 ler a seção *O que o projeto não responde* antes de concluir que quebrou.
 
 ## Como funciona
 
-Cada um dos três comandos é um programinha que fica esperando o assistente perguntar. Eles
-não abrem site, não abrem porta de rede e não têm tela. Se você rodar um deles no Terminal
-e não acontecer nada, é assim mesmo.
+Cada um dos três comandos é um programa que fica em segundo plano aguardando perguntas do
+assistente. Quem conversa com ele é o assistente, não você: executá-lo direto no terminal
+não produz saída, porque não é para ser usado assim.
 
 Quem decide qual ferramenta usar é o assistente, lendo a descrição de cada uma diante da
 sua pergunta. Por isso as descrições são escritas na linguagem de quem pergunta, e não com
