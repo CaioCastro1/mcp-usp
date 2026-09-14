@@ -19,6 +19,7 @@ import os
 
 from ..env import carregar_env
 from .arquivo import baixar_arquivo
+from .avisos import avisos
 from .cliente import ClienteMoodle
 from .diagnostico import diagnostico
 from .erros import ErroMoodle
@@ -32,15 +33,16 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Seis ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, e a quarta, a quinta e a sexta em 14/09). Os nomes vêm das
-# perguntas do dono, não das funções do Moodle por trás.
+# Sete ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, e da quarta à sétima em 14/09). Os nomes vêm das perguntas
+# do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
 _NOME_ARQUIVO = "baixar_arquivo"
 _NOME_DIAGNOSTICO = "diagnostico"
 _NOME_JA_ENTREGUEI = "ja_entreguei"
 _NOME_NOTAS = "notas"
+_NOME_AVISOS = "avisos"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -261,6 +263,38 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_AVISOS,
+            "description": (
+                "Mostra o que o professor e a turma escreveram nos fóruns de "
+                "uma disciplina do e-Disciplinas (Moodle da USP): o mural de "
+                "avisos primeiro, com o assunto, a data e o começo do texto de "
+                "cada tópico. Use para 'o professor avisou alguma coisa?', 'tem "
+                "recado novo em PTC3314', 'mudou alguma coisa sobre a prova', "
+                "'o que foi dito no fórum'. É aqui que aparece o que o "
+                "calendário não sabe — prova presencial adiada, sala trocada, "
+                "lista que vai sair —, porque isso não vira prazo de atividade. "
+                "Não diz QUEM escreveu: o fórum traz nome de outras pessoas e "
+                "eles não saem daqui. Tópico longo sai cortado, e a resposta "
+                "avisa quando cortou. Custa uma chamada ao Moodle para listar "
+                "os fóruns e mais uma por fórum lido."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
+                            "também com pedaço do nome."
+                        ),
+                    },
+                },
+                "required": ["disciplina"],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -299,6 +333,9 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_NOTAS:
         return notas(cliente, disciplina=argumentos.get("disciplina")).texto
+
+    if nome == _NOME_AVISOS:
+        return avisos(cliente, argumentos["disciplina"]).texto
 
     if nome == _NOME_JA_ENTREGUEI:
         return ja_entreguei(
@@ -377,6 +414,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_diagnostico = portas[_NOME_DIAGNOSTICO]
     porta_ja_entreguei = portas[_NOME_JA_ENTREGUEI]
     porta_notas = portas[_NOME_NOTAS]
+    porta_avisos = portas[_NOME_AVISOS]
     descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -488,6 +526,18 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_notas["name"], description=porta_notas["description"]
     )(_notas)
 
+    def _avisos(disciplina) -> str:
+        # `disciplina` SEM default, como em `material` e `ja_entreguei`: é a
+        # ausência de default que torna o parâmetro obrigatório no fio, e o
+        # `inputSchema` a declara em `required` (H6, 31/08). Aqui ela é mesmo
+        # obrigatória — sem escopo, `courseids` vazio traria as 74 matrículas.
+        return _chamar(porta_avisos["name"], {"disciplina": disciplina})
+
+    anotar(_avisos, porta_avisos["inputSchema"], {"disciplina": str})
+    servidor.tool(
+        name=porta_avisos["name"], description=porta_avisos["description"]
+    )(_avisos)
+
     servidor.run(transport="stdio")
 
 
@@ -558,6 +608,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_notas(disciplina: str | None = None) -> str:
         return ""
 
+    @servidor.tool(name="avisos", description="verificação")
+    def _sonda_avisos(disciplina: str) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
@@ -565,6 +619,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "diagnostico": _sonda_diagnostico,
         "ja_entreguei": _sonda_ja_entreguei,
         "notas": _sonda_notas,
+        "avisos": _sonda_avisos,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():

@@ -551,3 +551,203 @@ def itens_de_nota_falsos(itens=None, *, userid=8214, extras=(), com_warning=Fals
             else []
         ),
     }
+
+
+# --------------------------------------------------------------------------
+# `mod_forum_get_forums_by_courses` e `mod_forum_get_forum_discussions` —
+# **FIXTURE ESCRITA À MÃO**, e o rótulo é o ponto desta seção.
+#
+# **Não é captura.** A worktree onde isto nasceu não tem token e não devia obter
+# um. A FORMA vem da declaração das duas funções no core do Moodle 5.0
+# (`mod/forum/externallib.php`, `get_forums_by_courses_returns` e
+# `get_forum_discussions_returns`) e do que `notas/moodle-catalogo.md` §3.6
+# registra delas.
+#
+# O que aqui é REAL, e vale dizer separado do que não é: os `id`, `cmid` e
+# `name` dos dois fóruns vêm de `course_contents_ptc3314.json`, capturada em
+# 12/09 — "Avisos" é o `instance` 301511 (cmid 6372301) e "Discussão de
+# Exercícios" é o 301513 (cmid 6372305), na disciplina 142036. É isso que faz o
+# `forumid` ENVIADO ser conferido contra um id de verdade, e não contra um
+# número que o próprio teste inventou. Os `subject`, o `message` e os carimbos
+# de tempo são inventados.
+#
+# Consequência, dita aqui para não ser descoberta depois: qualquer razão de
+# projeção medida contra este payload mede o que a nossa projeção descarta de
+# uma resposta DESTA FORMA — não o tamanho do que o e-Disciplinas devolve. O
+# catálogo estima ~2.150 tokens para 4 discussões e marca a estimativa como
+# medida, enquanto `notas/fase1-moodle.md` lista fóruns na seção *Ainda aberto*
+# (a divergência está no `BACKLOG-correcoes.md`). Quem rodar ao vivo primeiro:
+# capture, higienize (§3.3) — o payload de fórum é o que mais tem nome de
+# terceiro do projeto inteiro — e troque isto por fixture de verdade.
+FORUM_AVISOS = 301511
+FORUM_DISCUSSAO = 301513
+CMID_AVISOS = 6372301
+CMID_DISCUSSAO = 6372305
+
+# O corpo do post é o campo gordo, e no fórum ele é o CONTEÚDO — não gordura de
+# transporte. O catálogo (§3.6) registra que é a resposta que menos comprime do
+# projeto inteiro. Este texto é longo de propósito: é ele que exercita o teto de
+# caracteres e o aviso de corte.
+_AVISO_LONGO = (
+    "<p dir=\"ltr\">Pessoal, a prova prática P1 foi <strong>adiada</strong> para "
+    "24/09, mesma sala e mesmo horário.</p><p>O conteúdo continua o mesmo: linhas "
+    "de transmissão, carta de Smith e casamento de impedância. A lista de "
+    "exercícios 3 sai ainda esta semana e cobre exatamente o que cai.</p>"
+    "<ul><li>Levem calculadora;</li><li>A carta de Smith impressa será "
+    "distribuída;</li><li>Não haverá consulta.</li></ul><p>Quem tiver conflito "
+    "de horário me procure at&eacute; sexta.</p>"
+)
+
+
+def foruns_falsos(*, com_avisos=True, com_discussao=True, extras=(), sem_contagem=False):
+    """`mod_forum_get_forums_by_courses`: devolve uma LISTA de fóruns.
+
+    `type` é o campo do core que separa o mural de avisos (`news`, onde só o
+    professor posta) do fórum de discussão (`general`). `numdiscussions` é o que
+    permite não gastar chamada num fórum vazio — `sem_contagem=True` produz a
+    resposta de um site que não devolve o campo, que tem de ser tratada como
+    "não sei", nunca como zero.
+    """
+    def _forum(forumid, cmid, nome, tipo, quantos):
+        f = {
+            "id": forumid,
+            "course": 142036,
+            "type": tipo,
+            "name": nome,
+            "intro": (
+                "<p>Espaço para os avisos da disciplina. Acompanhe.</p>"
+                "<p>Postagens apenas do professor.</p>"
+            ),
+            "introformat": 1,
+            "introfiles": [],
+            "duedate": 0,
+            "cutoffdate": 0,
+            "assessed": 0,
+            "assesstimestart": 0,
+            "assesstimefinish": 0,
+            "scale": 0,
+            "grade_forum": 0,
+            "maxbytes": 0,
+            "maxattachments": 9,
+            "forcesubscribe": 1,
+            "trackingtype": 1,
+            "rsstype": 0,
+            "rssarticles": 0,
+            "timemodified": 1788900000,
+            "warnafter": 0,
+            "blockafter": 0,
+            "blockperiod": 0,
+            "completiondiscussions": 0,
+            "completionreplies": 0,
+            "completionposts": 0,
+            "cmid": cmid,
+            "istracked": True,
+            "unreadpostscount": 2,
+        }
+        if not sem_contagem:
+            f["numdiscussions"] = quantos
+        return f
+
+    lista = []
+    if com_avisos:
+        lista.append(_forum(FORUM_AVISOS, CMID_AVISOS, "Avisos", "news", 3))
+    if com_discussao:
+        lista.append(
+            _forum(FORUM_DISCUSSAO, CMID_DISCUSSAO, "Discussão de Exercícios",
+                   "general", 2)
+        )
+    lista.extend(extras)
+    return lista
+
+
+def discussao_falsa(
+    *,
+    discussionid=910001,
+    subject="Prova P1 adiada para 24/09",
+    message=None,
+    created=1788910000,
+    timemodified=1788910000,
+    numreplies=0,
+    pinned=False,
+    nome_de_quem_postou="Fulano de Tal Professor",
+):
+    """Uma discussão na forma documentada de `get_forum_discussions`.
+
+    `userfullname` e as três irmãs estão aqui **de propósito**: o fórum é o
+    único lugar do projeto em que o payload traz nome de gente de verdade em
+    quantidade, e a projeção só prova que não os imprime se eles chegarem a
+    estar na entrada.
+    """
+    return {
+        "id": discussionid,
+        "name": subject,
+        "groupid": -1,
+        "timemodified": timemodified,
+        "usermodified": 4471,
+        "timestart": 0,
+        "timeend": 0,
+        "discussion": discussionid,
+        "parent": 0,
+        "userid": 4471,
+        "created": created,
+        "modified": timemodified,
+        "mailed": 1,
+        "subject": subject,
+        "message": _AVISO_LONGO if message is None else message,
+        "messageformat": 1,
+        "messagetrust": 0,
+        "attachment": "",
+        "attachments": [
+            {
+                "filename": "lista3.pdf",
+                "filepath": "/",
+                "filesize": 91233,
+                "fileurl": (
+                    "https://edisciplinas.usp.br/webservice/pluginfile.php/"
+                    "9599801/mod_forum/attachment/910001/lista3.pdf"
+                ),
+                "timemodified": timemodified,
+                "mimetype": "application/pdf",
+                "isexternalfile": False,
+            }
+        ],
+        "totalscore": 0,
+        "mailnow": 0,
+        "userfullname": nome_de_quem_postou,
+        "usermodifiedfullname": nome_de_quem_postou,
+        "userpictureurl": (
+            "https://edisciplinas.usp.br/webservice/pluginfile.php/"
+            "1234/user/icon/boost/f1"
+        ),
+        "usermodifiedpictureurl": (
+            "https://edisciplinas.usp.br/webservice/pluginfile.php/"
+            "1234/user/icon/boost/f1"
+        ),
+        "numreplies": numreplies,
+        "numunread": 0,
+        "pinned": pinned,
+        "locked": False,
+        "starred": False,
+        "canreply": False,
+        "canlock": False,
+        "canfavourite": True,
+    }
+
+
+def discussoes_falsas(discussoes=None, *, com_warning=False):
+    """`mod_forum_get_forum_discussions`: `{discussions, warnings}`."""
+    return {
+        "discussions": [discussao_falsa()] if discussoes is None else list(discussoes),
+        "warnings": (
+            [
+                {
+                    "item": "forum",
+                    "itemid": FORUM_DISCUSSAO,
+                    "warningcode": "1",
+                    "message": "Um tópico não pôde ser lido com esta credencial",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }

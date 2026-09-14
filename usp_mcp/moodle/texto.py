@@ -14,9 +14,17 @@ em 14/09 pelo mesmo motivo. Ela nasceu privada em `o_que_vence`, e
 — uma diz o que vence, a outra diz o que disso já foi entregue — e duas grafias
 do mesmo prazo fazem quem lê as duas respostas não reconhecer que é o mesmo
 prazo. J18 trava isso.
+
+`sem_html` chegou em 14/09 pela mesma porta, com `avisos`. O Moodle guarda o
+corpo de um post de fórum em HTML, e ele é a primeira resposta deste projeto em
+que o texto de terceiro sai no resultado em vez de virar contagem. Mora aqui, e
+não em `avisos`, porque o próximo módulo que precisar dela vai ser o que lê
+`intro` de atividade — e a terceira semântica de "tirar a marcação" é como as
+duas de casamento por nome nasceram.
 """
 from __future__ import annotations
 
+import html as _html
 import re
 import unicodedata
 from datetime import datetime
@@ -32,6 +40,50 @@ def formatar_data(quando: datetime) -> str:
     caracteres para dezenas de eventos)."""
     dia = _DIAS_SEMANA[quando.weekday()]
     return f"{dia} {quando.day:02d}/{quando.month:02d} {quando.hour:02d}:{quando.minute:02d}"
+
+
+# O que separa parágrafo de parágrafo quando a tag some. Sem isto, "…até sexta.
+# </p><p>Levem calculadora" vira "…até sexta.Levem calculadora", e duas frases
+# coladas mudam onde quem lê acha que a frase termina.
+_QUEBRAS = re.compile(r"(?i)</\s*(p|div|li|tr|h[1-6])\s*>|<\s*br\s*/?\s*>")
+_TAGS = re.compile(r"<[^>]*>")
+_ESPACOS = re.compile(r"[ \t\r\f\v]+")
+_LINHAS_VAZIAS = re.compile(r"\n{2,}")
+
+
+def sem_html(bruto: str) -> str:
+    """O corpo de um post de fórum, em texto corrido.
+
+    Aqui e não em `avisos` porque é o mesmo caminho de volta de `formatar_data`:
+    escrever o que a pessoa lê. O Moodle guarda o post em HTML, e repassá-lo cru
+    faria quem pergunta receber `<p dir="ltr">` no meio da frase e pagaria o
+    orçamento de texto com marcação.
+
+    Três coisas de propósito, e as três já foram erro em algum lugar:
+
+    1. **A entidade é traduzida antes das tags sumirem**, não depois: `at&eacute;`
+       lido literalmente é uma palavra que não existe em português, e o
+       e-Disciplinas escreve acento assim em post antigo.
+    2. **Fecho de bloco vira quebra de linha**, senão duas frases se colam e o
+       ponto final some no meio de uma palavra.
+    3. **Nada de regex fazendo as vezes de parser.** Isto não interpreta HTML —
+       descarta marcação de um texto que já é do aluno. Conteúdo entre `<script>`
+       ou `<style>` não aparece em post de fórum do Moodle (o filtro do próprio
+       Moodle já o remove na gravação), e se aparecesse o pior caso aqui é texto
+       feio, nunca execução: a saída é string dentro de uma resposta MCP.
+    """
+    if not bruto:
+        return ""
+    com_quebra = _QUEBRAS.sub("\n", bruto)
+    sem_tag = _TAGS.sub("", com_quebra)
+    legivel = _html.unescape(sem_tag)
+    # `\xa0` (nbsp) sobrevive ao unescape e imprime como espaço que não quebra
+    # linha — invisível no diff e visível na conta de bytes.
+    legivel = legivel.replace("\xa0", " ")
+    legivel = _ESPACOS.sub(" ", legivel)
+    return _LINHAS_VAZIAS.sub("\n", "\n".join(
+        linha.strip() for linha in legivel.splitlines()
+    )).strip()
 
 
 def normalizar(s: str) -> str:

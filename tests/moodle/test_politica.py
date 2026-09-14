@@ -54,6 +54,17 @@ PREFIXOS_DE_LEITURA = (
     # de `grader`.
     "gradereport_overview_get_",
     "gradereport_user_get_",
+    # 14/09/2026, com a ferramenta `avisos`. Aqui o prefixo do plugin serviria
+    # de teto e mesmo assim NÃO foi usado: `mod_forum_` casaria com
+    # `add_discussion`, `add_discussion_post`, `update_discussion_post`,
+    # `delete_post`, as quatro `set_*`, as duas `view_*`, `mark_posts_read`,
+    # `prepare_draft_area_for_post` e `toggle_favourite_state` — quatorze
+    # escritas, quatro delas no bloqueio do §2.2. `mod_forum_get_` não casa com
+    # nenhuma: as seis funções de leitura da família (catálogo §3.6) são as
+    # únicas que começam por `get_`, e `can_add_discussion`, que é leitura mas
+    # tem `add` no nome, fica de fora por não casar — o que está certo, porque
+    # ela não responde pergunta nenhuma deste projeto.
+    "mod_forum_get_",
 )
 
 # P4 vigia estes três nomes. Escrito à mão, e não derivado do módulo, porque
@@ -196,6 +207,12 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
     e-Disciplinas não competem, se complementam (catálogo §3.7), e a ferramenta
     escolhe UMA por invocação conforme a pergunta tenha ou não disciplina.
 
+    E de 8 para 10 no mesmo dia, com `avisos`: o que o calendário não sabe mora
+    no fórum, e chegar lá custa duas funções — uma que diz quais fóruns a
+    disciplina tem, outra que lê os tópicos de um deles. A segunda é
+    `mod_forum_get_forum_discussions`, e **não** a `mod_forum_get_discussions`
+    do comparável, que não existe neste Moodle.
+
     O teste segue travando o conjunto INTEIRO — é o que impede a próxima sessão
     de acrescentar "só mais uma" sem passar pelo §9.
     """
@@ -209,6 +226,8 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "mod_assign_get_submission_status",
             "gradereport_overview_get_course_grades",
             "gradereport_user_get_grade_items",
+            "mod_forum_get_forums_by_courses",
+            "mod_forum_get_forum_discussions",
         }
     )
 
