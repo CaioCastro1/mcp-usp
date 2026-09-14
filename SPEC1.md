@@ -2459,3 +2459,41 @@ quê — mesmo host, mesmo parâmetro, e traz nome de professor e sala.
 **O que a ferramenta declara não saber:** em que currículo você está. Ela mostra todos e
 marca qual é curso de ingresso — sem chamar de "extinto" o que não é ingresso, porque
 ênfase e módulo também ficam de fora da lista e o JupiterWeb não distingue os três.
+
+### 14/09/2026 — a superfície pública do Jupiter cobre só a metade de entrada do curso
+
+Quatro chamadas a `pubGradeCurricular`, uma por curso de ingresso da Poli, escolhidas à
+mão. A pergunta era se a fatia `curso` — adiada em 14/09 por não destravar o
+pré-requisito — destrava ao menos "o que falta pra formar".
+
+| curso | disciplinas | semestres ideais |
+|---|---|---|
+| 3033 Ciclo Básico - Eng Elétrica | 67 | **1–5** |
+| 3123 Habilitação: Eng de Computação | 28 | **1–4** |
+| 3084 Habilitação: Eng de Produção | 33 | **1–5** |
+| 3045 Habilitação: Eng Mecânica | 30 | **1–4** |
+
+**Nenhum passa do 5º semestre**, nem os que se chamam "Habilitação". Some-se ao que já
+havia sido medido no mesmo dia: `pubListarCursoEntrada` só lista curso de **ingresso**;
+`pubGradeCurricular` do 3032 (que carrega os requisitos da Elétrica) vem **vazia**; e
+`listarCursosRequisitos` de PTC3313 devolve 26 kB com **zero** currículo.
+
+**A conclusão, e ela é uma limitação do produto, não uma tarefa pendente:** a superfície
+pública estruturada do JupiterWeb é o **catálogo de entrada**. Da ênfase (7º semestre) e
+do módulo (9º) em diante — exatamente onde o dono está — não há grade, não há requisito e
+não há código de curso alcançável. O §5.4 do recon já dizia que o Jupiter público é
+"catálogo institucional, não perfil de aluno"; agora está medido que ele nem sequer é o
+catálogo **inteiro**.
+
+**Consequência de escopo, decidida aqui:** a fatia `curso` **não será construída** para
+responder "o que falta pra formar". Ela responderia isso para um calouro e devolveria um
+currículo que termina antes das matérias do dono começarem — o mesmo erro da fatia de
+requisitos, evitado desta vez por quatro chamadas em vez de uma implementação. Se algum
+dia ela existir, será por outra pergunta ("essa disciplina é obrigatória no ciclo
+básico?"), registrada no §5 como todas as outras.
+
+**O que isso deixa em aberto, e é a limitação a declarar:** nota, histórico, evolução do
+curso e saldo do RUCard **não têm caminho público**. Todos exigem a área logada, que não
+oferece token — só sessão de navegador, com dois cookies (§ nota do recon de 14/09) e
+timeout não medido. Enquanto essa medição não acontecer, o projeto **não responde** essas
+perguntas, e é melhor dizer isso do que ter ferramenta que responde pela metade.
