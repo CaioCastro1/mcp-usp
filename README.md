@@ -81,8 +81,8 @@ A chave é sua e pessoal, e cada pessoa obtém a dela. Ela nunca sai do seu comp
 por isso que ninguém pode te dar uma pronta.
 
 Para obtê-la você precisa do projeto baixado inteiro, e não só do programa instalado
-acima, porque o script que faz isso não vem junto no pacote. Siga *Mexer no código* até o
-fim do primeiro bloco de comandos, e depois rode:
+acima, porque o script que faz isso não vem junto no pacote. Siga *Rodando a partir do
+código* até o fim do primeiro bloco de comandos, e depois rode:
 
 ```bash
 ./scripts/token.sh
@@ -168,9 +168,14 @@ tamanho de cada arquivo, mas não devolve o endereço dele. Endereço sem a cred
 abre, e quem baixa de fato é a ferramenta de download, sem nunca pôr a sua chave num
 endereço.
 
-## Mexer no código
+## Rodando a partir do código
 
-Daqui para baixo é para quem vai contribuir.
+Você precisa desta seção em dois casos: se quiser usar o e-Disciplinas, porque o script
+que busca a chave só existe aqui, ou se for mexer no código.
+
+O repositório é público para ler, baixar e usar. Quem aprova mudança nele somos nós dois,
+o Caio e eu, então ninguém de fora ganha acesso de escrita. Sugestão é bem-vinda pelo
+caminho normal do GitHub: abra uma issue, ou um fork com pull request.
 
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
