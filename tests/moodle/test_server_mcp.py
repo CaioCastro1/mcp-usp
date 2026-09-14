@@ -25,9 +25,9 @@ pytestmark = pytest.mark.contrato
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — sete ferramentas. Cada crescimento é decisão registrada no §9:
+    """T42 — nove ferramentas. Cada crescimento é decisão registrada no §9:
     `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico`,
-    `ja_entreguei`, `notas` e `avisos` em 14/09.
+    `ja_entreguei`, `notas`, `avisos`, `o_que_mudou` e `disciplinas` em 14/09.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma
@@ -43,6 +43,7 @@ def test_expoe_exatamente_uma_ferramenta():
         "notas",
         "avisos",
         "o_que_mudou",
+        "disciplinas",
     ]
 
 
@@ -202,3 +203,48 @@ def test_T106_descricao_de_material_nao_afirma_premissa_refutada():
 
     assert "exigiria" not in descricao.lower()
     assert "baixar_arquivo" in descricao
+
+
+def test_T111_o_descritor_de_disciplinas_e_a_porta_de_entrada():
+    """A descrição precisa dizer que esta é a ferramenta do "quais matérias eu
+    tenho", e que a SIGLA que ela devolve é o que as outras aceitam.
+
+    Antes dela, a única forma de ver as próprias siglas era errar de propósito o
+    parâmetro de `material` — e um modelo que não sabe que esta existe continua
+    fazendo isso, porque o erro de lá também "funciona".
+    """
+    f = [x for x in server.listar_ferramentas() if x["name"] == "disciplinas"][0]
+
+    assert "get_users_courses" not in f["description"]
+    assert "sigla" in f["description"].lower()
+    props = f["inputSchema"]["properties"]
+    assert set(props) == {"todas"}
+    assert f["inputSchema"]["required"] == []
+    assert all(p.get("description") for p in props.values())
+
+
+def test_T112_chamar_ferramenta_roteia_disciplinas_com_cliente_injetado():
+    """A fronteira inteira, offline: nenhuma função além das duas que a
+    resolução de sigla já fazia, e o `courseid` não atravessa para quem lê."""
+    from usp_mcp.moodle import disciplinas as dis
+
+    from .conftest import ClienteFalso
+
+    dis.limpar_cache()
+    brutos = disciplinas_brutos()
+    cliente = ClienteFalso(
+        {
+            "core_webservice_get_site_info": {"userid": 8214},
+            "core_enrol_get_users_courses": brutos,
+        }
+    )
+
+    saida = server.chamar_ferramenta("disciplinas", {}, cliente=cliente)
+
+    dis.limpar_cache()
+    assert "PTC3314" in saida
+    assert [f for f, _ in cliente.chamadas] == [
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+    ]
+    assert str(brutos[0]["id"]) not in saida

@@ -57,6 +57,14 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "mod_assign_get_assignments",
         "mod_assign_get_submission_status",
     ),
+    # `disciplinas` (14/09) é a única linha desta tabela que não tem função
+    # própria: ela expõe a lista que a resolução de sigla já busca, e por isso
+    # exige exatamente as duas funções que TODAS as outras já exigem. Um site
+    # onde ela falha é um site onde nada com escopo de disciplina funciona.
+    "disciplinas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+    ),
     # `notas` (14/09) exige as DUAS visões, e é o único caso da tabela em que a
     # ferramenta não usa as duas na mesma invocação: ela escolhe uma conforme a
     # pergunta tenha ou não disciplina. Declarar as duas é o certo mesmo assim —

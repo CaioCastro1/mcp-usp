@@ -22,6 +22,7 @@ from .arquivo import baixar_arquivo
 from .avisos import avisos
 from .cliente import ClienteMoodle
 from .diagnostico import diagnostico
+from .disciplinas import minhas_disciplinas
 from .erros import ErroMoodle
 from .ja_entreguei import ja_entreguei
 from .material import material
@@ -34,8 +35,8 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Oito ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, e da quarta à oitava em 14/09). Os nomes vêm das perguntas
+# Nove ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, e da quarta à nona em 14/09). Os nomes vêm das perguntas
 # do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
@@ -45,6 +46,7 @@ _NOME_JA_ENTREGUEI = "ja_entreguei"
 _NOME_NOTAS = "notas"
 _NOME_AVISOS = "avisos"
 _NOME_MUDOU = "o_que_mudou"
+_NOME_DISCIPLINAS = "disciplinas"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -337,6 +339,38 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_DISCIPLINAS,
+            "description": (
+                "Lista as disciplinas em que você está matriculado no "
+                "e-Disciplinas (Moodle da USP), com a SIGLA de cada uma — que é "
+                "o que todas as outras ferramentas deste servidor pedem. Use "
+                "para 'quais matérias eu tenho', 'que disciplinas estou "
+                "cursando', 'qual a sigla de eletrônica', 'me lembra o que eu "
+                "fiz em 2024'. As do semestre em andamento vêm primeiro e "
+                "completas, com nome e período; as de semestres já encerrados "
+                "vêm só com a sigla, agrupadas por ano — nenhuma fica de fora, "
+                "e a resposta diz como abrir o detalhe delas. É a ferramenta "
+                "mais barata daqui: a lista já é buscada para traduzir sigla, "
+                "então a resposta costuma sair sem nenhuma chamada nova."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "todas": {
+                        "type": "boolean",
+                        "description": (
+                            "Mostra também o nome e o período de cada "
+                            "disciplina já encerrada, em vez de só a sigla "
+                            "agrupada por ano. Padrão falso."
+                        ),
+                        "default": False,
+                    },
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -372,6 +406,11 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_DIAGNOSTICO:
         return diagnostico(cliente)
+
+    if nome == _NOME_DISCIPLINAS:
+        return minhas_disciplinas(
+            cliente, todas=bool(argumentos.get("todas"))
+        ).texto
 
     if nome == _NOME_NOTAS:
         return notas(cliente, disciplina=argumentos.get("disciplina")).texto
@@ -465,6 +504,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_notas = portas[_NOME_NOTAS]
     porta_avisos = portas[_NOME_AVISOS]
     porta_mudou = portas[_NOME_MUDOU]
+    porta_disciplinas = portas[_NOME_DISCIPLINAS]
     descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -602,6 +642,18 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_mudou["name"], description=porta_mudou["description"]
     )(_o_que_mudou)
 
+    def _disciplinas(todas=False) -> str:
+        # `todas` COM default, como o `disciplina` de `notas`: o parâmetro é
+        # opcional de verdade, e o `inputSchema` o declara fora de `required`.
+        # A pergunta comum ("quais matérias eu tenho") não passa parâmetro
+        # nenhum, e é por isso que ela não pode ser obrigatória.
+        return _chamar(porta_disciplinas["name"], {"todas": todas})
+
+    anotar(_disciplinas, porta_disciplinas["inputSchema"], {"todas": bool})
+    servidor.tool(
+        name=porta_disciplinas["name"], description=porta_disciplinas["description"]
+    )(_disciplinas)
+
     servidor.run(transport="stdio")
 
 
@@ -680,6 +732,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_mudou(disciplina: str, dias: int = 7) -> str:
         return ""
 
+    @servidor.tool(name="disciplinas", description="verificação")
+    def _sonda_disciplinas(todas: bool = False) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
@@ -689,6 +745,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "notas": _sonda_notas,
         "avisos": _sonda_avisos,
         "o_que_mudou": _sonda_mudou,
+        "disciplinas": _sonda_disciplinas,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():
