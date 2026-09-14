@@ -812,3 +812,62 @@ def mudancas_falsas(instancias=None, *, com_warning=False, contextlevel="module"
             else []
         ),
     }
+
+
+# --------------------------------------------------------------------------
+# `mod_assign_get_assignments` com VÁRIOS cursos — **ESCRITA À MÃO**, e o rótulo
+# vale tanto quanto o payload.
+#
+# **Não é captura.** A única captura desta função que existe no repositório é
+# `assign_ptc3314.json` (12/09, real, higienizada), e ela cobre UM curso. A
+# ferramenta `atrasadas` (14/09) pergunta por várias disciplinas de uma vez, e
+# esta forma — `courses` com mais de um item — nunca foi vista vir do
+# e-Disciplinas por este projeto.
+#
+# O que aqui é REAL: os `courseid`, que vêm de `users_courses.json`, e a FORMA
+# de cada `assign`, que é a da fixture capturada reduzida aos cinco campos que a
+# projeção lê. Os `id`, nomes e prazos dos assign inventados são inventados.
+#
+# Consequência, dita aqui para não ser descoberta depois: qualquer contagem de
+# bytes medida contra este payload mede o que a nossa projeção descarta de uma
+# resposta DESTA FORMA. Os números do §9 de `atrasadas` que se apoiam em payload
+# real dizem isso explicitamente, e os que não, também.
+def entregas_falsas(por_curso, *, com_warning=False) -> dict:
+    """`por_curso` é uma lista de `(courseid, [(assignid, nome, duedate, nosub)])`.
+
+    `nosubmissions` é o campo que diz que a atividade NÃO aceita envio pelo
+    e-Disciplinas (as provas presenciais que o professor cria só para ter data),
+    e ele é a diferença entre uma consulta economizada e uma acusação falsa.
+    """
+    return {
+        "courses": [
+            {
+                "id": courseid,
+                "assignments": [
+                    {
+                        "id": assignid,
+                        "cmid": 6000000 + assignid,
+                        "name": nome,
+                        "duedate": duedate,
+                        "cutoffdate": 0,
+                        "nosubmissions": nosub,
+                        "introattachments": [],
+                    }
+                    for assignid, nome, duedate, nosub in assigns
+                ],
+            }
+            for courseid, assigns in por_curso
+        ],
+        "warnings": (
+            [
+                {
+                    "item": "module",
+                    "itemid": 6372370,
+                    "warningcode": "1",
+                    "message": "Sem direito de acesso a este módulo",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }

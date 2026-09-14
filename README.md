@@ -21,6 +21,7 @@ Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 | "Que arquivos tem em PTC3314?" | Lista o material da disciplina: regras, listas, provas antigas |
 | "Baixa a lista 2 pra mim" | Baixa o arquivo e diz onde ele ficou no seu computador |
 | "Já entreguei o EP1?" | O que você já enviou, o que ficou só como rascunho e se saiu no prazo |
+| "Perdi algum prazo?" | O que já venceu e o e-Disciplinas não registra como entregue, rascunho salvo incluído |
 | "Como estou de nota?" | As notas que o professor lançou no e-Disciplinas, de todas as disciplinas ou item a item de uma |
 | "O professor avisou alguma coisa?" | Os recados nos fóruns da disciplina, o mural de avisos primeiro |
 | "Mudou alguma coisa desde ontem?" | O que mexeu na disciplina nos últimos dias: arquivo novo, tópico novo, prazo alterado |
@@ -211,6 +212,13 @@ semestre passado continua na lista, com a sigla, porque você ainda pergunta sob
 "Já entreguei o EP1?" responde só sobre tarefa. Questionário não entra, e prova marcada só
 no quadro da sala não existe em sistema nenhum. A resposta diz isso quando você pergunta.
 
+A lista do que ficou para trás é a mesma coisa vista pelo outro lado, e ela tem um limite
+que vale ler devagar: o projeto sabe o que está registrado no e-Disciplinas, não o que você
+fez. Entrega no papel, por e-mail, num sistema do laboratório, ou que o professor recebeu e
+nunca lançou no site, não aparece como enviada. Por isso a resposta nunca diz que você não
+entregou: ela diz que não há registro, e manda confirmar. Quando o professor já lançou a
+nota sem receber arquivo, ela separa esse caso e não conta como falta.
+
 Uma limitação que costuma confundir: ao listar material, o projeto diz o nome, o tipo e o
 tamanho de cada arquivo, mas não devolve o endereço dele. Endereço sem a credencial não
 abre, e quem baixa de fato é a ferramenta de download, sem nunca pôr a sua chave num
@@ -264,16 +272,18 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, doze ferramentas. Comunicação por
+Três servidores MCP, treze ferramentas. Comunicação por
 stdio, JSON-RPC, um processo por servidor. Nove delas foram exercitadas contra a USP de
-verdade; `avisos`, `o_que_mudou` e `disciplinas` são de 14/09 e ainda não rodaram contra a
-USP. As duas primeiras nasceram contra resposta escrita à mão; `disciplinas` nasceu contra
-a resposta real capturada em agosto, que é outra coisa e ainda não é uso ao vivo.
+verdade; `avisos`, `o_que_mudou`, `disciplinas` e `atrasadas` são de 14/09 e ainda não rodaram
+contra a USP. As duas primeiras nasceram contra resposta escrita à mão; `disciplinas`
+nasceu contra a resposta real capturada em agosto, e `atrasadas` contra metade real (a
+lista de entregas) e metade escrita à mão (o estado de cada entrega). Nenhuma das quatro
+é uso ao vivo ainda.
 
 | Servidor | Ferramentas |
 |---|---|
 | `usp-rucard` | `bandejao` |
-| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas` |
+| `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas`, `atrasadas` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de

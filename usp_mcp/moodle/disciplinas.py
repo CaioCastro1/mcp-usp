@@ -325,8 +325,8 @@ def _bloco_compacto(disciplinas) -> list[str]:
 
 _COMO_USAR = (
     "Para perguntar sobre uma delas, use a SIGLA (a parte antes do primeiro "
-    "'-'): `material`, `notas`, `avisos`, `ja_entreguei` e `o_que_mudou` "
-    "aceitam a sigla."
+    "'-'): `material`, `notas`, `avisos`, `ja_entreguei`, `atrasadas` e "
+    "`o_que_mudou` aceitam a sigla."
 )
 
 _DE_ONDE_SAI = (

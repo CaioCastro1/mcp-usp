@@ -19,6 +19,7 @@ import os
 
 from ..env import carregar_env
 from .arquivo import baixar_arquivo
+from .atrasadas import atrasadas
 from .avisos import avisos
 from .cliente import ClienteMoodle
 from .diagnostico import diagnostico
@@ -35,8 +36,8 @@ from .o_que_vence import o_que_vence
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Nove ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, e da quarta à nona em 14/09). Os nomes vêm das perguntas
+# Dez ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, e da quarta à décima em 14/09). Os nomes vêm das perguntas
 # do dono, não das funções do Moodle por trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
@@ -47,6 +48,7 @@ _NOME_NOTAS = "notas"
 _NOME_AVISOS = "avisos"
 _NOME_MUDOU = "o_que_mudou"
 _NOME_DISCIPLINAS = "disciplinas"
+_NOME_ATRASADAS = "atrasadas"
 
 
 def listar_ferramentas() -> list[dict]:
@@ -371,6 +373,45 @@ def listar_ferramentas() -> list[dict]:
                 "additionalProperties": False,
             },
         },
+        {
+            "name": _NOME_ATRASADAS,
+            "description": (
+                "Diz o que já venceu e o e-Disciplinas (Moodle da USP) NÃO "
+                "registra como entregue — inclusive o rascunho que ficou salvo "
+                "e nunca foi enviado, que na tela parece entrega feita. Use "
+                "para 'tem alguma coisa atrasada?', 'perdi algum prazo?', 'o "
+                "que eu devo?', 'esqueci de entregar alguma coisa em "
+                "PTC3314?'. Sem disciplina, olha as do semestre em andamento; "
+                "com disciplina, só ela, inclusive de semestre passado. "
+                "IMPORTANTE ao relatar o resultado: esta ferramenta sabe o que "
+                "está REGISTRADO no e-Disciplinas, e não o que a pessoa fez — "
+                "entrega no papel, por e-mail ou que o professor não lançou no "
+                "site não aparece como enviada, então não afirme que alguém "
+                "não entregou; diga que não há registro e sugira confirmar. "
+                "Entrega já corrigida sem envio registrado a própria resposta "
+                "separa, e não conta como falta. Custa uma chamada ao Moodle "
+                "para listar as entregas e mais uma por entrega vencida. Para "
+                "ver TODAS as entregas de uma disciplina, vencidas ou não, use "
+                "`ja_entreguei`; para o que ainda vai vencer, `o_que_vence`."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Opcional: sem ela, a consulta cobre as "
+                            "disciplinas do semestre em andamento, com teto "
+                            "declarado na resposta."
+                        ),
+                    },
+                },
+                "required": [],
+                "additionalProperties": False,
+            },
+        },
     ]
 
 
@@ -406,6 +447,9 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
 
     if nome == _NOME_DIAGNOSTICO:
         return diagnostico(cliente)
+
+    if nome == _NOME_ATRASADAS:
+        return atrasadas(cliente, argumentos.get("disciplina")).texto
 
     if nome == _NOME_DISCIPLINAS:
         return minhas_disciplinas(
@@ -505,6 +549,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_avisos = portas[_NOME_AVISOS]
     porta_mudou = portas[_NOME_MUDOU]
     porta_disciplinas = portas[_NOME_DISCIPLINAS]
+    porta_atrasadas = portas[_NOME_ATRASADAS]
     descritor = portas[_NOME_FERRAMENTA]
     servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
 
@@ -654,6 +699,17 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         name=porta_disciplinas["name"], description=porta_disciplinas["description"]
     )(_disciplinas)
 
+    def _atrasadas(disciplina=None) -> str:
+        # `disciplina` COM default, como em `notas`: a pergunta comum ("tem
+        # alguma coisa atrasada?") não tem escopo, e obrigá-lo faria o modelo
+        # inventar uma disciplina para poder chamar.
+        return _chamar(porta_atrasadas["name"], {"disciplina": disciplina})
+
+    anotar(_atrasadas, porta_atrasadas["inputSchema"], {"disciplina": str | None})
+    servidor.tool(
+        name=porta_atrasadas["name"], description=porta_atrasadas["description"]
+    )(_atrasadas)
+
     servidor.run(transport="stdio")
 
 
@@ -736,6 +792,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_disciplinas(todas: bool = False) -> str:
         return ""
 
+    @servidor.tool(name="atrasadas", description="verificação")
+    def _sonda_atrasadas(disciplina: str | None = None) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
@@ -746,6 +806,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "avisos": _sonda_avisos,
         "o_que_mudou": _sonda_mudou,
         "disciplinas": _sonda_disciplinas,
+        "atrasadas": _sonda_atrasadas,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():
