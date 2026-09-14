@@ -39,3 +39,72 @@ entre si; 5 por último. Cada plano é uma branch e um PR contra a `main`, com o
   dono, não de revisão. Fica registrada como questão aberta.
 - **Cache em disco** para o RUCard/Jupiter: tolerável no Desktop (o processo vive a sessão);
   vale reabrir se o uso via `uvx` one-shot crescer.
+
+## Prompts prontos para uma sessão nova
+
+Um por plano. Cada um é autossuficiente: copie inteiro numa sessão limpa do Claude Code
+neste repositório.
+
+### 1 — comunicado no cardápio (RUCard)
+
+```
+Execute o plano docs/superpowers/plans/2026-09-14-rucard-aviso-no-cardapio.md usando a skill superpowers:executing-plans.
+
+Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-rucard-aviso-no-cardapio-design.md, depois o plano. Crie a branch fix/rucard-comunicado-no-cardapio a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"` antes de rodar qualquer teste.
+
+Regras: siga o plano tarefa por tarefa, na ordem, com os testes falhando antes da implementação. Não toque a rede da USP. Se um trecho citado pelo plano não existir mais, procure a função pelo nome, aplique a intenção do spec e registre a diferença no PR. Rode ./scripts/gate.sh antes de cada commit. Termine com o §9 do SPEC1.md atualizado e o PR aberto contra a main.
+
+Ao final me diga: PR aberto (link), o que divergiu do plano, e o texto real que a ferramenta devolve para a fixture nova.
+```
+
+### 2 — semana e vocabulário (RUCard) — depois do 1
+
+```
+Execute o plano docs/superpowers/plans/2026-09-14-rucard-semana-e-vocabulario.md usando a skill superpowers:executing-plans.
+
+Pré-requisito: o PR "comunicado no cardápio vira aviso" já mergeado na main. Confira com `git log origin/main --oneline | grep -i comunicado`; se não estiver, pare e me avise.
+
+Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-rucard-semana-e-vocabulario-design.md, depois o plano. Crie a branch feat/rucard-semana-e-vocabulario a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
+
+Regras: siga o plano tarefa por tarefa, testes primeiro. Sempre que tocar o schema em server.py, rode também tests/handshake. Nenhuma requisição a mais à USP: a semana inteira tem de custar 5 rotas no dublê. Os tetos de bytes são medidos; se um falhar, olhe o que engordou em vez de subir o número. Rode ./scripts/gate.sh antes de cada commit. Termine com o §9 do SPEC1.md, o README e o PR contra a main.
+
+Ao final me diga: PR aberto (link), o que divergiu do plano, e cole a saída de dia="semana", refeicao="almoco" para as fixtures.
+```
+
+### 3 — disciplina por seção (Jupiter)
+
+```
+Execute o plano docs/superpowers/plans/2026-09-14-jupiter-disciplina-secoes.md usando a skill superpowers:executing-plans.
+
+Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-jupiter-disciplina-secoes-design.md, depois o plano. Crie a branch feat/jupiter-disciplina-secoes a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
+
+Regras: siga o plano tarefa por tarefa, testes primeiro. A allowlist do Jupiter só encolhe neste plano (4 para 3 consultas); nenhuma consulta nova. Sempre que tocar o schema em server.py, rode tests/handshake e `.venv/bin/python -m usp_mcp.jupiter.server --auto-verificar`. Se algum teste de tests/jupiter/test_server_stdio.py enumerar os parâmetros de disciplina, atualize-o para {sigla, secoes, ingles}. Não toque a rede da USP. Rode ./scripts/gate.sh antes de cada commit. Termine com o §9 do SPEC1.md, o README e o PR contra a main.
+
+Ao final me diga: PR aberto (link), o que divergiu do plano, quantos bytes tem o texto padrão de PTC3314 e o de secoes=["todas"].
+```
+
+### 4 — requisitos agrupados (Jupiter) — depois do 3, ou com rebase
+
+```
+Execute o plano docs/superpowers/plans/2026-09-14-jupiter-requisitos-agrupados.md usando a skill superpowers:executing-plans.
+
+Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-jupiter-requisitos-agrupados-design.md, depois o plano. Crie a branch feat/jupiter-requisitos-agrupados a partir da main atualizada. Se o PR "ficha por seção" já tiver sido mergeado, parta dele; se estiver aberto, avise no PR que os dois tocam usp_mcp/jupiter/server.py e faça rebase antes de pedir merge. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
+
+Regras: só formatação. A projeção, o recorte HTML, a política e a descrição da ferramenta não mudam. Dois currículos só entram no mesmo grupo se o conjunto de (sigla, nome, tipo, rótulo) for idêntico. T70, T71 e T72 têm de continuar verdes sem edição. Rode ./scripts/gate.sh antes de cada commit. Termine com o §9 do SPEC1.md e o PR contra a main.
+
+Ao final me diga: PR aberto (link), o que divergiu do plano, e cole a saída de requisitos para MAT2455 com a contagem de bytes.
+```
+
+### 5 — saída sem jargão — depois do 2 e do 3
+
+```
+Execute o plano docs/superpowers/plans/2026-09-14-saida-sem-jargao.md usando a skill superpowers:executing-plans.
+
+Pré-requisito: os PRs "semana numa chamada" (RUCard) e "ficha por seção" (Jupiter) já mergeados na main. Confira com `git log origin/main --oneline | grep -iE "semana|seção|secoes"`; se faltar algum, pare e me avise.
+
+Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-saida-sem-jargao-design.md, depois o plano. Crie a branch fix/saida-sem-jargao a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
+
+Regras: primeiro o teste tests/test_jargao.py, e a lista que ele imprime é a lista de trabalho. Docstrings e comentários não mudam; só string que sai do processo. Cada reescrita tira a referência e mantém o fato e a instrução. A mensagem de SDK ausente com `pip install -r requirements.txt` não muda. Faça a sabotagem da Tarefa 4 e me mostre o resultado. Rode ./scripts/gate.sh antes de cada commit. Termine com o §9 do SPEC1.md e o PR contra a main.
+
+Ao final me diga: PR aberto (link), a lista de arquivos e linhas que o teste apontou, e se algum arquivo fora dos listados no plano apareceu.
+```
