@@ -13,6 +13,7 @@ a regra 11 do `CLAUDE.md` é o motivo de dizer.
 from __future__ import annotations
 
 import base64
+import os
 import subprocess
 import sys
 
@@ -278,3 +279,222 @@ def test_fix_token_acha_o_env_do_checkout_e_nao_o_do_worktree(tmp_path):
     assert env_verdadeiro.read_text(encoding="utf-8") == f"MOODLE_TOKEN={WSTOKEN}\nOUTRA=1\n"
     assert not (wt / ".env").exists(), "criou um .env no worktree, sombreando o verdadeiro"
     assert WSTOKEN not in r.stdout + r.stderr, "ecoou o token"
+
+
+# ------------------------------- a URL de IDA, e as duas fricoes de 12/09/2026
+
+# A passagem real de um segundo usuario em 12/09/2026 (§B2 do ROADMAP) mediu
+# duas fricoes no passo do link, e nenhuma e hipotese. A primeira: a pagina que o
+# `launch.php` mostra com `confirmed=1` tem uma caixa verde, um botao cinza e um
+# link azul escrito "Clique aqui se a aplicacao nao abrir automaticamente" —
+# nada ali parece um token, e o texto do link promete ser um plano B dispensavel.
+# O que foi para o clipboard na primeira tentativa foram os 137 bytes da URL da
+# PROPRIA pagina. A segunda: nao havia como olhar o clipboard antes de entregar.
+
+URL_DE_IDA = (
+    "https://edisciplinas.usp.br/admin/tool/mobile/launch.php"
+    "?service=moodle_mobile_app&passport=1234567890"
+    "&urlscheme=moodlemobile&confirmed=1"
+)
+
+
+def test_a_url_de_ida_reprova_reconhecida_e_nao_adivinhada():
+    """T-tok-15 — o decodificador nomeia o erro em vez de deduzi-lo do base64.
+
+    Antes desta checagem a mesma entrada ja reprovava, mas pelo ramo do base64,
+    com a causa no condicional ("o mais comum e ter copiado a URL do
+    launch.php"). Reprovar estava certo; o diagnostico e que era um palpite, e
+    ele nao dizia o que fazer. A assercao de que `base64` NAO aparece e o que
+    trava isso: se alguem tirar o reconhecimento, a mensagem antiga volta e este
+    teste cai.
+    """
+    r = decodificar(URL_DE_IDA)
+    assert r.returncode != 0
+    assert "Traceback" not in r.stderr
+    assert not campos(r.stdout), "emitiu campo para uma URL de ida"
+    assert "base64" not in r.stderr.lower(), (
+        "voltou a diagnosticar pelo ramo do base64 — a URL de ida tem de ser "
+        "reconhecida antes, com a cura junto"
+    )
+
+
+def test_a_recusa_da_url_de_ida_diz_qual_link_e_que_e_botao_direito():
+    """T-tok-16 — Invariante 6: a mensagem aponta a cura, e a cura e o link.
+
+    "Copie o endereco do link" nao diz QUAL link numa pagina com tres elementos
+    clicaveis; foi exatamente essa a fricao medida. Citar o texto do link e a
+    parte acionavel da mensagem, nao enfeite.
+    """
+    r = decodificar(URL_DE_IDA)
+    assert "Clique aqui se a aplicação não abrir automaticamente" in r.stderr
+    assert "BOTÃO DIREITO" in r.stderr
+    assert "moodlemobile://token=" in r.stderr
+
+
+def test_a_recusa_da_url_de_ida_nao_ecoa_a_entrada():
+    """T-tok-17 — a entrada pode ser a credencial; o diagnostico e de forma."""
+    r = decodificar(URL_DE_IDA)
+    assert URL_DE_IDA not in r.stderr + r.stdout
+    # O TAMANHO da entrada pode sair — e forma, e e o que deixa "137 bytes"
+    # reconhecivel para quem ja passou por isto. Os bytes, nunca.
+    assert "passport=1234567890" not in r.stderr + r.stdout
+    assert "edisciplinas.usp.br/admin" not in r.stderr + r.stdout
+
+
+def test_o_base64_nu_continua_passando_depois_da_checagem_de_ida():
+    """T-tok-18 — a checagem nova nao pode comer o caminho bom.
+
+    `e_url_de_ida` reprova http(s) sem `token=`; um base64 nu nao e nem uma
+    coisa nem outra e tem de seguir. Sem esta guarda, apertar o reconhecimento
+    mais tarde quebraria em silencio quem cola so o payload.
+    """
+    r = decodificar(payload(SITEID, WSTOKEN, PRIVATE))
+    assert r.returncode == 0, r.stderr
+    assert campos(r.stdout)["wstoken"] == WSTOKEN
+
+
+# ------------------------------------------- o token.sh, pelo caminho do stdin
+
+# `pbpaste | ./scripts/token.sh` e um caminho de uso documentado no cabecalho do
+# script, e e o unico alcancavel pela suite: sem tty o script NAO abre navegador
+# (o `open` mora dentro de `[ -t 0 ]`) e NAO tenta a captura automatica. Continua
+# valendo o que o BACKLOG registra desde 10/09 — os passos de abrir o navegador e
+# ler o clipboard de verdade nao sao alcancaveis daqui, e nada abaixo finge que
+# sao. O que estes testes alcancam e o texto que o script imprime e a conferencia
+# que ele faz sobre o valor que chega.
+
+
+@pytest.fixture
+def raiz_token(raiz_falsa):
+    """A raiz falsa do fix-token, mais o `token.sh` e um `.env` sem token.
+
+    O `.venv/bin/python` e um link para o interpretador da suite porque e o que o
+    script prefere (linha 44); sem ele o teste dependeria do `python3` do PATH,
+    que pode nao ser o mesmo. O `.env` precisa ter `MOODLE_TOKEN` VAZIO: com um
+    token de forma valida o script pede confirmacao para sobrescrever e, sem
+    terminal, reprova antes de chegar ao passo do link.
+    """
+    destino = raiz_falsa / "scripts" / "token.sh"
+    destino.write_bytes((RAIZ / "scripts" / "token.sh").read_bytes())
+    destino.chmod(0o755)
+
+    venv = raiz_falsa / ".venv" / "bin"
+    venv.mkdir(parents=True)
+    (venv / "python").symlink_to(sys.executable)
+
+    (raiz_falsa / ".env").write_text(
+        "MOODLE_URL=https://exemplo.invalid\nMOODLE_TOKEN=\nOUTRA=1\n",
+        encoding="utf-8",
+    )
+    return raiz_falsa
+
+
+def curl_dublado(raiz, corpo):
+    """Um `curl` de mentira no PATH, e devolve o PATH para usar.
+
+    O passo 6 do `token.sh` confirma o token contra a USP antes de gravar, e essa
+    chamada fica no log da conta de quem roda (§1.1) — a suite nao a faz. O dube
+    drena o stdin porque o script manda o campo por `curl -K -`: nao drenar
+    deixaria o `printf` do outro lado do cano com SIGPIPE.
+    """
+    binario = raiz / "bin"
+    binario.mkdir(exist_ok=True)
+    falso = binario / "curl"
+    falso.write_text("#!/bin/sh\ncat >/dev/null\ncat <<'JSON'\n" + corpo + "\nJSON\n")
+    falso.chmod(0o755)
+    return f"{binario}:{os.environ['PATH']}"
+
+
+def token_sh(raiz, colado, path=None):
+    """Roda o `token.sh` com o valor vindo do stdin. Nada aqui toca a rede."""
+    ambiente = dict(os.environ)
+    if path is not None:
+        ambiente["PATH"] = path
+    return subprocess.run(
+        ["bash", str(raiz / "scripts" / "token.sh")],
+        input=colado,
+        capture_output=True,
+        text=True,
+        cwd=raiz,
+        env=ambiente,
+    )
+
+
+def test_o_script_cita_o_texto_do_link_e_manda_nao_clicar(raiz_token):
+    """T-tok-19 — a cura da fricao 1, no texto que a pessoa de fato le.
+
+    Asserir sobre a SAIDA e nao sobre o fonte: o bloco de instrucoes so existe no
+    caminho manual, e e por ele que a pessoa passa. Um `grep` no arquivo passaria
+    com o texto certo escrito num ramo que nunca executa.
+    """
+    r = token_sh(raiz_token, "")
+    saida = r.stdout + r.stderr
+    assert "Clique aqui se a aplicacao nao abrir automaticamente" in saida
+    assert "NAO CLIQUE" in saida
+    assert "Copiar endereco do link" in saida
+    # Os dois chamarizes, nomeados para serem ignorados de proposito.
+    assert "O seu cadastro foi confirmado" in saida
+    assert "Ambientes" in saida
+
+
+def test_o_script_recusa_a_url_de_ida_sem_tocar_o_env(raiz_token):
+    """T-tok-20 — a conferencia pega o erro medido antes de qualquer decodificacao.
+
+    O `.env` intacto e o passo 6 nunca alcancado sao a metade que importa: o que
+    a pessoa fez de errado nao pode custar uma chamada no log da conta nem um
+    `.env` meio escrito.
+
+    A assercao de que o passo `4/7` NAO aparece e o que faz este teste ser sobre
+    a CONFERENCIA. Sem ela o teste passava com a conferencia desligada, porque o
+    decodificador recusa a mesma entrada logo em seguida, com uma mensagem
+    parecida — verificado por sabotagem: tirar o `exit 1` do ramo `launch.php`
+    nao quebrava nada. Duas camadas com a mesma mensagem sao boas de ter e
+    pessimas de confundir num teste.
+    """
+    antes = (raiz_token / ".env").read_text(encoding="utf-8")
+    r = token_sh(raiz_token, URL_DE_IDA)
+    saida = r.stdout + r.stderr
+    assert r.returncode != 0
+    assert "4/7" not in saida, "passou da conferencia e so parou no decodificador"
+    assert "URL de IDA" in saida
+    assert "de VOLTA" in saida
+    assert "Clique aqui se a aplicacao nao abrir automaticamente" in saida
+    assert (raiz_token / ".env").read_text(encoding="utf-8") == antes
+    assert "passport=1234567890" not in saida, "ecoou o valor colado"
+
+
+def test_a_conferencia_nao_imprime_byte_nenhum_de_um_base64_nu(raiz_token):
+    """T-tok-21 — Invariante 3 aplicado a checagem NOVA, que e o risco que ela cria.
+
+    A conferencia a mao e `pbpaste | cut -c1-21`. Um `cut` incondicional dentro
+    do script imprimiria 21 caracteres de token quando a pessoa cola so o base64
+    — que e um caminho valido e documentado. So o prefixo do esquema pode sair, e
+    so quando ele e o prefixo de verdade.
+    """
+    colado = payload(SITEID, WSTOKEN, PRIVATE)
+    caminho = curl_dublado(raiz_token, '{"userid": 4242, "sitename": "dube"}')
+    r = token_sh(raiz_token, colado, path=caminho)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida  # o base64 nu e caminho bom, nao erro
+    assert colado[:21] not in saida, "imprimiu 21 caracteres do payload colado"
+    assert colado[:8] not in saida, "imprimiu o comeco do payload colado"
+    assert WSTOKEN not in saida, "ecoou o token (Invariante 3)"
+    assert PRIVATE not in saida, "ecoou o privatetoken (§2.2)"
+
+
+def test_a_conferencia_confirma_o_prefixo_e_o_script_grava(raiz_token):
+    """T-tok-22 — o caminho bom: a conferencia diz o que a pessoa queria ver.
+
+    E o unico eco autorizado do valor: o prefixo do esquema, que e publico e tem
+    zero byte de token depois do `=`. O resto da assercao e o contrato do script
+    inteiro — grava os 32 hex, nunca imprime o valor.
+    """
+    colado = f"moodlemobile://token={payload(SITEID, WSTOKEN, PRIVATE)}"
+    caminho = curl_dublado(raiz_token, '{"userid": 4242, "sitename": "dube"}')
+    r = token_sh(raiz_token, colado, path=caminho)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+    assert "confere: comeca com `moodlemobile://token=`" in saida
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+    assert WSTOKEN not in saida, "ecoou o token (Invariante 3)"
+    assert PRIVATE not in saida, "ecoou o privatetoken (§2.2)"
