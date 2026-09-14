@@ -2646,6 +2646,82 @@ alcança.
 passar a oferecer OAuth no e-Disciplinas, o Claude passar a entregar segredo por usuário
 sem OAuth, ou a decisão de custódia mudar. Nenhuma das três depende de trabalho nosso.
 
+### 14/09/2026 — `ja_entreguei`, e a sexta função da allowlist
+
+**O que fechou a decisão:** o C2 do `ROADMAP` propõe "já entreguei isso?" como a
+alternativa que **não** colide com o §2.2 — ler o estado resolve a ansiedade, escrever
+resolveria a preguiça, e escrever está recusado por escrito (B3). A pergunta já existia
+no §5 e o README a listava como buraco desde que foi reescrito.
+
+**O dado que a sustenta, e ele estava na fixture que já temos.** `mod_assign_get_assignments`
+(na allowlist desde 12/09) diz o que existe e quando vence, e **nunca** diz o que foi
+feito. Quem sabe isso é `mod_assign_get_submission_status`, pelo
+`lastattempt.submission.status`. Os quatro valores do campo não são detalhe: `draft` é
+rascunho salvo e **não enviado**, e na tela do Moodle ele parece entrega — o arquivo está
+lá, o professor não recebeu nada. `draft` e `submitted` são uma palavra de distância no
+payload e uma reprovação de distância na vida. É esse par que a ferramenta existe para
+separar, e nenhuma das cinco funções anteriores o separa.
+
+**Allowlist de 5 para 6.** A função é leitura pura e casa com o prefixo `mod_assign_get_`
+que já estava declarado em P5 desde 12/09 — nenhum prefixo novo foi preciso, e a
+vizinhança perigosa (`save_submission`, `submit_for_grading`, `start_submission`,
+`remove_submission`) segue negada duas vezes, pela omissão da allowlist e pelo §2.2. T7 e
+T77 travam o conjunto novo; D4 exigiu a linha de `ja_entreguei` em `FUNCOES_POR_FERRAMENTA`.
+
+**Duas decisões de custo, as duas medidas na fixture real de PTC3314 (12/09):**
+
+1. **`nosubmissions: 1` não gasta chamada.** 2 dos 4 `assign` da disciplina não aceitam
+   envio nenhum — são as duas provas presenciais que o professor criou só para ter data, o
+   mesmo par que `material` já nomeia como "entregas sem anexo". Consultar o status delas
+   gastaria **metade** das idas ao Moodle desta disciplina para receber "não entregou"
+   sobre algo que não tem como ser entregue, o que não é informação, é acusação falsa. Elas
+   aparecem na saída com o motivo: não consultar não é sumir (Invariante 7).
+2. **Teto de 10 consultas por invocação.** Esta é a primeira ferramenta do projeto que faz
+   **N chamadas** em vez de uma ou duas. O catálogo (§3.5) registra o perfil: barata em
+   token, cara em latência — e cada ida fica no log da conta do dono (Invariante 5).
+   PSI3472 tem 11 entregas, então o teto morde exatamente onde deve; o corte é declarado
+   com a contagem e com o nome do parâmetro que o evita (`entrega`).
+
+**A projeção, medida:**
+
+| | bytes |
+|---|---|
+| `mod_assign_get_assignments` de PTC3314 (cru, fixture real) | 8.571 |
+| 2 × `mod_assign_get_submission_status` (cru, forma documentada) | 7.549 |
+| **cru total** | **16.120** |
+| **texto devolvido pela ferramenta** | **810** |
+| razão | 19,9× (5,0%) |
+
+Os dois campos que o corte existe para descartar são o `plugins[].editorfields[].text` — o
+texto inteiro que o aluno entregou, 1.470 B só ele na amostra — e o
+`assignmentdata.activity`, o enunciado inteiro em HTML. Nenhum dos dois responde "eu já
+entreguei isso?": o primeiro é o trabalho, o segundo já é resposta de `material`. Das
+`fileurl` sai o **nome** do arquivo e não o endereço, pela mesma regra de `material`
+(Invariante 3).
+
+**O que NÃO foi verificado ao vivo, e é a parte que dói.** A resposta de
+`mod_assign_get_submission_status` usada na suíte é **escrita à mão** a partir da forma
+documentada no core do Moodle 5.0 e do que o catálogo registra — a worktree onde isto foi
+feito não tem token e não devia obter um. A lista de entregas, essa, é a fixture real. Em
+consequência: a razão de 19,9× mede o que a nossa projeção descarta de uma resposta
+**desta forma**, e não o tamanho do que o e-Disciplinas devolve de fato. Quem rodar ao
+vivo primeiro captura, higieniza (§3.3) e troca o dublê por fixture — e confere de uma vez
+o único comportamento que nenhum teste offline alcança: se `assignid` de uma entrega de
+outra disciplina responde erro legível ou silêncio.
+
+**Encaixe com `o_que_vence`, e ele é decisão e não acabamento.** As duas respondem a mesma
+véspera partida em duas. A grafia da data passou a morar em `texto.formatar_data` (era
+privada de `o_que_vence`), porque duas grafias do mesmo prazo fazem quem lê as duas
+respostas não reconhecer que é o mesmo prazo — J18 trava isso. E cada descrição aponta
+para a outra ferramenta: esta cobre só `assign`, e o calendário vê 6 disciplinas contra 4
+que têm `assign` (§9, 28/08), então mandar quem pergunta por questionário para
+`o_que_vence` é Invariante 6, não cortesia.
+
+**Um defeito de forma foi curado de passagem, e vale registrar porque é reincidente.**
+`main()` desempacotava os descritores **por posição** — foi assim que o quarto, em 14/09,
+matou o servidor antes do handshake com a suíte verde em tudo que não fosse o T78. Agora
+indexa por nome: ferramenta nova precisa ser registrada, nunca contada.
+
 ---
 ### 14/09/2026 — o RUCard passou a publicar comunicado dentro do cardápio
 

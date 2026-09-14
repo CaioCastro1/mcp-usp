@@ -177,6 +177,11 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
     que `core_course_get_contents` não devolve — os módulos `assign` chegam lá
     com `contents` vazio, e o arquivo só existe em `mod_assign_get_assignments`.
 
+    E de 5 para 6 em 14/09, no §9: `ja_entreguei` responde "eu já entreguei
+    isso?", e a única função que sabe a diferença entre rascunho salvo e entrega
+    enviada é `mod_assign_get_submission_status`. `get_assignments`, que já
+    estava aqui, diz o que EXISTE e o prazo — nunca o que foi feito.
+
     O teste segue travando o conjunto INTEIRO — é o que impede a próxima sessão
     de acrescentar "só mais uma" sem passar pelo §9.
     """
@@ -187,6 +192,7 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "core_enrol_get_users_courses",
             "core_course_get_contents",
             "mod_assign_get_assignments",
+            "mod_assign_get_submission_status",
         }
     )
 

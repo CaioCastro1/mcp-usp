@@ -347,12 +347,13 @@ def test_sigla_desconhecida_nao_chega_a_pedir_conteudo(disciplinas_brutas, conte
 
 @pytest.mark.politica
 def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
-    """T77 — a superfície passou de 1 para 4 (§9, 31/08) e de 4 para 5 (12/09).
+    """T77 — a superfície passou de 1 para 4 (§9, 31/08), de 4 para 5 (12/09) e
+    de 5 para 6 (14/09, `ja_entreguei`).
 
     O teste continua travando o conjunto INTEIRO, que é o que impede a próxima
     sessão de acrescentar "só mais uma". Todas são leitura; nenhuma escreve, e
-    nenhuma está no bloqueio permanente do §2.2 — o que importa dizer da quinta,
-    porque ela é vizinha de nome de quatro funções que estão.
+    nenhuma está no bloqueio permanente do §2.2 — o que importa dizer das duas
+    últimas, porque as duas são vizinhas de nome de quatro funções que estão.
     """
     assert politica.ALLOWLIST == frozenset({
         "core_calendar_get_action_events_by_timesort",
@@ -360,6 +361,7 @@ def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
         "core_enrol_get_users_courses",
         "core_course_get_contents",
         "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
     })
     assert not (politica.ALLOWLIST & politica.BLOQUEIO_PERMANENTE)
     for funcao in politica.ALLOWLIST:
