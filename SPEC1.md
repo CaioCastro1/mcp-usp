@@ -176,6 +176,36 @@ Não negociáveis, independentemente do que a descoberta sugerir.
      `enrol_self_enrol_user` — falam com terceiros em nome do usuário. Note os **dois**
      caminhos de envio de mensagem: bloquear só `send_instant_messages` deixa o outro aberto.
 
+   **Acrescentados em 14/09/2026, por auditoria.** As 447 funções do site foram varridas
+   por verbo de escrita (57 candidatas) e classificadas contra as cinco categorias acima.
+   Quinze caíam dentro delas e não estavam nomeadas. Isto **não reabre** a decisão de
+   31/08 de que esta lista não é exaustiva — ela continua não sendo, e a allowlist segue
+   sendo a superfície. O que muda é que as categorias que a lista **afirma** cobrir
+   passam a cobrir:
+   - `mod_choice_submit_choice_response`, `mod_choicegroup_submit_choicegroup_response`,
+     `mod_feedback_process_page`, `mod_questionnaire_submit_questionnaire_response` —
+     entregam em nome do usuário em atividade que não é `assign`. A enquete de grupo é a
+     mais cara das quatro: ela **muda a matrícula** em grupo de trabalho.
+   - `mod_feedback_launch_feedback`, `mod_scorm_launch_sco` — queimam tentativa, mesmo
+     raciocínio de `mod_lesson_launch_attempt`.
+   - `mod_data_add_entry`, `mod_glossary_add_entry`, `core_blog_add_entry` — publicam
+     conteúdo assinado pelo usuário e visível a terceiros.
+   - `core_comment_add_comments`, `core_rating_add_rating`, `core_notes_create_notes`,
+     `core_message_create_contact_request` — falam com terceiros em nome do usuário,
+     mesma classe dos dois caminhos de mensagem acima.
+   - `core_completion_mark_course_self_completed`,
+     `core_completion_update_activity_completion_status_manually` — afirmam progresso que
+     o usuário não fez; a primeira declara um curso inteiro concluído. Nenhuma das duas
+     tem desfazer pela API.
+
+   **Olhadas e deixadas de fora, com motivo** (registrado em `tests/moodle/test_politica.py`,
+   para a próxima varredura não reabrir as mesmas perguntas): as funções de nota e prazo
+   (`mod_assign_save_grade*`, `*_save_feedback`, `save_user_extensions`) são capacidade de
+   quem corrige e não da conta de aluno — se um dia o projeto servir conta de monitor, elas
+   entram por decisão de §9; o calendário pessoal; dispositivo, arquivos privados e pedido
+   de dados do próprio usuário; e a emissão de certificado, que é consequência da conclusão
+   e não caminho para ela.
+
    Motivo do bloqueio: essas funções serão chamadas por um modelo interpretando linguagem
    ambígua. "Manda ver a lista de exercícios" não deve ter caminho até `submit_for_grading`.
 

@@ -79,6 +79,37 @@ BLOQUEIO_PERMANENTE: frozenset[str] = frozenset(
         "mod_forum_update_discussion_post",
         "mod_forum_delete_post",
         "enrol_self_enrol_user",
+        # --- acrescentados em 14/09/2026, por auditoria (§9) -----------------
+        # As 57 funções do site que casam com verbo de escrita foram
+        # classificadas contra as categorias que este bloco já usa. Estas 15
+        # caem dentro delas e estavam de fora — a allowlist as negava por
+        # omissão, que é a primeira linha, mas o §2.2 é a SEGUNDA, para o dia
+        # em que alguém acrescentar algo à allowlist por engano.
+        #
+        # respondem/entregam em nome do usuário — mesma classe de
+        # `mod_assign_submit_for_grading`, em atividades que não são entrega
+        "mod_choice_submit_choice_response",
+        "mod_choicegroup_submit_choicegroup_response",
+        "mod_feedback_process_page",
+        "mod_questionnaire_submit_questionnaire_response",
+        # queimam tentativa — mesmo raciocínio de `mod_lesson_launch_attempt`
+        "mod_feedback_launch_feedback",
+        "mod_scorm_launch_sco",
+        # publicam conteúdo assinado pelo usuário, visível a terceiros
+        "mod_data_add_entry",
+        "mod_glossary_add_entry",
+        "core_blog_add_entry",
+        # falam com terceiros em nome do usuário — mesma classe dos dois
+        # caminhos de mensagem e dos posts de fórum acima
+        "core_comment_add_comments",
+        "core_rating_add_rating",
+        "core_notes_create_notes",
+        "core_message_create_contact_request",
+        # afirmam progresso que o usuário não fez. `mark_course_self_completed`
+        # declara um curso inteiro concluído; a outra marca atividade a
+        # atividade. Nenhuma das duas tem desfazer pela API.
+        "core_completion_mark_course_self_completed",
+        "core_completion_update_activity_completion_status_manually",
     }
 )
 
