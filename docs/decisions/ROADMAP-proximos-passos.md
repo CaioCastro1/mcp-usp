@@ -65,6 +65,15 @@ olhou o que "preencher atividade" exigiria, não o conjunto todo.
 
 ### A3. Ferramenta `diagnostico` · trabalho · ~2 h
 
+> **Correção de 14/09, depois de escrever este arquivo.** Isto foi proposto sem
+> eu ter lido `notas/portabilidade-moodle.md` e `scripts/compatibilidade.sh`,
+> que **já estavam na `main`**. O script responde a mesma família de pergunta
+> **antes e sem credencial nenhuma**, e a nota já mediu 17 instituições.
+> A ferramenta continua valendo, mas como **segundo passo**: o script diz se o
+> site tem o serviço ligado, e a própria nota registra que verde lá *"NÃO
+> promete que as ferramentas respondem bem"*. É essa distância que a ferramenta
+> cobre, e só com token. Não substitui o script — aponta para ele.
+
 Inspirada no `list_ws_functions` do `SaadRahman01`, e é a ideia mais barata das
 duas leituras. Uma ferramenta que devolve **o que o Moodle de quem está rodando
 de fato expõe**, lendo o campo `functions` do `core_webservice_get_site_info` —
@@ -243,6 +252,17 @@ lembra. Uma action que rode a camada offline em cada push custa pouco. A camada
 depende da USP estar de pé reprova PR por motivo errado.
 
 ### D5. Moodle genérico + pacote USP · **DECISÃO** · reorganização real
+
+> **Correção de 14/09.** O levantamento abaixo foi escrito por leitura de
+> código, e a `notas/portabilidade-moodle.md` (13/09, já na `main`) **já tinha
+> medido isto melhor**: as 5 funções da allowlist são core upstream, o piso do
+> projeto é **Moodle 3.3** (a função do calendário não existe em 2.9), e os
+> pontos que travam fora da USP são **quatro**, não os três que listei — falta
+> o fuso fixo em −3, e o de `shortname` tem um agravante que eu não tinha visto:
+> `resolver` nunca olha `d.rotulo`, então num site com shortname
+> `2026S2-BIO-101` procurar "BIO101" não acha, mesmo com a string literalmente
+> lá. Leia a nota antes deste item; o que sobra aqui é a **decisão de escopo**,
+> não o levantamento.
 
 O servidor do Moodle já é quase genérico: as quatro funções são Moodle core, o
 `MOODLE_URL` é configurável, e `resolver` casa sigla exata, prefixo ou pedaço do
