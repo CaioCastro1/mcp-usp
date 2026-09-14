@@ -137,8 +137,8 @@ def decidir(funcao: str, permitir_escrita: bool = False) -> Decisao:
         return Decisao(
             permitida=False,
             motivo=(
-                f"{funcao} está no bloqueio permanente do §2.2 — negada mesmo "
-                "com permitir_escrita=True, pois não há flag que libere."
+                f"{funcao} está no bloqueio permanente — negada mesmo com "
+                "permitir_escrita=True, pois não há configuração que libere."
             ),
         )
 
@@ -148,7 +148,7 @@ def decidir(funcao: str, permitir_escrita: bool = False) -> Decisao:
     return Decisao(
         permitida=False,
         motivo=(
-            f"{funcao} não está na allowlist — default é negar (Invariante 2, "
-            "allowlist e não denylist)."
+            f"{funcao} não é uma das funções que esta ferramenta chama no Moodle "
+            "(a lista é fechada; o padrão é negar)."
         ),
     )

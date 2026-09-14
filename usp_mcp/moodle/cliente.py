@@ -108,8 +108,8 @@ def _levantar_se_erro(rotulo: str, resposta) -> None:
     errorcode = resposta["errorcode"]
     if errorcode == "invalidtoken":
         raise TokenInvalido(
-            "Token do Moodle inválido ou expirado — gere um novo e "
-            "atualize MOODLE_TOKEN no .env (ver §8 do SPEC1.md)."
+            "Token do Moodle inválido ou expirado — rode ./scripts/token.sh para "
+            "gerar um novo e gravar MOODLE_TOKEN no .env."
         )
     mensagem = resposta.get("message", "") or resposta.get("error", "")
     raise ErroMoodle(f"Moodle recusou {rotulo}: {errorcode} — {mensagem}")
