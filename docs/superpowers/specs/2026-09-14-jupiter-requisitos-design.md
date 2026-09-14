@@ -28,31 +28,39 @@ diferentes — o que o §5.1 do recon registrou como discrepância e não explic
 modelo o `codcur` que faz `disciplina` responder *"a consulta não trouxe nenhuma
 linha"* para PTC3314. Correta e inútil.
 
-### 2. Filtrar por "vigente" piora a resposta
+### 2. O projeto piloto trocou o vocabulário, não ficou vazio
 
-`listarCursosRequisitos?coddis=MAT2455` → 23 currículos:
+> **Correção de 14/09, depois do primeiro ciclo de TDD.** Esta seção afirmava
+> que os sete currículos novos estavam *vazios*, e a afirmação era minha, não do
+> JupiterWeb: o parser de exploração exigia letras na sigla e era cego a
+> `2000101`. O T54 nasceu dessa premissa falsa, falhou no primeiro RED, e o dado
+> real apareceu. Fica registrado porque já tinha entrado no §9 do SPEC1.
 
-| | tem requisito | `(sem linha)` |
-|---|---|---|
-| **na lista de ingresso** | 3033, 3152 | **3023, 3073, 3084, 3093, 3123, 3201, 3251** |
-| fora da lista | 3021, 3022, 3032, 3044, 3072, 3083, 3091, 3092, 3112, 3122, 3151, 3200, 3250 | — |
+`listarCursosRequisitos?coddis=MAT2455` → 23 currículos, **nenhum deles vazio**:
 
-Os currículos **novos** estão vazios: o curso existe, a estrutura é nova
-(projeto piloto), o requisito ainda não foi cadastrado. Cortar o que está fora
-da lista de ingresso devolveria "nada" exatamente para as turmas recentes.
+| grupo | exige |
+|---|---|
+| ingresso, já no piloto (7) | 3023, 3073, 3084, 3093, 3123, 3201, 3251 → **`2000101` Fundamentos Científicos e Modelagem para Engenharia I** |
+| ingresso, ainda no antigo (3) | 3033 Elétrica, 3045 Mecânica, 3152 Ambiental → MAT2454 + MAT3458 |
+| fora da lista de ingresso (13) | MAT2454 + MAT3458/MAT2458 |
+
+A estrutura nova **substituiu** MAT2454/MAT3458 por uma disciplina de código só
+numérico — é o projeto piloto aparecendo no dado. E a adoção é **parcial**: três
+cursos de ingresso seguem no vocabulário antigo. Qualquer regra do tipo "filtre
+pelo curso vigente" acerta metade da Poli e erra a outra.
 
 Os pares 3021/3022/**3023**, 3072/**3073**, 3083/**3084**, 3092/**3093**,
 3122/**3123**, 3200/**3201**, 3250/**3251** são o mesmo curso em gerações de
 currículo; o maior é o que consta como ingresso hoje.
 
-### 3. A ausência tem quatro formas, e nenhuma é "não precisa de nada"
+### 3. A ausência tem três formas medidas, e nenhuma é "não precisa de nada"
 
 | forma | exemplo medido |
 |---|---|
-| bloco existe, zero linhas | MAT2455 em 3023 |
 | zero blocos na página inteira | **PTC3313: 26.623 B, nenhum `Curso:`** |
 | curso não informado | o `disciplina` de hoje |
 | sigla inexistente | erro no corpo com HTTP 200 (já tratado) |
+| ~~bloco com zero linhas~~ | **não observado** — era o efeito do meu parser cego (§2). Tratado no código, mas sem fixture que o prove |
 
 PTC3314, PTC3360 e PTC3361 aparecem **só** sob 3032, 6º período. Da ênfase (7º) e
 do módulo (9º) em diante — estruturas que o dono descreveu e que viram curso
@@ -117,13 +125,14 @@ matrícula do aluno.
    lista de ingresso — currículo antigo, ênfase ou módulo; o JupiterWeb não
    distingue os três`. A segunda frase é literal: as três causas não são
    distinguíveis com o dado disponível, e escolher uma seria inventar.
-6. **Os quatro silêncios ganham texto próprio** (Invariantes 6 e 7). Nenhum
-   deles pode ser lido como "não há exigência":
-   - bloco vazio → *"o currículo 3023 não tem requisito cadastrado. Comum em
-     estrutura curricular nova: o curso existe, o cadastro ainda não."*
+6. **Os silêncios ganham texto próprio** (Invariantes 6 e 7). Nenhum deles pode
+   ser lido como "não há exigência":
    - zero blocos → *"o JupiterWeb não lista requisito para esta disciplina em
      curso nenhum. Da ênfase (7º) e do módulo (9º) em diante esse endpoint
      costuma não ter registro — não conclua que não há exigência."*
+   - bloco com zero linhas, se aparecer → dito como tal, sem inventar a causa.
+   - **sigla fora do formato esperado nunca vira ausência**: foi assim que a
+     medição de 14/09 errou, e o T54 existe para impedir a volta.
 7. **Os três tipos saem distintos**, aqui e no `disciplina` que já existe:
    *"requisito"*, *"requisito fraco (pode matricular devendo)"* e *"correquisito
    (cursa junto)"*. O rótulo do HTML sai **verbatim** junto, porque é o que o

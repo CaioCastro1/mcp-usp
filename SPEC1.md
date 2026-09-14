@@ -2359,13 +2359,24 @@ registros e vai até o 5º semestre; a de 3032 vem **vazia**. São duas metades 
 programa sob códigos diferentes, o que fecha parcialmente a discrepância do §5.1 do
 recon: não é erro de digitação nem de superfície, é **geração de currículo**.
 
-**Filtrar por "vigente" piorava a resposta, e isso foi medido.** Em `MAT2455` (23
-currículos), os cursos que constam como ingresso hoje — 3023, 3073, 3084, 3093, 3123,
-3201, 3251 — são justamente os que trazem **zero linha**; os antigos é que têm o
-requisito cadastrado. Currículo novo (projeto piloto) existe antes de o requisito ser
-cadastrado, então cortar o que não é ingresso devolveria "nada" para as turmas recentes.
-Os pares 3021/3022/**3023**, 3072/**3073**, 3092/**3093** são a mesma coisa em gerações
-diferentes.
+**O projeto piloto trocou o vocabulário de disciplina.** Em `MAT2455` (23 currículos),
+os sete cursos de ingresso que já migraram — 3023, 3073, 3084, 3093, 3123, 3201, 3251 —
+exigem **`2000101` Fundamentos Científicos e Modelagem para Engenharia I**, código só de
+dígitos, no lugar de MAT2454+MAT3458. A adoção é **parcial**: 3033 (Elétrica), 3045
+(Mecânica) e 3152 (Ambiental) seguem no vocabulário antigo. Regra do tipo "filtre pelo
+curso vigente" acerta metade da Poli e erra a outra. Os pares 3021/3022/**3023**,
+3072/**3073**, 3092/**3093** são a mesma coisa em gerações diferentes.
+
+> **Correção lavrada no mesmo dia, algumas horas depois.** O parágrafo acima dizia que
+> esses sete currículos traziam **zero linha** e que o piloto existia "antes de o
+> requisito ser cadastrado". Era falso, e a fonte do erro era minha: o parser de
+> exploração exigia letras na sigla (`[A-Z]{2,4}\d{3,4}`) e era **cego a `2000101`**.
+> Quem derrubou a afirmação foi o primeiro ciclo de TDD: o T54, escrito sobre a premissa
+> errada, falhou com a linha que eu jurava não existir. Duas lições, e a segunda é a
+> cara: (a) classificar antes de olhar a distribuição dos valores apaga justamente a
+> categoria inesperada; (b) **o `//` entre medir e registrar é onde o erro entra** — este
+> §9 recebeu o fato às 16h e o desmentiu às 18h, e o que separou os dois foi um teste que
+> falhou, não uma releitura. Medição de exploração não é fato até um teste dependê-la.
 
 **A ausência tem quatro formas e nenhuma é "não precisa de nada":** bloco com zero linhas
 (MAT2455 em 3023), zero blocos na página inteira (**PTC3313: 26.623 B, nenhum curso**),
