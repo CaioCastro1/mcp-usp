@@ -1,4 +1,4 @@
-"""C1-C7: o CI roda a camada offline, e só ela, sem credencial nenhuma.
+"""C1-C8: o CI roda a camada offline, e só ela, sem credencial nenhuma.
 
 O `scripts/gate.sh` já checa tudo o que precisa ser checado antes de um commit.
 O defeito nunca foi o que ele checa — é que ele só roda quando alguém lembra.
@@ -19,7 +19,9 @@ Uma action fecha essa porta, e abre duas outras que estes testes trancam:
 C3 e C4 seriam verdes num diretório `.github/` vazio, que é o falso-verde que
 este repositório persegue desde o primeiro gate. C1, C2, C5 e C6 são o
 contrapeso: existe workflow, ele dispara em push e em pull request, ele de fato
-instala o pacote e roda a camada offline, e ele cria o `.env` antes disso.
+instala o pacote e roda a camada offline, e ele cria o `.env` antes disso. C8
+guarda a terceira porta, que só apareceu quando o CI rodou pela primeira vez: o
+sistema do runner.
 
 O `.env` de C6 não é detalhe de implementação: sem ele a suíte offline reprova
 com `RUCARD_HASH não está no ambiente nem no .env`, que é consequência e não
@@ -226,6 +228,29 @@ def test_c6_o_ci_cria_o_env_antes_de_rodar_a_suite(arquivo):
         f"{arquivo} cria o `.env` DEPOIS de rodar a suíte. Mova `{CURA}` para "
         "antes: na ordem atual a suíte roda sem ambiente e reprova sem ter "
         "chegado ao que a PR mudou."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c8_o_ci_roda_onde_o_projeto_roda(arquivo):
+    """C8 — a escolha do sistema do runner não pode envelhecer calada.
+
+    Escrita à mão aqui, como o dono do repositório no U1: se um dia a decisão
+    mudar, este teste reprova e obriga a mudança a ser declarada, em vez de
+    virar um vermelho misterioso numa PR que não tem nada com isso.
+    """
+    texto = sem_comentarios((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+    assert re.search(r"runs-on:\s*macos", texto), (
+        f"{arquivo} não roda em macOS. Medido em 15/09/2026, num runner Linux: "
+        "735 de 736. O `test_g3` cria uma pasta acentuada em NFD e pergunta ao "
+        "git sobre a mesma pasta em NFC, que é a forma que o Python entrega — "
+        "duas grafias que só são a mesma pasta num sistema de arquivos "
+        "insensível a normalização, como o do Mac onde o projeto é "
+        "desenvolvido e usado. Em ext4 a segunda simplesmente não existe e o "
+        "teste morre antes de medir o que veio medir. Levar o CI para Linux "
+        "é mais barato e fica possível no dia em que esse teste souber pular "
+        "declarando o motivo; até lá, um vermelho ali reprova a PR por um "
+        "motivo que não é da PR."
     )
 
 
