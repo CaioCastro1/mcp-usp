@@ -23,11 +23,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Fatia vertical: a pergunta do §5 do SPEC1 ("quantos créditos e qual o
-# pré-requisito?"). Crescer isto é decisão registrada no §9, não conveniência.
+# Fatia vertical: a ficha da disciplina, e as duas consultas de navegação que
+# marcam se um `codcur` é curso de ingresso (fatia de requisitos, 14/09).
+# `pubListarRequisitoDisciplina` SAIU em 14/09: exigia um `codcur` que a API não
+# deixa descobrir corretamente, e `requisitos(sigla)` responde sem ele (§9).
+# Crescer isto é decisão registrada no §9, não conveniência.
 CONSULTAS_PERMITIDAS: dict[str, str] = {
     "pubObterDisciplina": "obter",
-    "pubListarRequisitoDisciplina": "listar",
     "pubListarCursoEntrada": "listar",
     "pubListarColegiado": "listar",
 }

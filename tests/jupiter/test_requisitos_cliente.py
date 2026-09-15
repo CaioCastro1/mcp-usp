@@ -119,3 +119,52 @@ def test_t66_pagina_sem_curriculo_avisa_em_vez_de_devolver_lista_vazia(
 
     assert ficha["curriculos"] == []
     assert any("não conclua" in a.lower() for a in ficha["avisos"])
+
+
+# --- T81: agrupar currículos com a mesma combinação de exigências (14/09) -----
+
+
+def _mat2455(mat2455_html, ingresso_poli, colegiados):
+    from usp_mcp.jupiter import cliente as _cliente, ferramentas
+    from tests.jupiter.conftest import Gravador
+
+    c = _cliente.ClienteJupiter(
+        Gravador([colegiados, ingresso_poli]), transporte_get=GravadorGet(mat2455_html)
+    )
+    return ferramentas.requisitos("MAT2455", cliente=c)
+
+
+def test_t81_mat2455_tem_23_curriculos_em_4_combinacoes(mat2455_html, ingresso_poli, colegiados):
+    from usp_mcp.jupiter import ferramentas
+
+    grupos = ferramentas.agrupar_curriculos(_mat2455(mat2455_html, ingresso_poli, colegiados)["curriculos"])
+
+    assert len(grupos) == 4
+    assert sum(len(membros) for _, membros in grupos) == 23
+    assert [len(membros) for _, membros in grupos] == [13, 7, 2, 1], "maiores primeiro"
+
+
+def test_t81b_o_tipo_separa_grupos_mesmo_com_as_mesmas_siglas(mat2455_html, ingresso_poli, colegiados):
+    from usp_mcp.jupiter import ferramentas
+
+    grupos = ferramentas.agrupar_curriculos(_mat2455(mat2455_html, ingresso_poli, colegiados)["curriculos"])
+    por_codcur = {c["codcur"]: chave for chave, membros in grupos for c in membros}
+
+    # 3250 exige MAT2454 + MAT3458 como requisito DURO; 3033 exige as mesmas como
+    # FRACO. Mesmas siglas, grupos diferentes — é a informação que decide a matrícula.
+    assert por_codcur["3250"] != por_codcur["3033"]
+    assert {s for s, _, _, _ in por_codcur["3250"]} == {s for s, _, _, _ in por_codcur["3033"]}
+    # 3033, 3032 e 3045 exigem a mesma coisa nos mesmos termos: um grupo só.
+    assert por_codcur["3033"] == por_codcur["3032"] == por_codcur["3045"]
+    # Os sete do projeto piloto (2000101) ficam juntos.
+    piloto = {"3023", "3073", "3084", "3093", "3123", "3201", "3251"}
+    assert len({por_codcur[c] for c in piloto}) == 1
+
+
+def test_t81c_curriculo_sem_exigencia_forma_o_grupo_vazio_por_ultimo():
+    from usp_mcp.jupiter import ferramentas
+
+    a = {"codcur": "1", "exigencias": [{"sigla": "X", "nome": "x", "tipo": "requisito", "rotulo": "Requisito"}]}
+    vazio = {"codcur": "2", "exigencias": []}
+    grupos = ferramentas.agrupar_curriculos([vazio, a])
+    assert grupos[-1][0] == () and grupos[-1][1] == [vazio]
