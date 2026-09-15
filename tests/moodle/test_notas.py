@@ -212,7 +212,15 @@ def test_n10_item_a_item_com_nota_maximo_e_peso(disciplinas_brutas):
 
     assert "EC-1 - Transitórios em LT" in r.texto
     assert "8,50" in r.texto
-    assert "10" in r.texto, "não disse de quanto é a nota"
+    assert "25,00 %" in r.texto, "não disse quanto o item pesa"
+
+    # O `grademax` NÃO chega deste site: a captura de 15/09 tem 20 itens e
+    # nenhum o traz (F2 trava isso). A ferramenta lê o campo e degrada sozinha,
+    # imprimindo só a nota — e o que este teste guarda é justamente que ela não
+    # INVENTA um máximo quando ele não vem.
+    assert " de " not in r.texto.split("peso")[0], (
+        "apareceu um máximo que o e-Disciplinas não mandou:\n" + r.texto
+    )
     assert "25,00 %" in r.texto, "não disse o peso"
 
 
