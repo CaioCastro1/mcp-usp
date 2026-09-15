@@ -273,6 +273,50 @@ _SEM_NOTA = (
 )
 
 
+def _quantos_warnings(bruto) -> int:
+    """`warnings` da resposta, na mesma leitura das outras cinco ferramentas.
+
+    Chave ausente, `null` e `[]` são o mesmo zero: um site que não devolve o
+    campo não é um site que avisou coisa nenhuma, e tratar a ausência como erro
+    faria a ferramenta gritar contra Moodle de outra faculdade.
+    """
+    return len((bruto or {}).get("warnings") or ())
+
+
+def _aviso_da_lista(quantos: int) -> str:
+    """As duas chamadas desta ferramenta avisam, e avisam coisas DIFERENTES.
+
+    Esta é a da lista (`mod_assign_get_assignments`): o que ela põe em dúvida é
+    a existência da entrega. Pode haver tarefa que nem chegou a aparecer, e
+    nenhuma linha da resposta denuncia a falta — a lista fica com cara de
+    completa. É o mesmo aviso que `atrasadas` dá, com a mesma contagem.
+    """
+    return (
+        f"O e-Disciplinas avisou que {quantos} atividade(s) desta disciplina "
+        "não puderam ser lidas com esta credencial: pode haver entrega fora "
+        "desta lista."
+    )
+
+
+def _aviso_do_status(quantos: int) -> str:
+    """E esta é a do status (`mod_assign_get_submission_status`).
+
+    O que ela põe em dúvida não é a existência da entrega — essa apareceu —, é
+    o VEREDITO impresso na linha dela. Por isso as duas contagens saem
+    separadas em vez de somadas: "sumiu da lista" e "está na lista e o estado é
+    duvidoso" têm curas diferentes, e um número só apagaria qual é qual.
+
+    A unidade aqui é a ENTREGA e não o item de aviso, porque cada ida destas é
+    sobre uma entrega só: dois `warnings` na mesma resposta continuam sendo uma
+    entrega para conferir, e dizer "2" mandaria procurar uma que não existe.
+    """
+    return (
+        f"O e-Disciplinas avisou ao responder sobre {quantos} entrega(s) desta "
+        f"lista: o estado delas pode estar incompleto, e um {_NADA} aqui pode "
+        "ser que não deu para ler — que não é a mesma coisa."
+    )
+
+
 def ja_entreguei(
     cliente, disciplina: str, entrega: str | None = None, agora=None
 ) -> RespostaJaEntreguei:
@@ -295,17 +339,29 @@ def ja_entreguei(
     alvo = resolucao.disciplina
     # O escopo não é otimização: sem `courseids[0]` esta função devolve as 74
     # matrículas, 1 MB, ~251k tokens (§9, 28/08).
-    todas = projetar_entregas(
-        cliente.chamar("mod_assign_get_assignments", **{"courseids[0]": alvo.courseid})
+    bruto = cliente.chamar(
+        "mod_assign_get_assignments", **{"courseids[0]": alvo.courseid}
     )
+    todas = projetar_entregas(bruto)
+    # Lido do bruto e não da projeção: `projetar_entregas` devolve só as
+    # entregas, e o aviso é justamente sobre o que não virou entrega nenhuma.
+    nao_listadas = _quantos_warnings(bruto)
     cabecalho = f"{alvo.sigla} ({alvo.rotulo}) — já entreguei?"
 
     if not todas:
         # 6 das 10 disciplinas do semestre não têm `assign` nenhum (§9, 12/09).
         # Vazio é comum aqui, e vazio mudo seria o falso "não tem nada".
+        #
+        # E é aqui que o aviso da lista pesa mais do que em qualquer outro
+        # ramo: `courses` vazio COM warning é o Moodle dizendo "não te deixei
+        # ver", enquanto a frase abaixo, sozinha, diz "não há o que entregar".
+        # As duas leem igual e só uma manda dormir tranquilo.
+        avisos = [_aviso_da_lista(nao_listadas)] if nao_listadas else []
+        avisos.append(COBERTURA)
         return RespostaJaEntreguei(
             texto=f"{cabecalho}\n\nEsta disciplina não tem nenhuma tarefa de "
-            f"entrega no e-Disciplinas.\n\n⚠ {COBERTURA}",
+            "entrega no e-Disciplinas."
+            + "".join(f"\n\n⚠ {a}" for a in avisos),
             total=0,
             consultadas=0,
             truncado=False,
@@ -319,12 +375,16 @@ def ja_entreguei(
         # "Nada com esse nome" ≠ "nada para entregar". Dizer o total é o que
         # permite a quem lê distinguir as duas — e nenhuma chamada de status
         # sai para um filtro que não casou (J15).
+        #
+        # O total também é uma afirmação, e o warning a enfraquece: a entrega
+        # procurada pode estar exatamente entre as que não foram lidas.
         return RespostaJaEntreguei(
             texto=(
                 f"{cabecalho}\n\nNenhuma entrega com {entrega!r} no nome. A "
                 f"disciplina tem {len(todas)} entregas: "
                 + ", ".join(e.nome for e in todas)
                 + "."
+                + (f"\n\n⚠ {_aviso_da_lista(nao_listadas)}" if nao_listadas else "")
             ),
             total=len(todas),
             consultadas=0,
@@ -341,6 +401,7 @@ def ja_entreguei(
         escolhidas = escolhidas[-TETO_CONSULTAS:]
 
     situacoes = []
+    status_incompletos = 0
     for alvo_entrega in escolhidas:
         if not alvo_entrega.aceita_envio:
             # Sem ida ao Moodle: não há status a consultar, e "não entregou"
@@ -349,28 +410,33 @@ def ja_entreguei(
             continue
         # Um erro do cliente sobe daqui sem ser capturado (J17): falha de
         # credencial não pode virar "você não entregou nada".
-        situacoes.append(
-            projetar_status(
-                cliente.chamar(
-                    "mod_assign_get_submission_status", assignid=alvo_entrega.assignid
-                ),
-                alvo_entrega,
-            )
+        bruto_status = cliente.chamar(
+            "mod_assign_get_submission_status", assignid=alvo_entrega.assignid
         )
+        # Acumulado por ENTREGA e não por item de aviso — ver `_aviso_do_status`.
+        if _quantos_warnings(bruto_status):
+            status_incompletos += 1
+        situacoes.append(projetar_status(bruto_status, alvo_entrega))
 
     consultadas = sum(1 for s in situacoes if s.entrega.aceita_envio)
     linhas = [cabecalho, "", *(_formatar_linha(s, agora) for s in situacoes)]
 
-    avisos = [COBERTURA, _SEM_NOTA]
+    avisos = []
     if truncado:
         # Invariante 7: o corte é dito, com a contagem e com a cura.
-        avisos.insert(
-            0,
+        avisos.append(
             f"Esta consulta custa uma ida ao e-Disciplinas por entrega, e para "
             f"em {TETO_CONSULTAS}: {cortadas} entrega(s) de prazo mais antigo "
             "ficaram de fora. Use o parâmetro `entrega` para perguntar por uma "
-            "delas pelo nome.",
+            "delas pelo nome."
         )
+    # As duas origens, em dois avisos. A ordem é a da leitura: primeiro o que
+    # pode faltar na lista, depois o que pode estar errado dentro dela.
+    if nao_listadas:
+        avisos.append(_aviso_da_lista(nao_listadas))
+    if status_incompletos:
+        avisos.append(_aviso_do_status(status_incompletos))
+    avisos.extend([COBERTURA, _SEM_NOTA])
 
     linhas.extend(f"\n⚠ {a}" for a in avisos)
 
