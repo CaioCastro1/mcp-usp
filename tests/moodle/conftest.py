@@ -351,7 +351,6 @@ def status_de_entrega(
         "groupid": 0,
         "assignment": 577509,
         "latest": 1,
-        "gradingstatus": gradingstatus,
         "plugins": [
             *([plugin_texto] if com_texto_online else []),
             {
@@ -417,9 +416,7 @@ def status_de_entrega(
                         "isexternalfile": False,
                     }
                 ],
-                "activity": [],
             },
-            "activity": _ENUNCIADO_EM_HTML,
         },
         "warnings": [],
     }
@@ -449,8 +446,6 @@ def notas_gerais_falsas(pares, com_warning=False) -> dict:
                 "courseid": courseid,
                 "grade": "-" if nota is None else nota,
                 "rawgrade": "-" if nota is None else nota.replace(",", "."),
-                "rank": 12,
-                "maxrank": 58,
             }
             for courseid, nota in pares
         ],
@@ -497,9 +492,6 @@ def _item_de_nota(**campos) -> dict:
         "gradeislocked": False,
         "gradeisoverridden": False,
         "gradeformatted": "8,50",
-        "grademin": 0,
-        "grademax": 10,
-        "rangeformatted": "0,00–10,00",
         "percentageformatted": "85,00 %",
         "feedback": (
             "<p dir=\"ltr\">Bom relatório. A dedução do coeficiente de reflexão "
@@ -510,8 +502,6 @@ def _item_de_nota(**campos) -> dict:
         "feedbackformat": 1,
         "weightraw": 0.25,
         "weightformatted": "25,00 %",
-        "status": "",
-        "averageformatted": "7,10",
     }
     base.update(campos)
     return base
@@ -642,7 +632,6 @@ def foruns_falsos(*, com_avisos=True, com_discussao=True, extras=(), sem_contage
             "completionposts": 0,
             "cmid": cmid,
             "istracked": True,
-            "unreadpostscount": 2,
         }
         if not sem_contagem:
             f["numdiscussions"] = quantos
@@ -697,20 +686,6 @@ def discussao_falsa(
         "messageformat": 1,
         "messagetrust": 0,
         "attachment": "",
-        "attachments": [
-            {
-                "filename": "lista3.pdf",
-                "filepath": "/",
-                "filesize": 91233,
-                "fileurl": (
-                    "https://edisciplinas.usp.br/webservice/pluginfile.php/"
-                    "9599801/mod_forum/attachment/910001/lista3.pdf"
-                ),
-                "timemodified": timemodified,
-                "mimetype": "application/pdf",
-                "isexternalfile": False,
-            }
-        ],
         "totalscore": 0,
         "mailnow": 0,
         "userfullname": nome_de_quem_postou,
