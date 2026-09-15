@@ -50,7 +50,7 @@ def servidor_montado(monkeypatch):
 
 
 @pytest.mark.contrato
-def test_t78_main_registra_as_tres_ferramentas(servidor_montado):
+def test_t78_main_registra_todas_as_ferramentas(servidor_montado):
     """O bug histórico em uma asserção: API errada do SDK e nada aqui roda.
 
     Pegou de novo em 14/09: `main()` desempacotava TRÊS descritores de
@@ -61,9 +61,15 @@ def test_t78_main_registra_as_tres_ferramentas(servidor_montado):
     ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
 
     assert sorted(f.name for f in ferramentas) == [
+        "atrasadas",
+        "avisos",
         "baixar_arquivo",
         "diagnostico",
+        "disciplinas",
+        "ja_entreguei",
         "material",
+        "notas",
+        "o_que_mudou",
         "o_que_vence",
     ]
     assert servidor_montado["transporte"] == "stdio", (

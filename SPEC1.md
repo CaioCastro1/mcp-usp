@@ -2646,6 +2646,174 @@ alcança.
 passar a oferecer OAuth no e-Disciplinas, o Claude passar a entregar segredo por usuário
 sem OAuth, ou a decisão de custódia mudar. Nenhuma das três depende de trabalho nosso.
 
+### 14/09/2026 — `ja_entreguei`, e a sexta função da allowlist
+
+**O que fechou a decisão:** o C2 do `ROADMAP` propõe "já entreguei isso?" como a
+alternativa que **não** colide com o §2.2 — ler o estado resolve a ansiedade, escrever
+resolveria a preguiça, e escrever está recusado por escrito (B3). A pergunta já existia
+no §5 e o README a listava como buraco desde que foi reescrito.
+
+**O dado que a sustenta, e ele estava na fixture que já temos.** `mod_assign_get_assignments`
+(na allowlist desde 12/09) diz o que existe e quando vence, e **nunca** diz o que foi
+feito. Quem sabe isso é `mod_assign_get_submission_status`, pelo
+`lastattempt.submission.status`. Os quatro valores do campo não são detalhe: `draft` é
+rascunho salvo e **não enviado**, e na tela do Moodle ele parece entrega — o arquivo está
+lá, o professor não recebeu nada. `draft` e `submitted` são uma palavra de distância no
+payload e uma reprovação de distância na vida. É esse par que a ferramenta existe para
+separar, e nenhuma das cinco funções anteriores o separa.
+
+**Allowlist de 5 para 6.** A função é leitura pura e casa com o prefixo `mod_assign_get_`
+que já estava declarado em P5 desde 12/09 — nenhum prefixo novo foi preciso, e a
+vizinhança perigosa (`save_submission`, `submit_for_grading`, `start_submission`,
+`remove_submission`) segue negada duas vezes, pela omissão da allowlist e pelo §2.2. T7 e
+T77 travam o conjunto novo; D4 exigiu a linha de `ja_entreguei` em `FUNCOES_POR_FERRAMENTA`.
+
+**Duas decisões de custo, as duas medidas na fixture real de PTC3314 (12/09):**
+
+1. **`nosubmissions: 1` não gasta chamada.** 2 dos 4 `assign` da disciplina não aceitam
+   envio nenhum — são as duas provas presenciais que o professor criou só para ter data, o
+   mesmo par que `material` já nomeia como "entregas sem anexo". Consultar o status delas
+   gastaria **metade** das idas ao Moodle desta disciplina para receber "não entregou"
+   sobre algo que não tem como ser entregue, o que não é informação, é acusação falsa. Elas
+   aparecem na saída com o motivo: não consultar não é sumir (Invariante 7).
+2. **Teto de 10 consultas por invocação.** Esta é a primeira ferramenta do projeto que faz
+   **N chamadas** em vez de uma ou duas. O catálogo (§3.5) registra o perfil: barata em
+   token, cara em latência — e cada ida fica no log da conta do dono (Invariante 5).
+   PSI3472 tem 11 entregas, então o teto morde exatamente onde deve; o corte é declarado
+   com a contagem e com o nome do parâmetro que o evita (`entrega`).
+
+**A projeção, medida:**
+
+| | bytes |
+|---|---|
+| `mod_assign_get_assignments` de PTC3314 (cru, fixture real) | 7.975 |
+| 2 × `mod_assign_get_submission_status` (cru, **medido ao vivo em 14/09**) | 4.022 |
+| **cru total** | **11.997** |
+| **texto devolvido pela ferramenta** | **699** |
+| razão | **17,2×** |
+
+Os dois campos que o corte existe para descartar são o `plugins[].editorfields[].text` — o
+texto inteiro que o aluno entregou, 1.470 B só ele na amostra — e o
+`assignmentdata.activity`, o enunciado inteiro em HTML. Nenhum dos dois responde "eu já
+entreguei isso?": o primeiro é o trabalho, o segundo já é resposta de `material`. Das
+`fileurl` sai o **nome** do arquivo e não o endereço, pela mesma regra de `material`
+(Invariante 3).
+
+**A suíte ainda usa resposta escrita à mão, e a medição acima não.** A fixture de
+`mod_assign_get_submission_status` que os testes exercitam foi escrita a partir da forma
+documentada no core 5.0, porque a worktree onde a ferramenta nasceu não tem token e não
+devia obter um. Os números da tabela vieram depois, de uma execução real de 14/09 contra a
+conta do dono, e são estes que valem. Trocar o dublê por fixture capturada e higienizada
+(§3.3) segue pendente, e está no backlog.
+
+**Duas perguntas que a execução ao vivo fechou.** `assignid` que não pertence à conta
+responde **erro legível**, não silêncio: `invalidrecordunknown` em 150 B, com mensagem em
+português. E a resposta real traz três chaves de topo — `assignmentdata`, `lastattempt` e
+`warnings` — com `lastattempt.submission.status` no lugar que a ferramenta espera.
+
+**Encaixe com `o_que_vence`, e ele é decisão e não acabamento.** As duas respondem a mesma
+véspera partida em duas. A grafia da data passou a morar em `texto.formatar_data` (era
+privada de `o_que_vence`), porque duas grafias do mesmo prazo fazem quem lê as duas
+respostas não reconhecer que é o mesmo prazo — J18 trava isso. E cada descrição aponta
+para a outra ferramenta: esta cobre só `assign`, e o calendário vê 6 disciplinas contra 4
+que têm `assign` (§9, 28/08), então mandar quem pergunta por questionário para
+`o_que_vence` é Invariante 6, não cortesia.
+
+**Um defeito de forma foi curado de passagem, e vale registrar porque é reincidente.**
+`main()` desempacotava os descritores **por posição** — foi assim que o quarto, em 14/09,
+matou o servidor antes do handshake com a suíte verde em tudo que não fosse o T78. Agora
+indexa por nome: ferramenta nova precisa ser registrada, nunca contada.
+
+### 14/09/2026 — `notas`: UMA ferramenta com parâmetro opcional, e duas funções
+
+**A decisão de desenho é o número de ferramentas, e a alternativa era duas.** O catálogo
+(§3.7) diz das duas funções de nota que elas "não competem, se complementam — a escolha é
+por pergunta": `gradereport_overview_get_course_grades` dá a nota final de cada matrícula,
+e `gradereport_user_get_grade_items` dá item a item de UM curso, com peso e máximo. Duas
+funções, duas visões, e a tentação óbvia é duas ferramentas.
+
+**Ficou uma, e o critério é o §5: o nome vem da PERGUNTA, não da função da API.** "Como
+estou de nota?" e "como estou de nota em PTC3314?" são a mesma pergunta com e sem escopo —
+quem faz a segunda depois da primeira não mudou de assunto, estreitou. Duas ferramentas
+obrigariam o modelo a escolher entre `notas` e `notas_da_disciplina` por uma diferença que
+é um **parâmetro**, e é exatamente aí que ele chama a errada quando a frase é ambígua
+("como estou em eletrônica?" — isso é disciplina ou é a vida?). O mesmo argumento aparece
+ao contrário em `material` e `baixar_arquivo`, que **são** duas ferramentas porque
+respondem perguntas diferentes (o que existe × me dá esse arquivo) e não a mesma pergunta
+com escopo diferente.
+
+**O que a decisão custa, e por que o preço é aceitável:** a ferramenta fica com um `if`
+que escolhe a função, e o T42 passa a travar seis ferramentas para oito funções. A Regra de
+Ouro (§3.1) continua de pé porque a escolha é do CÓDIGO, à mão, determinística, e nunca
+chama as duas "para ter as duas visões" — N3 é o teste que trava isso, e a sabotagem que
+chama as duas reprova doze testes.
+
+**Allowlist de 6 para 8, e um prefixo novo em P5.** `gradereport_` não casava com nenhum
+dos cinco prefixos de leitura, e o teto do P5 existe para forçar exatamente esta
+declaração. Entraram **dois** prefixos estreitos — `gradereport_overview_get_` e
+`gradereport_user_get_` — e não o `gradereport_`, porque a família tem três nomes que este
+projeto não quer perto: `gradereport_overview_view_grade_report` e
+`gradereport_user_view_grade_report` são **escrita** (disparam evento de log), e
+`gradereport_grader_get_users_in_report` é leitura de **nota de terceiros**. O prefixo do
+plugin não serve de teto aqui; o do relatório mais o verbo, sim.
+
+**Dois parâmetros que este projeto manda e a API não exige, e é decisão e não zelo.** As
+duas funções declaram `userid [opt=0]`, e `grade_items` declara também `courseid [opt=0]`.
+O Apêndice B do catálogo registra, desde 31/08, que **ninguém verificou** o que o 0 faz ali
+("pode ser erro, pode ser todos os cursos e uma resposta gigante"). Uma ferramenta que
+depende de um default não verificado promete o que não sabe. E há um agravante: a descrição
+do core de `grade_items` é "a lista de itens de nota para os usuários **de um curso**" —
+num token com capacidade de correção, a ausência de `userid` traz terceiros. O id explícito
+fecha as duas portas, é derivado do token (nunca configurado, §9 de 28/08) e custa **zero
+chamada**: `disciplinas.carregar` já o buscava e o jogava fora. Agora ele fica no mesmo
+cache, atrás de `userid_do_token`.
+
+**A projeção, medida:**
+
+| visão | cru | texto devolvido | razão |
+|---|---|---|---|
+| geral, 45 matrículas com 7 notas lançadas | 2.240 B | 470 B | **4,8×** |
+| PTC3314, 20 itens de nota, 24 campos cada | 10.815 B | 1.408 B | **7,7×** |
+
+Medido ao vivo em 14/09/2026, contra a conta do dono. A primeira versão desta tabela dizia
+13,8× e 9,8×, sobre resposta escrita à mão, e as duas estavam erradas — a de cima para
+mais do que o dobro.
+
+O campo gordo da visão de disciplina é o `feedback` — o comentário do professor em HTML,
+**1.084 B dos 4.819** (22,5%) numa amostra de cinco itens. Ele é descartado, e a decisão
+não é "é grande": é que ele responde *o que eu errei*, que é outra pergunta. O corte é
+declarado com a contagem, porque sumir com ele calado esconderia que existe texto para ler.
+Saem também `userfullname` e `useridnumber` (o número USP — §3.3) e `percentageformatted`,
+que é `graderaw/grademax` já calculado.
+
+**Correção de 14/09, pela mesma execução ao vivo:** a resposta real de
+`gradereport_overview_get_course_grades` traz **três campos por item** — `courseid`,
+`grade` e `rawgrade` — e mais nada. O `rank`/`maxrank` e o `averageformatted` que este
+parágrafo dizia descartar **não existem lá**; eles vieram da resposta escrita à mão. O
+descarte real acontece na outra função, a de disciplina, cujos itens têm 24 campos.
+
+**Duas coisas que a saída diz e a API não:** nota **ocultada pelo professor**
+(`gradeishidden`) não vira "sem nota lançada", porque "ainda não corrigiram" e "corrigiram
+e não liberaram" têm curas diferentes; e as matrículas sem nota são **contadas** em vez de
+listadas — o e-Disciplinas devolve as 74, semestres antigos inclusive, e 71 linhas de "-"
+enterrariam as três que respondem.
+
+**O que NÃO foi verificado ao vivo**, mesma ressalva da entrada anterior e pelo mesmo
+motivo (a worktree não tem token): as duas respostas de nota da suíte são **escritas à mão**
+a partir da forma documentada do core 5.0. Os `courseid` são reais, vindos de
+`users_courses.json`, então a tradução courseid → sigla é exercitada contra dado de
+verdade. Fica sem confirmação: se `userid` explícito é aceito pelas duas funções (o
+esperado, já que o parâmetro é declarado), se `overview` devolve mesmo as 74 matrículas ou
+só as correntes, e qual string o e-Disciplinas usa para "sem nota" — o código trata `""`,
+`"-"` e ausência como o mesmo caso, justamente para não depender de acertar essa string.
+
+**Um achado colateral foi para o `BACKLOG-correcoes.md` em vez de virar trabalho aqui:** o
+catálogo marca como **[notas]** ("medido na Fase 1") o custo em tokens destas duas funções
+e do `submission_status`, e a `notas/fase1-moodle.md` lista as três na seção *Ainda
+aberto*. Os números são plausíveis e não têm fonte, que é o modo de falha que o §9 de 27/08
+registra como o mais fácil de um documento de descoberta virar documento de viés. Nada
+nesta entrada depende deles.
+
 ---
 ### 14/09/2026 — o RUCard passou a publicar comunicado dentro do cardápio
 
@@ -2755,3 +2923,400 @@ parte. A frase "cinco ferramentas" que o plano original mirava já não existia:
 tinha avançado para "sete ferramentas" (correto, e já batendo com a tabela) entre a
 escrita do plano e a execução — os pré-requisitos `rucard-semana-e-vocabulario` e
 `jupiter-disciplina-secoes` fecharam nesse intervalo.
+
+### 14/09/2026 — `avisos`: o fórum responde o que o calendário não sabe, e o nome da função importa
+
+**Por que a ferramenta existe, e a medição é anterior a ela.** A
+`notas/fase1-moodle.md` registra, da Fase 1, que o anúncio da *Prova Prática P1* de PSI3323
+estava no fórum **Avisos** e que a prova **não** estava no calendário da disciplina. O
+`o_que_vence` é honesto sobre isso desde 28/08 — a `cobertura` dele diz que prova
+presencial não lançada no Moodle não entra —, mas dizer "não sei" não era a única opção
+disponível: o dado existia, num lugar que ninguém lia. `avisos` é esse lugar. As duas
+ferramentas respondem a mesma véspera por dois caminhos: uma o que tem **prazo**, outra o
+que foi **dito**.
+
+**A decisão que este commit pede para julgar é o NOME da segunda função.** O comparável
+`loyaniu/moodle-mcp` chama `mod_forum_get_discussions`, e ela **não existe** no Moodle 5.0
+da USP — medido em 14/09/2026 contra o e-Disciplinas, junto com as outras três do P2. A
+função é `mod_forum_get_forum_discussions`. Copiar a lista do comparável sem conferir dá
+suíte verde e erro na primeira pergunta real, porque **um dublê responde a qualquer nome
+que o teste tenha previsto**: o nome errado no código e no teste é verde dos dois lados.
+A19 é a asserção que trava isso, e ela é sobre o nome ENVIADO.
+
+**Duas funções e não uma, e a primeira é tradução.**
+`mod_forum_get_forum_discussions` exige um `forumid`, que não é o `courseid` nem o `cmid`
+— os três chegam lado a lado na mesma resposta, e trocar um pelo outro produz uma chamada
+que o Moodle aceita e responde sobre outra coisa. Quem dá o `forumid` é
+`mod_forum_get_forums_by_courses`. É a mesma forma da tradução sigla → `courseid` que
+`disciplinas` já faz, um nível abaixo. A3 usa os ids reais dos dois fóruns de PTC3314
+(`301511`/`cmid 6372301` e `301513`/`cmid 6372305`, de `course_contents_ptc3314.json`)
+exatamente para que a troca seja visível.
+
+**Allowlist de 8 para 10, e um prefixo novo em P5 — de novo o prefixo do plugin não
+serve.** `mod_forum_` é a família mais perigosa que a allowlist já tocou: das 18 funções,
+**14 escrevem**, e quatro delas são dano público — `add_discussion` e
+`add_discussion_post` já estão no §2.2, `update_discussion_post` edita post alheio e
+`delete_post` **apaga a discussão inteira quando o post é o tópico** (§3.6 do catálogo).
+O prefixo declarado é `mod_forum_get_`, que não casa com nenhuma das 14; `mod_forum_`
+casaria com todas. Fica de fora também `mod_forum_can_add_discussion`, que é leitura mas
+não casa — e está certo, porque ela não responde pergunta nenhuma deste projeto.
+
+**Três decisões de custo, e a terceira é a incômoda:**
+
+1. **Fórum com `numdiscussions: 0` não gasta chamada.** É o `nosubmissions` de
+   `ja_entreguei`: consultar gastaria uma ida ao Moodle para receber lista vazia. Não
+   consultar **não é sumir** — o fórum aparece na saída com o motivo (A4). E ausência do
+   campo é **"não sei"**, nunca zero: o erro cai para o lado de gastar a chamada, porque o
+   outro lado é declarar vazio um fórum que ninguém leu (A4b).
+2. **Teto de 4 fóruns por invocação**, pelo mesmo motivo do teto de 10 de `ja_entreguei`:
+   latência e log da conta (Invariante 5). O corte fica com os ÚLTIMOS depois da ordenação,
+   e a ordenação põe o mural de avisos (`type: "news"`) na frente — então o que fica de
+   fora é fórum de discussão, e a saída diz isso.
+3. **Teto de 600 caracteres por tópico, declarado no texto.** Esta é diferente das outras
+   duas: aqui o corte remove **resposta**, não transporte. O catálogo (§3.6) registra o
+   fórum como a resposta que menos comprime do projeto inteiro, *"porque ali o payload é o
+   conteúdo"*. Descartar o corpo devolveria "o professor avisou alguma coisa" sem dizer o
+   quê, que não responde a pergunta; devolver inteiro faria um tópico longo comer a
+   resposta. O meio-termo só é honesto porque é dito, com a contagem e com onde está o
+   resto (A8).
+
+**Nome de terceiro não atravessa esta ferramenta.** O fórum é o único lugar deste projeto
+em que o payload é escrito por outras pessoas em quantidade: cada discussão chega com
+`userfullname`, `usermodifiedfullname`, `userid`, `usermodified` e **duas**
+`userpictureurl` — 338 B dos 1.610 B de uma discussão, 21%. Nenhum deles sai (§3.3, A6), e
+a omissão é **dita**: quem lê precisa saber que a autoria ficou de fora, senão atribui ao
+professor o que um colega escreveu. Dos anexos (263 B, 16%) não sai nem endereço
+(Invariante 3) nem nome de arquivo — quem responde "que arquivo tem aqui" é `material`.
+
+**A projeção, medida — e o payload é ESCRITO À MÃO.** A ressalva vem antes do número
+porque é ela que diz o que o número vale:
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 2 fóruns + os 4 tópicos de Avisos (**medido ao vivo em 14/09**) | 7.346 B | 2.390 B | **3,1×** |
+
+A primeira versão desta linha dizia 2,8× sobre payload escrito à mão, e a razão real ficou
+perto. Razão baixa aqui é o esperado e não defeito: em fórum o conteúdo **é** a resposta, e
+o que dá para descartar é pouco.
+
+Isto **não** é medição contra a conta do dono: a worktree não tem token e não devia obter
+um. A forma vem da declaração das duas funções no core 5.0 (`mod/forum/externallib.php`) e
+do §3.6 do catálogo; os `id` e os `name` dos dois fóruns são reais, o resto é inventado. O
+que a razão mede é **o que a nossa projeção descarta de uma resposta desta forma**, não o
+tamanho do que o e-Disciplinas devolve. Vale dizer que 35,7% sobrando cai em cima dos "35%
+sobrando após projeção" que o catálogo registra para fórum — mas isso é coincidência de
+ordem de grandeza entre um número medido e um payload que escrevemos, e não confirmação de
+coisa nenhuma. A19 é a única asserção deste arquivo que não depende da fixture.
+
+**O que fica sem verificação ao vivo**, e é o que a próxima sessão com token deve conferir
+primeiro: se `numdiscussions` de fato vem em `get_forums_by_courses` neste site (a
+ferramenta inteira economiza chamada com base nele, e trata a ausência como "não sei"); o
+que `perpage [opt=0]` e `page [opt=-1]` fazem quando omitidos — mandamos os dois
+explícitos pela mesma razão do `userid` de `notas`, mas ninguém mediu o default; se o
+`type` do fórum *Avisos* do e-Disciplinas é mesmo `news` (a ordenação depende disso, e
+degrada para ordem alfabética se não for); e se o corpo do post vem em HTML com as
+entidades que `texto.sem_html` traduz. Capturar isto exige higienização do §3.3 mais
+pesada que a das outras: é o payload com mais nome de terceiro do projeto.
+
+**Uma coisa que a saída diz e a API não:** *fórum vazio* e *disciplina sem fórum* são
+rótulos diferentes (`sem_topico` e `sem_forum`), porque no primeiro caso vale voltar
+amanhã e no segundo não. E a diferença entre `numdiscussions` e o que `perpage` trouxe
+vira contagem na saída — custa zero chamada, porque as duas grandezas já estão em mãos.
+
+**`texto.sem_html` nasceu aqui e foi morar em `texto.py`**, pelo mesmo motivo que
+`formatar_data` mudou de casa em 14/09: é o caminho de volta — escrever o que a pessoa lê —
+e a segunda semântica de "tirar a marcação" neste servidor seria a repetição literal do que
+aconteceu com o casamento por nome, que nasceu duas vezes com regras diferentes e custou o
+T83.
+
+---
+
+### 14/09/2026 — `o_que_mudou`: a janela é por dias, e a tradução do ponteiro é condicional
+
+**O C4 do ROADMAP, e a decisão que este commit pede para julgar é o DESENHO DA JANELA.**
+`core_course_get_updates_since` recebe `since`, um epoch, e a alternativa óbvia era expor
+esse epoch — "o que mudou desde 1788900000". Recusada, por três razões em ordem de peso:
+
+1. **Quem escolhe o valor é um modelo, e epoch calculado por modelo erra para o lado
+   invisível.** Um ano trocado põe `since` no futuro, o Moodle aceita e a resposta volta
+   vazia: *"nada mudou"*. É o falso vazio que o §9 de 28/08 registra como o modo de falha
+   mais caro deste projeto, e aqui ele é pior que em qualquer outra ferramenta — **ninguém
+   estranha "nada mudou"**. Uma lista de entregas vazia levanta suspeita; esta não. A
+   janela por dias não tem como produzir isso: `dias` é um inteiro pequeno, a aritmética é
+   do código, e `dias <= 0` é recusado **antes de qualquer chamada**, com erro legível que
+   diz por quê (M9).
+2. **Duas grafias da mesma ideia no mesmo servidor.** `o_que_vence` já fala `dias`, e as
+   duas ferramentas respondem a mesma noite. É o argumento do J18 uma camada acima: lá era
+   a grafia da data, aqui é a grafia da janela.
+3. **A janela por extenso cabe na resposta; um epoch, não.** A saída diz *"nos últimos 2
+   dias (desde sex 12/09 16:00)"*.
+
+**O que a decisão custa, e a cura:** não dá para dizer "desde a última vez que olhei". Por
+isso a saída imprime o instante exato que usou (M7) — é a informação que o carimbo daria de
+graça, escrita de um jeito que quem lê consegue encaixar com a próxima pergunta.
+
+**A segunda decisão: a tradução `cmid` → nome, e quando ela acontece.** O ponteiro devolve
+`cmid` e o tipo da mudança, e nada mais — *"o módulo 6372306 mudou os arquivos"* não é
+resposta. Quem sabe o nome é `core_course_get_contents`, que **já está na allowlist** desde
+31/08: nenhuma função nova foi necessária para isso. Mas as duas têm ordens de grandeza
+diferentes de custo — o catálogo (§3.3) mede o ponteiro em ~100 tokens para 7 dias e o
+`get_contents` em ~14.500 por disciplina.
+
+Então a cara só acontece **quando há mudança** (M3). O caso comum de "mudou alguma coisa?"
+é *não*, e nele a ferramenta custa uma chamada barata e pronto. Quando há, o custo do
+`get_contents` é de transporte e de latência e **não de contexto**: dele sobram dois campos
+por módulo, nome e `modname`. É a mesma economia que `projecao.py` existe para fazer, e é
+o que torna o preço aceitável.
+
+**Allowlist de 10 para 11, e pela primeira vez o P5 não pediu prefixo novo.**
+`core_course_get_updates_since` casa com `core_course_get_`, declarado desde 31/08 por
+causa de `get_contents`. Vale registrar que a família `core_course_` **tem** escrita —
+`core_course_set_favourite_courses`, que o T5 usa como exemplo justamente porque se declara
+`read` e grava, e `core_course_view_course` — e que nenhuma das duas casa com o prefixo do
+verbo. O teto funcionou sem ter de crescer, que é o comportamento que se espera dele.
+
+**Um parâmetro que este projeto NÃO manda, ao contrário das duas ferramentas anteriores.**
+`filter` é `[opt=[]]`, e aqui o default **não é incógnita**: vazio significa "todos os
+tipos", que é o documentado e é o que queremos. Nas irmãs (`userid [opt=0]` em `notas`,
+`perpage [opt=0]` em `avisos`) o explícito entrou porque o default era desconhecido;
+mandar uma lista aqui seria outra coisa — seria decidir por quem pergunta o que conta como
+mudança. M17 trava a ausência, para que a decisão não seja revertida por zelo.
+
+**A projeção, medida — e o payload do ponteiro é ESCRITO À MÃO:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 4 módulos mexidos, janela de 14 dias (**medido ao vivo em 14/09**) | 107.886 B | 922 B | **117,0×** |
+
+A ressalva é diferente da de `avisos`, e vale separar as duas metades: o
+`core_course_get_contents` desta conta é **fixture real** (PTC3314, 12/09, 107.113 B) e
+responde por 99,3% do cru — quem domina a razão é ele. O `updates_since` (773 B ao vivo) é
+**escrito à mão** a partir da forma documentada do core 5.0, com os `cmid` reais da mesma
+fixture. Ou seja: a razão mede sobretudo o que descartamos da resposta real e cara, que é a
+parte que importa aqui; o que fica inventado é a forma do ponteiro, que é pequeno por
+natureza.
+
+**Duas coisas que a saída diz e a API não:** `cmid` que a tradução não acha **não some** —
+`get_contents` esconde módulo que o aluno não pode ver, e apagar a linha faria a resposta
+jurar que nada mais mudou (M5); e a resposta diz, sempre, que ela é **ponteiro e não
+conteúdo**, apontando `material`, `avisos` e `o_que_vence` por nome. Sem essa frase um
+modelo lê "arquivo novo ou trocado" como se soubesse qual arquivo é.
+
+**O que fica sem verificação ao vivo:** se `instances` vem mesmo com `contextlevel`
+`module` e `course` como o core declara (M14 depende disso); quais `name` de mudança o
+e-Disciplinas usa de fato — a tradução cobre dezesseis e deixa o desconhecido sair cru,
+então o pior caso medido é vocabulário estranho e nunca rótulo inventado (M6); e se
+`since` no futuro devolve vazio em vez de erro, que é a hipótese por trás de recusar
+`dias <= 0`. As três são baratas de fechar: uma chamada cada, e a primeira já sai da mesma
+execução que capturar a fixture.
+
+---
+
+### 14/09/2026 — as quatro perguntas em aberto do P2, fechadas ao vivo
+
+Rodado contra a conta do dono, depois que `avisos` e `o_que_mudou` nasceram numa worktree
+sem token. **As quatro suposições que o desenho fez se confirmaram**, o que é registro tão
+útil quanto uma teria sido refutada.
+
+1. **`numdiscussions` chega**, e é o que sustenta a economia de chamada: em PTC3314 o
+   *Avisos* traz `4` e o *Discussão de Exercícios* traz `0`. Pular o fórum vazio economiza
+   uma chamada sem inventar ausência.
+2. **O fórum de avisos é `type: "news"`**, confirmando a ordenação que a ferramenta usa.
+3. **`since` no futuro devolve vazio com `warning`, não erro** — `instances: []`, 180 B,
+   um aviso. Este é o dado que valida a decisão de janela em DIAS e não carimbo: epoch
+   calculado por um modelo, errado para frente, produziria "nada mudou" e **ninguém
+   estranharia**. É o falso vazio do §9 de 28/08, e aqui ele é invisível por construção.
+4. **Os seis `name` de mudança** que o e-Disciplinas usa numa janela de 14 dias são
+   `gradeitems`, `submissions`, `grades`, `attempts`, `configuration` e `contentfiles` — os
+   seis que a ferramenta já traduzia. `contextlevel` vem só como `module`.
+
+As duas razões de projeção foram remedidas e estão corrigidas acima. A de `o_que_mudou`
+caiu de 134,5× para 117,0×, e a de `avisos` subiu de 2,8× para 3,1×.
+
+**As fixtures da suíte seguem escritas à mão**, e isso não mudou: o que foi medido aqui
+foram os payloads reais, não as fixtures. Trocá-las por captura higienizada continua no
+backlog, e a de fórum é a mais cara do projeto — 21% dos bytes de uma discussão são nome de
+terceiro.
+
+---
+
+### 14/09/2026 — `disciplinas`: a ferramenta mais barata do projeto, e o que fazer com 74 matrículas
+
+**Ela não estava no ROADMAP, e estava no Anexo A — que é a lista para ser confrontada, não
+seguida.** `minhas_disciplinas` é o primeiro nome daquela tabela de oito derivada da API, e
+entra aqui pela porta do §5 e não pela dela: a pergunta existe, é a primeira que alguém faz
+("quais matérias eu tenho?"), e até hoje o único jeito de respondê-la era **provocar um
+erro**. Pedir `material` de uma sigla inexistente faz o Invariante 7 de `resolver` cuspir a
+lista inteira no motivo. Funciona, e é constrangedor.
+
+**Nenhuma função nova.** `disciplinas.carregar` já busca `core_enrol_get_users_courses` e
+já a cacheia por um semestre para traduzir sigla em `courseid`. A allowlist fica em 11, o
+T7 não se move, o P5 não pede prefixo, e o D4 só ganhou a linha da ferramenta nova —
+apontando para as duas funções que todas as outras já exigiam. DI1 é a asserção que trava
+isso pelo lado das funções ENVIADAS, e DI2 registra o que ela custa na segunda pergunta:
+zero chamadas.
+
+**A decisão que este commit pede para julgar: o que fazer com as matrículas antigas.** A
+conta tem dezenas, e a minoria é do semestre corrente — 74 matrículas com 10 em andamento
+na fixture real de 31/08, e 45 matrículas com 7 notas lançadas na medição ao vivo de 14/09.
+Os dois números discordam entre si (a fixture é de agosto e pode ter sido capturada com
+outro filtro; fica para a verificação ao vivo) e **nenhum dos dois muda o desenho**: em
+qualquer um deles a maioria é de semestre passado, e despejar tudo com nome e período
+enterra a resposta certa.
+
+Duas saídas foram consideradas e recusadas:
+
+- **Filtrar as antigas fora.** É o corte mais limpo de ler e o único que quebra o
+  Invariante 7: a matrícula sumiria da resposta, e perguntar "e PMT3100?" devolveria "não
+  achei", indistinguível de "você não cursou".
+- **Paginar com teto declarado.** Teto é a ferramenta certa quando o custo cresce com o
+  tamanho — `ja_entreguei` paga uma chamada por entrega. Aqui a lista já está em memória e
+  cacheada: paginar cobraria uma segunda pergunta por um dado que já foi buscado.
+
+**O que ficou: corte de DETALHE, nunca de EXISTÊNCIA.** As em andamento saem completas
+(sigla, rótulo, nome, período); as encerradas saem só com o rótulo, agrupadas pelo ano em
+que terminaram; o corte é declarado com a contagem e com o parâmetro que o desfaz
+(`todas`), e a frase diz o que ficou de fora — *o nome e o período*, não a matrícula. DI4
+varre as 74 e reprova se qualquer rótulo sumir de qualquer modo.
+
+**Quatro desfechos de situação, e os dois extras vieram da fixture real.** `enddate: 0`
+existe: duas das 74 matrículas não declaram fim, e chamá-las de encerradas seria inventar
+um fato sobre a vida acadêmica de quem pergunta (DI7). Matrícula do semestre que vem
+também não é "em andamento" nem "encerrada" (DI15). Os dois casos saem em bloco próprio,
+com o motivo.
+
+**A grafia da data aqui NÃO é a de `texto.formatar_data`, e é de propósito.** J18 pede uma
+grafia só para a mesma coisa, e prazo e vigência não são a mesma coisa: `formatar_data`
+omite o ano porque prazo é de agora, e uma lista que cobre sete anos de matrícula sem o ano
+não localiza nada — PMT3100 de 2023 e PMT3100 de 2024 ficariam idênticas (DI9).
+
+**A projeção, medida — e o cru aqui é FIXTURE REAL, ao contrário das três irmãs:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| 47 matrículas, modo padrão (**medido ao vivo em 14/09**) | 71.805 B | 2.433 B | **29,5×** |
+| 74 matrículas da fixture de 31/08, modo padrão | 98.171 B | 3.075 B | 31,9× |
+| as mesmas 74 com `todas` | 98.171 B | 8.687 B | 11,3× |
+
+O que domina o cru é `summary` (a ementa repetida em cada matrícula), `courseimage`,
+`overviewfiles` e `progress`: 29 chaves por disciplina viram 5. `courseimage` é ainda uma
+URL de `pluginfile.php`, a família que o Invariante 3 mantém fora de toda resposta deste
+servidor (DI13). O `courseid` também não sai (DI14): quem lê responde a próxima pergunta
+com a **sigla**, e o número interno só existiria na saída para ser copiado para um lugar
+que não o aceita.
+
+**Uma coisa que a saída diz e a API não:** "em andamento" aqui é a data que o
+e-Disciplinas declara para o espaço da disciplina, e **não** a matrícula oficial.
+Trancamento e cancelamento não chegam até lá, e disciplina que o professor não datou cai no
+bloco sem período. Sem essa frase, a lista lê como se fosse o JupiterWeb (DI8).
+
+**A divergência 74 × 47 × 45 foi resolvida ao vivo em 14/09, e não era bug.** Três números,
+três causas:
+
+- **74** é a fixture de 31/08, e ela está **velha**. Comparando os `id`, 40 matrículas
+  saíram e 13 entraram em duas semanas. Os ids da fixture são **reais**: `id` não está em
+  nenhuma lista do `scripts/higienizar.py`, e o `142036` de PTC3314 aparece lá igual ao
+  que a conta devolve hoje.
+- **47** é o que `core_enrol_get_users_courses` devolve agora.
+- **45** é o que `gradereport_overview_get_course_grades` devolveu na mesma sessão. As
+  duas funções não cobrem o mesmo conjunto, e quem for usar uma no lugar da outra precisa
+  saber disso.
+
+Consequência para quem ler as tabelas de projeção deste §9: **razão calculada sobre a
+fixture de 31/08 superestima**, porque a fixture é 57% maior que a conta de hoje. A linha
+medida ao vivo é a que vale.
+
+**O que fica sem verificação ao vivo:** se `enddate: 0`
+continua aparecendo na conta de hoje; e se alguma matrícula do semestre corrente fica de
+fora do bloco "em andamento" por `enddate` mal declarado pelo professor — que é o único
+modo de esta ferramenta errar calada, e o mais barato de checar, porque a resposta certa
+o dono sabe de cor.
+
+---
+
+### 14/09/2026 — `atrasadas`: a primeira resposta que acusa alguém, e o que ela não pode dizer
+
+Este é o par invertido de `o_que_vence`: ela olha para a frente, esta olha para trás **e**
+cruza com o estado da entrega. As duas funções já estavam na allowlist desde `ja_entreguei`
+(12 e 14/09) — **nenhuma função nova**, allowlist parada em 11, T7/P5/D4 sem mexer além da
+linha da ferramenta nova em `FUNCOES_POR_FERRAMENTA`, e AT18 travando isso pelo lado do
+que é chamado.
+
+**A decisão que este commit pede para julgar é o TOM, e ela é técnica.** A saída diz que
+algo não foi entregue, e o e-Disciplinas conhece esse fato pela metade: ele sabe o que foi
+REGISTRADO nele. Entrega no papel, por e-mail, num sistema do laboratório, ou que o
+professor recebeu e nunca lançou, é invisível daqui. Cinco regras saíram disso, e as cinco
+têm teste:
+
+1. **Nunca "você não entregou"** (AT7). A frase é sempre sobre o registro — *"o
+   e-Disciplinas não registra envio seu"* —, e a resposta inteira, inclusive a que não
+   acusa ninguém, carrega a ressalva e manda confirmar. Não é diplomacia: uma frase é
+   afirmação sobre a pessoa, a outra é sobre o sistema, e só a segunda é verificável daqui.
+2. **Nota lançada sem envio registrado NÃO é falta** (AT8). `gradingstatus: "graded"` sem
+   `submission` é, quase sempre, entrega feita fora do Moodle e nota posta à mão pelo
+   professor. É o único desmentido que a própria API oferece, e ele é usado: essas saem em
+   bloco próprio, com a leitura explícita, e não entram na conta do que falta.
+3. **Prorrogação individual ainda válida não é atraso** (AT10) — o J8 um passo adiante.
+4. **`nosubmissions` nunca vira acusação** (AT5): a prova presencial que o professor criou
+   só para ter data não tem como ser entregue pelo site. Aparece, com o motivo, sem gastar
+   chamada.
+5. **Warning da API vira aviso** (AT13). A fixture REAL traz dois `warnings` de "sem
+   direito de acesso": dizer "nada em atraso" sobre uma lista que o próprio Moodle avisou
+   estar incompleta é o falso vazio do Invariante 7 no lugar em que ele custa mais caro —
+   é esta resposta que faz alguém parar de procurar.
+
+**A segunda decisão é o escopo.** `disciplina` é OPCIONAL, ao contrário de `ja_entreguei`:
+"o que eu devo?" é pergunta de todas as matérias de uma vez, e obrigar a sigla faria repetir
+a pergunta dez vezes — que é exatamente o que `ja_entreguei` já faz bem. Sem sigla, o escopo
+são as disciplinas **em andamento**, que `disciplinas.situacao_de` (nascida hoje) responde
+sem gastar chamada, porque a lista está cacheada. Escopo vazio não é opção: sem `courseids`
+a função devolve as 74 matrículas, 1 MB, ~251k tokens (§9, 28/08).
+
+**Dois tetos, e eles são de naturezas diferentes:**
+
+- `TETO_CONSULTAS` (10, importado de `ja_entreguei`) é de LATÊNCIA e de log da conta: uma
+  ida por entrega vencida. O corte fica com as de prazo mais recente — o que venceu ontem
+  ainda dá para correr atrás — e é declarado com a contagem e a cura (AT11).
+- `TETO_DISCIPLINAS` (10) é de BYTES: a chamada é uma só, mas o payload cresce com o número
+  de `courseid`. O que fica de fora é **nomeado**, não contado (AT12).
+
+**A projeção, e as duas metades do cru têm procedências diferentes:**
+
+| | cru | texto devolvido | razão |
+|---|---|---|---|
+| PTC3314, uma entrega vencida com rascunho salvo | 10.956 B | 1.250 B | **8,8×** |
+
+Dos 10.956 B, **8.571 B são fixture REAL** (`assign_ptc3314.json`, 12/09, a mesma medida
+como JSON compacto que o §9 de `ja_entreguei` usa; 7.975 B em disco) e **2.385 B são
+escritos à mão** (uma resposta de `mod_assign_get_submission_status`, forma documentada do
+core 5.0, ressalva inteira no `conftest`). A razão é menor que a das irmãs porque o cru
+aqui é pequeno: a projeção descarta os mesmos dois campos gordos de `ja_entreguei` — o
+texto que o aluno entregou e o enunciado em HTML — e o que sobra já é quase todo resposta.
+
+O número de dez disciplinas — ~86 kB de payload cru — é **aritmética sobre uma disciplina
+medida**, e não medição: a única captura desta função que existe cobre um curso. Está dito
+assim no módulo e no teste.
+
+**Dois defeitos de `ja_entreguei` apareceram ao reusar a projeção dela, e os dois são do
+mesmo ramo — o retorno rápido de "nada enviado":**
+
+- ele descartava `gradingstatus`, que é justamente o campo do item 2 acima;
+- ele descartava `extensionduedate`, e por isso `ja_entreguei` imprimia **"PRAZO VENCIDO"**
+  para quem tinha prorrogação e ainda não tinha enviado. Nenhum teste de lá via, porque
+  todos os casos de prorrogação da suíte tinham envio.
+
+Os dois foram corrigidos na projeção compartilhada, que é o motivo de ela ser
+compartilhada. Junto vieram `Entrega.courseid` (a resposta cobre várias disciplinas e "EP1"
+sem a matéria não é resposta) e o predicado público `envio_registrado` — `RASCUNHO` e
+`REABERTA` parecem entrega na tela do Moodle e não são, e uma segunda cópia dessa regra é
+uma cópia que alguém atualiza sozinha.
+
+**O que fica sem verificação ao vivo:** se `warnings` de `get_assignments` aparece mesmo
+quando há entrega escondida (a fixture real tem dois, mas não se sabe o que eles escondem);
+se `mod_assign_get_assignments` com dez `courseid` responde na mesma forma e em quanto
+tempo — é a única suposição estrutural desta ferramenta, e a mais barata de checar; e o par
+"nota lançada sem envio registrado", que é plausível pela forma do core e nunca foi visto
+neste site. As três saem de uma execução só, junto com a captura que troca a fixture de
+status por uma de verdade.
+
+---
