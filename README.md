@@ -262,8 +262,10 @@ endereço.
 Você precisa desta seção em dois casos: se quiser usar o e-Disciplinas, porque o script
 que busca a chave só existe aqui, ou se for mexer no código.
 
-O repositório é público para ler, baixar e usar. Mudanças necessitam de aprovação. Sugestão é bem-vinda pelo
-caminho normal do GitHub: abra uma issue, ou um fork com pull request.
+O repositório é público para ler, baixar e usar, sob licença MIT: você pode usar, modificar
+e redistribuir, desde que mantenha o aviso de autoria. O texto completo está no arquivo
+`LICENSE`. Mudanças necessitam de aprovação. Sugestão é bem-vinda pelo caminho normal do
+GitHub: abra uma issue, ou um fork com pull request.
 
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
