@@ -1,0 +1,280 @@
+"""C1-C7: o CI roda a camada offline, e só ela, sem credencial nenhuma.
+
+O `scripts/gate.sh` já checa tudo o que precisa ser checado antes de um commit.
+O defeito nunca foi o que ele checa — é que ele só roda quando alguém lembra.
+Uma action fecha essa porta, e abre duas outras que estes testes trancam:
+
+1. **Ligar a camada `live` no CI.** Ela fala com a USP de verdade, com o token
+   pessoal do dono, e cada chamada fica no log da conta. Um CI que depende de a
+   USP estar de pé reprova uma PR por motivo que não é da PR — e o dado da
+   `live` não é do CI para gastar. Por isso ela fica atrás de uma variável de
+   ambiente, e por isso C3 reprova qualquer workflow que ligue essa variável.
+2. **Levar credencial para dentro do runner.** Credencial pessoal não sai da
+   máquina do dono, nem "só pra testar", nem guardada no cofre do GitHub. C4
+   reprova o NOME do token do Moodle, o cofre de segredos do próprio GitHub e
+   qualquer valor com forma de chave — e reprova no arquivo inteiro, comentário
+   incluído: um segredo citado "só para explicar" continua sendo um segredo
+   escrito num arquivo rastreado.
+
+C3 e C4 seriam verdes num diretório `.github/` vazio, que é o falso-verde que
+este repositório persegue desde o primeiro gate. C1, C2, C5 e C6 são o
+contrapeso: existe workflow, ele dispara em push e em pull request, ele de fato
+instala o pacote e roda a camada offline, e ele cria o `.env` antes disso.
+
+O `.env` de C6 não é detalhe de implementação: sem ele a suíte offline reprova
+com `RUCARD_HASH não está no ambiente nem no .env`, que é consequência e não
+causa. O `docs/superpowers/specs/2026-09-10-gate-em-clone-limpo-design.md`
+mediu isso num clone limpo e a cura cabe numa linha — `cp .env.example .env` —
+porque a hash do RUCard é a chave pública embutida no app oficial, não
+credencial de ninguém. É o mesmo passo que o README manda dar, e é por isso que
+o CI pode rodar o gate inteiro em vez de só o pytest.
+
+Sem marcador, como o `test_documentacao.py`: não são allowlist nem forma contra
+fixture. Custam um `read_text` por arquivo e entram no gate junto com o resto.
+"""
+from __future__ import annotations
+
+import pathlib
+import re
+
+import pytest
+
+RAIZ = pathlib.Path(__file__).resolve().parents[1]
+WORKFLOWS = RAIZ / ".github" / "workflows"
+
+# A variável que liga a camada que fala com a USP. Escrita à mão aqui, e não
+# importada de `usp_mcp`, porque é justamente o nome que não pode aparecer ligado
+# no YAML: derivar do código faria o teste concordar com uma renomeação em vez de
+# reprovar por ela.
+VARIAVEL_LIVE = "USP_MCP_LIVE"
+
+# Valores que NÃO ligam a camada: vazio (a forma que o próprio gate usa para
+# limpar a variável antes do pytest) e zero.
+_DESLIGADO = ("", '""', "''", "0", '"0"', "'0'")
+
+# Nome de credencial e forma de credencial, nesta ordem. `secrets.` pega o cofre
+# do GitHub inteiro, inclusive o `GITHUB_TOKEN` automático: este CI lê código
+# público e roda teste offline, e não tem o que fazer com nenhum deles.
+PALAVRAS_DE_SEGREDO = ("MOODLE_TOKEN", "wstoken", "secrets.")
+
+# Trinta e dois hexadecimais seguidos: a forma do token do web service e a da
+# hash do RUCard. Pega valor colado no YAML mesmo com nome de variável inventado
+# na hora, que é o vazamento que uma lista de nomes nunca alcança.
+FORMA_DE_CHAVE = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{32}(?![0-9a-fA-F])")
+
+# Comentário de YAML: `#` no começo da linha ou depois de espaço, até o fim.
+_COMENTARIO = re.compile(r"(?:^|(?<=\s))#.*$")
+
+# O comando que cria o `.env`, idêntico ao que o README manda dar e ao que a
+# mensagem de falha do gate cita. Três cópias da mesma string em três lugares é
+# de propósito: é ela que amarra o CI ao passo do README.
+CURA = "cp .env.example .env"
+
+# Como se roda a camada offline. Qualquer um dos dois serve para C5/C6: o teste
+# tranca que ela ROLE, não por qual porta.
+COMANDOS_OFFLINE = ("scripts/gate.sh", "pytest")
+
+
+def workflows() -> list[pathlib.Path]:
+    """Todo arquivo de workflow, nas duas extensões que o GitHub aceita."""
+    if not WORKFLOWS.is_dir():
+        return []
+    return sorted(p for p in WORKFLOWS.iterdir() if p.suffix in (".yml", ".yaml"))
+
+
+def sem_comentarios(texto: str) -> str:
+    """O YAML sem os comentários — o que a action de fato executa.
+
+    C3 olha por aqui porque comentário que EXPLICA a variável da camada live é o
+    que se quer no arquivo, e não o que se quer proibir. C4 olha o texto cru, e
+    a diferença é deliberada: explicar não é vazar, mas um segredo citado em
+    comentário está tão escrito quanto um em `env:`.
+    """
+    return "\n".join(_COMENTARIO.sub("", linha) for linha in texto.splitlines())
+
+
+def liga_a_camada_live(texto: str) -> list[tuple[int, str]]:
+    """(linha, trecho) de cada atribuição que LIGA a camada live."""
+    achados = []
+    padrao = re.compile(rf"{VARIAVEL_LIVE}\s*[:=]\s*(\S*)")
+    for numero, linha in enumerate(sem_comentarios(texto).splitlines(), 1):
+        for valor in padrao.findall(linha):
+            if valor not in _DESLIGADO:
+                achados.append((numero, linha.strip()))
+    return achados
+
+
+def segredos_em(texto: str) -> list[tuple[int, str]]:
+    """(linha, o que apareceu) de cada segredo — por nome ou por forma."""
+    achados = []
+    for numero, linha in enumerate(texto.splitlines(), 1):
+        for palavra in PALAVRAS_DE_SEGREDO:
+            if palavra in linha:
+                achados.append((numero, palavra))
+        if FORMA_DE_CHAVE.search(linha):
+            achados.append((numero, "valor com forma de chave (32 hex)"))
+    return achados
+
+
+def _indice(texto: str, agulha: str) -> int:
+    """Posição da primeira ocorrência, ou -1. Ordem, como o D1/D3 fazem."""
+    return texto.find(agulha)
+
+
+def test_c1_existe_workflow_de_ci():
+    """C1 — o item de roadmap é "não tem CI"; começa por aqui."""
+    assert workflows(), (
+        "não há workflow nenhum em .github/workflows/. O gate é melhor que o CI "
+        "dos comparáveis e mesmo assim só roda quando alguém lembra — crie um "
+        "arquivo .yml lá que rode a camada offline em push e em pull request."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c2_o_ci_dispara_em_push_e_em_pull_request(arquivo):
+    """C2 — um workflow que só roda à mão tem o mesmo defeito do gate."""
+    texto = sem_comentarios((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+    cabeca = texto.split("jobs:")[0]
+    faltando = [g for g in ("push:", "pull_request:") if g not in cabeca]
+    assert not faltando, (
+        f"{arquivo} não dispara em {', '.join(faltando)}. Declare os dois no "
+        "bloco `on:`: rodar só em push deixa a PR de um fork sem checagem, e "
+        "rodar só em pull request deixa a branch principal sem nenhuma."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c3_nenhum_workflow_liga_a_camada_live(arquivo):
+    """C3 — o erro que o item de roadmap nomeia, travado."""
+    achados = liga_a_camada_live((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+    assert not achados, (
+        f"{arquivo} liga a camada que fala com a USP de verdade:\n  "
+        + "\n  ".join(f"linha {l}: {t}" for l, t in achados)
+        + f"\nTire a atribuição de {VARIAVEL_LIVE} do workflow. Essa camada "
+        "precisa de rede da USP e do token pessoal do dono, e cada chamada fica "
+        "no log da conta dele: no CI ela reprovaria a PR por um motivo que não "
+        "é da PR. O canário da live se roda à mão, na máquina do dono."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c4_nenhum_workflow_menciona_segredo(arquivo):
+    """C4 — nem o nome, nem o cofre do GitHub, nem um valor com forma de chave."""
+    achados = segredos_em((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+    assert not achados, (
+        f"{arquivo} traz credencial para dentro do runner:\n  "
+        + "\n  ".join(f"linha {l}: {t}" for l, t in achados)
+        + "\nTire do arquivo. Este CI roda a camada offline, que não autentica "
+        "em nada: não precisa de cofre, de token do Moodle nem de chave "
+        "colada. Credencial pessoal não sai da máquina do dono, e o que o "
+        "workflow precisa do ambiente sai do `.env.example`, que é público e "
+        "já está no repositório."
+    )
+
+
+def test_c5_o_ci_de_fato_instala_e_roda_a_camada_offline():
+    """C5 — anti-vácuo: C3 e C4 passariam num workflow que não roda nada.
+
+    É a mesma trava do U2: uma varredura que não acha nada fica verde sem ter
+    verificado nada, e aqui o "nada" seria um CI decorativo.
+    """
+    textos = {p.name: sem_comentarios(p.read_text(encoding="utf-8")) for p in workflows()}
+
+    rodam = {
+        nome: [c for c in COMANDOS_OFFLINE if c in texto] for nome, texto in textos.items()
+    }
+    assert any(rodam.values()), (
+        "nenhum workflow roda a camada offline. Achei "
+        f"{list(textos) or 'nenhum arquivo'} e em nenhum deles aparece "
+        f"{' nem '.join(COMANDOS_OFFLINE)}. Um CI que não roda a suíte é "
+        "decoração: ele fica verde sem ter checado nada."
+    )
+
+    instalam = [nome for nome, texto in textos.items() if "pip install -e" in texto]
+    assert instalam, (
+        "nenhum workflow instala o pacote com `pip install -e \".[dev]\"`. Sem "
+        "a instalação editável não existem os três comandos em .venv/bin/ que "
+        "o tests/test_pacote.py exige, e ele passa a PULAR — o CI ficaria verde "
+        "justamente sobre o que o pacote promete."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c6_o_ci_cria_o_env_antes_de_rodar_a_suite(arquivo):
+    """C6 — o clone limpo do CI é o mesmo clone limpo que o spec mediu.
+
+    O runner clona o repositório do zero, e o `.env` é gitignorado: ele não vem
+    junto, exatamente como no clone de quem acabou de chegar. Sem ele a suíte
+    reprova falando de `RUCARD_HASH`, que é o sintoma registrado no spec de
+    10/09/2026. A cura é a mesma linha do README, e vem antes.
+    """
+    texto = sem_comentarios((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+
+    offline = [_indice(texto, c) for c in COMANDOS_OFFLINE if _indice(texto, c) != -1]
+    if not offline:
+        pytest.skip(f"{arquivo} não roda a camada offline — C5 cobre o conjunto")
+
+    env = _indice(texto, CURA)
+    assert env != -1, (
+        f"{arquivo} roda a suíte sem criar o `.env`. O runner clona limpo e o "
+        f"`.env` é gitignorado, então acrescente `{CURA}` antes: sem isso a "
+        "suíte reprova falando de RUCARD_HASH, que é consequência e não causa. "
+        "A hash do RUCard já vem preenchida no exemplo e é pública — o token "
+        "pessoal continua vazio, e a camada offline não o usa."
+    )
+    assert env < min(offline), (
+        f"{arquivo} cria o `.env` DEPOIS de rodar a suíte. Mova `{CURA}` para "
+        "antes: na ordem atual a suíte roda sem ambiente e reprova sem ter "
+        "chegado ao que a PR mudou."
+    )
+
+
+def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
+    """C7 — sabotagem controlada das duas varreduras.
+
+    Sem isto, um regex quebrado deixaria C3 e C4 verdes em cima de um workflow
+    que liga a camada live e carrega o cofre de segredos junto — os dois casos
+    exatos para os quais estes testes foram escritos.
+    """
+    sujo = (
+        "env:\n"
+        f"  {VARIAVEL_LIVE}: 1\n"
+        f"  TOKEN: ${{{{ secrets.MOODLE_TOKEN }}}}\n"
+        # Hexadecimal inventado, e não a hash real do RUCard: o valor real está
+        # no `.env`, e a checagem 1 do gate reprova qualquer arquivo rastreado
+        # que o contenha — inclusive um teste que o usasse como exemplo.
+        "  HASH: 0123456789abcdef0123456789abcdef\n"
+        f"# comentário explicando por que {VARIAVEL_LIVE}=1 não entra aqui\n"
+        "run: |\n"
+        f"  {VARIAVEL_LIVE}=1 pytest -m live\n"
+    )
+    arquivo = tmp_path / "sujo.yml"
+    arquivo.write_text(sujo, encoding="utf-8")
+    texto = arquivo.read_text(encoding="utf-8")
+
+    ligadas = [linha for linha, _ in liga_a_camada_live(texto)]
+    assert ligadas == [2, 7], (
+        "a varredura da camada live não pegou as duas formas (`VAR: 1` no bloco "
+        f"`env:` e `VAR=1` na linha de comando), ou contou o comentário: {ligadas}"
+    )
+
+    achados = segredos_em(texto)
+    assert (3, "MOODLE_TOKEN") in achados, "não pegou o nome do token"
+    assert (3, "secrets.") in achados, "não pegou o cofre do GitHub"
+    assert (4, "valor com forma de chave (32 hex)") in achados, (
+        "não pegou um valor de 32 hexadecimais colado no YAML"
+    )
+
+    # E o contrário: um workflow limpo não pode acusar nada, senão a regra vira
+    # ruído e a próxima pessoa a desliga em vez de ler.
+    limpo = (
+        "on:\n  push:\n  pull_request:\n"
+        "jobs:\n  offline:\n    steps:\n"
+        f"      - run: {CURA}\n"
+        '      - run: pip install -e ".[dev]"\n'
+        "      - run: ./scripts/gate.sh\n"
+        f"# a camada que fala com a USP fica fora: ela exige {VARIAVEL_LIVE} e "
+        "credencial pessoal\n"
+    )
+    assert liga_a_camada_live(limpo) == [], "acusou um comentário que só explica"
+    assert segredos_em(limpo) == [], "acusou um workflow que não tem segredo nenhum"
