@@ -118,6 +118,27 @@ assistido tem que acontecer com acesso à rede dele, ou contra fixtures.
 - `core_calendar_get_calendar_export_token` devolve um hash que compõe uma URL de feed iCal
   (`/calendar/export_execute.php?userid=…&authtoken=…`). A URL **é a credencial** — quem tem
   o link lê o calendário.
+- **Item de nota de `gradereport_user_get_grade_items`: 26 chaves, e nenhuma diz de quanto
+  era a nota.** Medido em 15/09/2026 sobre `fixtures/moodle/grade_items_ptc3314.json`
+  (captura real e higienizada, PTC3314, 20 itens): 26 chaves distintas, 23 presentes nos 20
+  itens, `cmid` em 17 e o par `weightraw`/`weightformatted` em 10. As chaves, na íntegra:
+  `id`, `itemname`, `itemtype`, `itemmodule`, `iteminstance`, `itemnumber`, `idnumber`,
+  `categoryid`, `outcomeid`, `scaleid`, `locked`, `cmid`, `graderaw`, `gradedatesubmitted`,
+  `gradedategraded`, `gradehiddenbydate`, `gradeneedsupdate`, `gradeishidden`,
+  `gradeislocked`, `gradeisoverridden`, `gradeformatted`, `percentageformatted`, `feedback`,
+  `feedbackformat`, `weightraw`, `weightformatted`. **`grademax` não vem em item nenhum**, e
+  nenhuma outra carrega o máximo com outro nome: `graderaw`, `gradeformatted` e
+  `percentageformatted` dizem *quanto se tirou*. **`averageformatted` também não existe**,
+  aqui nem na visão geral. Os dois nomes circularam escritos no §9 e em docstring, vindos de
+  resposta imaginada e não de captura (§9, 14/09 e 15/09). Quem for prometer "8,50 de 10,00"
+  não tem de onde tirar o 10,00.
+- **Quem manda `warnings` e quem não manda.** `mod_assign_get_assignments`,
+  `mod_assign_get_submission_status`, `gradereport_overview_get_course_grades` e
+  `gradereport_user_get_grade_items` respondem com envelope e trazem `warnings` na raiz.
+  `core_enrol_get_users_courses` **não**: ela devolve uma LISTA crua, sem envelope, e não há
+  campo de aviso para ler ali. Conferido contra as capturas em 15/09/2026 — importa porque
+  ferramenta que engole o campo faz resposta incompleta parecer completa (Invariante 7), e
+  procurar o campo onde ele não existe é guarda escrita para caso inexistente.
 
 ### 1.4 Ainda não verificado, apenas recordado — confirmar antes de usar
 
@@ -2792,6 +2813,13 @@ que é `graderaw/grademax` já calculado.
 parágrafo dizia descartar **não existem lá**; eles vieram da resposta escrita à mão. O
 descarte real acontece na outra função, a de disciplina, cujos itens têm 24 campos.
 
+**Segunda correção, em 15/09, pela captura da função de disciplina** (ver a entrada de
+15/09 sobre o campo `maximo`): os "24 campos" acima são **26 chaves distintas**, 23 delas
+presentes nos 20 itens. E `percentageformatted` **não** é `graderaw/grademax` calculado,
+porque `grademax` não chega deste site: é a mesma nota em percentual. A frase acima é o
+último resíduo do dicionário imaginado que esta própria entrada corrigiu para a visão
+geral. A forma medida está no §1.3.
+
 **Duas coisas que a saída diz e a API não:** nota **ocultada pelo professor**
 (`gradeishidden`) não vira "sem nota lançada", porque "ainda não corrigiram" e "corrigiram
 e não liberaram" têm curas diferentes; e as matrículas sem nota são **contadas** em vez de
@@ -3318,5 +3346,407 @@ tempo — é a única suposição estrutural desta ferramenta, e a mais barata d
 "nota lançada sem envio registrado", que é plausível pela forma do core e nunca foi visto
 neste site. As três saem de uma execução só, junto com a captura que troca a fixture de
 status por uma de verdade.
+
+---
+
+### 15/09/2026 — o §2.2 foi reaberto e respondido: sim parcial para entrega, não para questionário
+
+**A pergunta que o B3 do ROADMAP devolveu ao dono foi feita e respondida, e a data importa
+tanto quanto a resposta.** Até hoje a lista de bloqueio permanente dizia *o quê* e não
+registrava que já havia pedido para reabri-la. Agora registra: em 15/09/2026 a resposta foi
+**sim parcial**. `mod_assign_save_submission` e `mod_assign_submit_for_grading` passam a ser
+chamáveis sob condição; `mod_quiz_start_attempt`, `mod_quiz_save_attempt` e
+`mod_quiz_process_attempt` continuam recusadas.
+
+**Isto é spec e não código, e a diferença é verificável.** O que entrou foi
+`docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`, 225 linhas, zero de
+produção. O `BLOQUEIO_PERMANENTE` de `usp_mcp/moodle/politica.py` **continua com 40 nomes
+hoje**, as duas de assign entre eles, e só cai para 38 quando a implementação entrar. Quem
+ler o §2.2 agora lê o estado verdadeiro do código. O próprio §2.2 já antecipava a forma
+desta decisão, na frase sobre as quatro de `mod_assign`: *"Se algum dia entrarem, entram
+como comando dedicado com confirmação humana, nunca como efeito colateral."* O spec é essa
+frase detalhada, não uma virada contra ela.
+
+**Três medições mudaram o desenho, e as três dizem a mesma coisa por caminhos diferentes:
+não existe prova de humano do lado do servidor.**
+
+1. `Context.elicit` existe no `mcp 2.2.0`, e a docstring do próprio SDK avisa que um cliente
+   que seja agente pode responder à elicitação sozinho, **dentro da especificação**. Então
+   elicitação entra como forma de apresentar a pergunta, nunca como a garantia.
+2. Tudo que o servidor diz ao modelo, o modelo pode repetir. Um código de confirmação
+   impresso na saída volta na chamada seguinte sem que ninguém tenha lido.
+3. Dentro do Claude Code o modelo tem shell. Arquivo de confirmação, variável de ambiente e
+   marca com prazo são todos alcançáveis por `Bash`.
+
+Por isso o spec tem uma seção de **modelo de ameaça escrita antes do desenho**, dizendo o
+que o portão protege (acidente e ambiguidade) e o que ele não protege (um modelo com shell
+que decidiu entregar). Esse parágrafo é o que mais precisa sobreviver: ele é a diferença
+entre ligar a flag sabendo o que se ligou e ligar achando que se comprou garantia. Portão
+que promete mais do que cumpre é pior que portão nenhum, porque faz quem liga baixar a
+guarda.
+
+**A camada que resolve o problema real é a segunda, e não a confirmação.** O acidente
+medido não é "o modelo entregou de propósito", é estado velho virando escrita errada. Então
+a primeira invocação nunca escreve: devolve o plano e um código que é hash do plano. Se o
+conjunto de arquivos, o `status` ou o `timemodified` mudarem entre as duas, o código não
+bate e a escrita é recusada trazendo o plano novo. O plano é montável sem escrever nada, e
+isso foi conferido contra captura: `fixtures/moodle/submission_status_ec1.json` (15/09) traz
+em `lastattempt` o `status`, `canedit`, `cansubmit`, `locked`, `gradingstatus`,
+`extensionduedate`, `timelimit`, `teamsubmission` e os arquivos por `filearea`.
+
+**O que foi considerado e descartado:**
+
+- **Um parâmetro `acao: "salvar" | "entregar"`.** Põe as duas a uma letra de distância, e a
+  segunda não tem desfazer. Ficaram duas ferramentas com verbos separados.
+- **Código de confirmação como prova de presença humana.** Medição 2 acima.
+- **Elicitação como garantia.** Medição 1. Ela fica como apresentação, e o código distingue
+  *"não pude perguntar"* de *"perguntei e disseram não"*, que não são a mesma resposta.
+- **Reaproveitar `USP_MCP_ALLOW_WRITES`.** Ela está documentada nos três servidores como
+  flag que não abre nada, e os testes de cada um afirmam isso. Reusá-la mudaria em silêncio
+  o significado de três arquivos. Entra `USP_MCP_ENTREGA`, desligada por padrão e só no
+  Moodle.
+- **Levar junto as três de questionário.** A razão é de desenho e não de conforto: para
+  entrega existe estado anterior legível e rascunho que se sobrescreve, então dá para
+  mostrar um plano fiel. Para tentativa não existe rascunho, `start_attempt` já é
+  irreversível, e o plano honesto seria *"vou abrir uma tentativa e não sei dizer o que
+  acontece depois"*.
+
+**Cinco recusas que a flag ligada não abre**, e elas são parte da decisão e não detalhe de
+implementação: `teamsubmission` verdadeiro (escreve em nome de terceiros que não estão na
+conversa), `locked` verdadeiro ou `cansubmit` falso (o site já disse não), `status` já
+`submitted`, e plano com zero arquivos, que é o acidente mais silencioso da lista.
+
+**A bateria é de catorze, e o E14 é o que evita ensinar o modelo a tentar:** com a flag
+desligada, as duas ferramentas novas **não aparecem** no `tools/list`. Ferramenta que
+aparece e sempre recusa é convite. Escrita ao vivo não entra na suíte em fase nenhuma: um
+teste que entrega atividade de verdade é o próprio acidente que este spec existe para
+evitar.
+
+**Fica anotado para uma eventual Fase 2**, para não ser redescoberto:
+`mod_quiz_get_quizzes_by_courses` devolve `attempts`, com `0` significando tentativas
+ilimitadas. Um portão de questionário que comece exigindo `attempts == 0` é a versão
+defensável, e é por onde essa fase deve começar se ela existir.
+
+---
+
+### 15/09/2026 — `ja_entreguei` e os dois avisos que não podiam virar um número só
+
+Ela era a única das seis ferramentas novas do Moodle que não lia o campo `warnings`:
+`atrasadas`, `avisos`, `notas`, `o_que_mudou` e `material` já liam. Quando o Moodle avisava,
+a resposta saía como se estivesse tudo certo, e *"não entreguei nada"* e *"não consegui
+ver"* viravam a mesma frase. É a ferramenta da véspera do prazo, e é sobre esta resposta que
+alguém decide ir dormir.
+
+**Quais chamadas trazem o campo, conferido contra captura e não contra a documentação:**
+
+| função | traz? | onde se vê |
+|---|---|---|
+| `mod_assign_get_assignments` | sim, e preenchido | `fixtures/moodle/assign_ptc3314.json` (12/09), dois avisos de "sem direito de acesso" |
+| `mod_assign_get_submission_status` | sim, na raiz | `fixtures/moodle/submission_status_ec1.json` (15/09), lista vazia nesta conta |
+| `core_enrol_get_users_courses` | **não** | `fixtures/moodle/users_courses.json` é uma LISTA, sem envelope e sem campo para ler |
+
+A terceira linha é a que evita trabalho inventado: a resolução de disciplina não tem
+`warnings` a tratar, e procurar um ali seria escrever guarda para caso que não existe.
+
+**A decisão que este commit pede para julgar: separado por origem, nunca somado.** Os dois
+avisos não dizem a mesma coisa nem têm a mesma cura.
+
+- O **aviso da lista** põe em dúvida a **existência** da entrega. Pode haver tarefa que nem
+  apareceu, e nenhuma linha da resposta denuncia a falta: a lista fica com cara de completa.
+- O **aviso do status** põe em dúvida o **veredito** impresso na linha de uma entrega que
+  apareceu. Quem lê tem de conferir aquela entrega, e não a lista.
+
+Um `3 atividade(s) não puderam ser lidas` somado juntaria *"sumiu da lista"* com *"está na
+lista e o estado é duvidoso"*, que é exatamente o colapso que esta ferramenta existe para
+não cometer. J23 trava isso pelo lado de fora, afirmando que o número somado **não** aparece
+na saída.
+
+**A unidade do aviso de status é a ENTREGA, e não o item de aviso.** Cada ida dessas é sobre
+uma entrega só: dois `warnings` na mesma resposta continuam sendo uma entrega para conferir,
+e imprimir "2" mandaria procurar uma que não existe.
+
+**O aviso da lista entra nos três ramos de saída, e não só no feliz.** O que mais pesa é o
+vazio: `courses` vazio **com** aviso é o Moodle dizendo *"não te deixei ver"*, enquanto
+*"esta disciplina não tem nenhuma tarefa de entrega"* diz *"não há o que entregar"*. As duas
+leem igual e só uma manda dormir tranquilo. É a lista vazia que parece "não tem nada" que o
+Invariante 7 proíbe pelo nome. O mesmo vale para o filtro que não casou: o total impresso ali
+também é uma afirmação, e o aviso a enfraquece, porque a entrega procurada pode estar
+justamente entre as que não foram lidas.
+
+**Nenhum sexto jeito foi inventado.** A forma segue `atrasadas`, a irmã mais próxima: mesmas
+duas chamadas, mesma leitura `len((bruto or {}).get("warnings") or ())`, mesma lista de
+avisos montada antes do rodapé fixo. O acúmulo ao longo das N consultas de status segue o
+que `avisos` já faz no loop dela. Cinco testes (J21-J25) no arquivo da própria ferramenta,
+sem tocar em teste de outra, e cada um afirma sobre o **texto da saída**. O J25 é o par do
+J14 e vale sozinho: sem aviso nenhum, nenhum aviso é inventado, porque aviso que aparece
+sempre treina quem lê a ignorá-lo.
+
+Fecha a linha de 14/09 do `BACKLOG-correcoes.md`.
+
+---
+
+### 15/09/2026 — o CI existe, e o primeiro que rodou reprovou por causa do sistema de arquivos
+
+Fecha o **D4** do `docs/decisions/ROADMAP-proximos-passos.md`. O defeito não era o que o
+`scripts/gate.sh` checa, era que ele só rodava quando alguém lembrava de chamá-lo.
+
+**Chama o gate, e não o `pytest`, e a escolha é medida.** O desenho de 10/09 sobre rodar o
+gate num clone limpo mediu que a única coisa que falta num clone é o `.env`, e que a cura
+cabe numa linha, `cp .env.example .env`, sem segredo nenhum: a chave do RUCard é a chave
+pública embutida no aplicativo oficial e já vem preenchida no exemplo, e o campo do token
+pessoal fica vazio, que é como a camada offline precisa dele. Dada essa linha, o gate roda
+inteiro no runner, e ele é três checagens a mais que o `pytest`: segredo do `.env` em arquivo
+rastreado, cru com dado pessoal ainda ignorado, e a suíte com a camada live desligada por ele
+mesmo. Chamar o `pytest` direto criaria uma segunda resposta para *"o que precisa passar
+antes de commitar"*, e este repositório já pagou três vezes pelo preço de a mesma pergunta ter
+duas implementações.
+
+**A camada live fica de fora**, pelo mesmo motivo que ela não entra no gate: exige a USP de
+pé e o token pessoal do dono, e cada chamada fica no log da conta dele. No CI ela reprovaria
+uma PR por um motivo que não é da PR. Nenhum segredo entra no workflow e o cofre do GitHub
+não é usado; o trabalho recebe só `contents: read`.
+
+**O runner é macOS, e isso foi medido, não preferido.** A primeira versão rodava em
+`ubuntu-latest` e **reprovou por 735 de 736**, nas duas versões do Python (rodada
+`35013389922`). O `tests/test_git.py::test_g3` cria uma pasta acentuada em NFD e pergunta ao
+git sobre a **mesma** pasta escrita em NFC, que é a forma que o Python entrega. No APFS as
+duas grafias são a mesma entrada, e é lá que o defeito que o teste reproduz acontece; no ext4
+são dois nomes, o segundo não existe, e o teste morre com `FileNotFoundError` no `cwd` antes
+de medir o que veio medir.
+
+Isso é o *"reprovar PR por motivo errado"* que o item de roadmap manda evitar, só que por
+plataforma em vez de por rede. O runner passou a ser o macOS, que é onde o dono desenvolve e
+usa os três servidores. O preço está registrado porque ele é real: minuto de macOS conta a
+10x num repositório privado. A suíte leva ~16 s, então o gasto está no preparo do runner e
+não nela.
+
+**O que foi descartado:** afrouxar ou remover o `test_g3` para caber no Linux. Ele reproduz
+um defeito que **acontece** no sistema de arquivos do dono, e desligá-lo trocaria um vermelho
+honesto por um verde que não verificou nada. A cura certa é o teste **pular declarando o
+motivo** quando o sistema de arquivos separa as duas formas, e ela ficou no
+`BACKLOG-correcoes.md` com a medida, porque fechá-la libera o runner Linux. `tests/test_git.py`
+não foi tocado: outras trilhas rodavam em paralelo.
+
+**A matriz é de duas pontas, 3.11 e 3.14, sem nada no meio.** 3.11 é o piso que o
+`pyproject.toml` anuncia e que até aqui **nada** exercitava, e o CI é o lugar mais barato
+para exercitá-lo, em vez de descobrir pelo relato de quem instalou. 3.14 é o que o dono roda:
+verde só no piso protegeria todo mundo menos ele. Os passos de instalação são os do
+`README.md`, na mesma ordem de propósito, para o CI também responder se o caminho que o
+README manda seguir continua funcionando, pergunta que hoje só um clone novo feito à mão
+alcança.
+
+**O teste veio antes do workflow** (`tests/test_ci.py`, C1-C8, offline, no gate). Dois merecem
+nome: **C3** afirma que nenhum workflow liga a variável da camada live, lendo o YAML **sem**
+comentários, porque comentário que explica a variável é o que se quer no arquivo; **C4** varre
+o texto cru, comentário incluído, atrás de credencial por nome, pelo cofre ou por valor com
+forma de chave (32 hex), porque explicar não é vazar mas um segredo citado "só para explicar"
+continua escrito. **C8** trava o runner macOS com a razão na mensagem de falha, para a escolha
+não envelhecer calada nem virar vermelho misterioso numa PR que não tem nada com isso.
+
+Medido também, porque a dúvida era real: `git clone --local` a partir de um clone raso apenas
+avisa e copia do jeito normal, com código de saída 0. É por isso que o `actions/checkout` fica
+na profundidade padrão mesmo com o `tests/test_gate.py` clonando o checkout.
+
+---
+
+### 15/09/2026 — o corpo da requisição do `ws.sh` sai do argv, e o arquivo de configuração do `curl` não é o shell
+
+`scripts/ws.sh` passava `--data-urlencode "wstoken=$MOODLE_TOKEN"` na linha de comando do
+`curl`. Argumento de processo não é privado: enquanto o `curl` roda, qualquer processo do
+mesmo usuário lê o argv dele com `ps aux`. O token é credencial pessoal do dono (Invariante
+4), cada chamada feita com ele fica no log da conta dele na USP, e o Invariante 3 diz que
+esse valor não se lê, não se imprime e não se ecoa. Argv é eco.
+
+**A cura já existia neste repositório**, e é por isso que ela foi a escolhida: o passo 6 do
+`scripts/token.sh` resolveu o mesmo problema com `curl -K -`, que lê a configuração pelo
+stdin. Uma solução, e não duas.
+
+**A decisão que este commit pede para julgar: sai TUDO do argv, e não só o token.**
+`wsfunction` e os parâmetros do usuário não são segredo, e tirar só o token teria funcionado.
+O que não compensa são duas rotas para montar o mesmo corpo: dois lugares para errar o
+escape, e uma regra ("o token sai, o resto fica") que ninguém confere de fora sem ler o
+script inteiro. Com uma rota só a invariante fica mecânica e verificável, **nenhum
+`--data-urlencode` no argv**, e é essa que o teste afirma. De quebra, um parâmetro que por
+acaso carregue algo sensível também não vaza. A URL continua no argv de propósito: é pública,
+está no `.env.example`, e é o que faz o processo seguir reconhecível no `ps` de quem depura.
+
+**O achado que mais custa a redescobrir é o escape, e ele não é opcional.** O arquivo de
+configuração do `curl` não é o shell: dentro de aspas duplas ele desfaz `\\`, `\"`, `\t`,
+`\n`, `\r` e `\v`, e come qualquer outra barra invertida junto com o caractere seguinte. Como
+o `ws.sh` repassa parâmetro arbitrário, `caminho=C:\temp` e `nota=ele disse "oi"` montariam
+uma linha de configuração diferente da pedida, e o `curl` obedeceria a ela sem reclamar.
+Chamada silenciosamente errada é o pior resultado possível (Invariante 6). Daí o
+`escapar_para_config`, que trata os seis antes de escrever, quebra de linha inclusive: solta,
+ela terminaria a linha no meio das aspas.
+
+A interface não mudou. `./scripts/ws.sh <funcao> [param=valor ...]` continua igual, e
+`capture.sh` e `userid.sh` seguem chamando do mesmo jeito.
+
+**Os testes (T1-T5, offline, no gate), e dois deles respondem à regra 11 do `CLAUDE.md`:**
+T1 varre o **diretório** `scripts/` e não uma lista escrita à mão, então um script novo com o
+mesmo defeito reprova no dia em que nascer, e pega também a query string e a forma partida por
+continuação de linha; T2 é o anti-vácuo dela; T3 sabota a varredura, provando que ela acha as
+cinco formas do defeito e **não** acusa a cura, porque regra que reprova o conserto acaba
+desligada; T4 roda o `ws.sh` contra um `curl` dublê e afirma sobre o **argv recebido** e sobre
+o **stdin lido**, porque um `ws.sh` que parasse de mandar o token passaria na primeira metade
+com louvor; T5 usa o `curl` de verdade contra um servidor em `127.0.0.1` com parâmetros
+hostis (aspa, barra invertida, quebra de linha, tab, `=&#+%`) e confere o corpo POST que
+chegou do outro lado, porque quem desfaz as aspas é o parser real e não uma reimplementação
+nossa, que concordaria consigo mesma estando errada.
+
+Conferido por mutação: removida a linha que escapa a barra invertida, **T5 reprova**. Nenhum
+teste conhece o token de verdade, e nada toca a rede da USP.
+
+Fecha a linha de 10/09 do `BACKLOG-correcoes.md`, que registrava o furo e já trazia a medição
+do `curl -K -`.
+
+---
+
+### 15/09/2026 — `notas` lia um campo que o e-Disciplinas não manda, e a suíte só travava o lado do dublê
+
+`usp_mcp/moodle/notas.py` montava o campo `maximo` de cada item a partir de
+`item.get("grademax")`, e o renderizador imprimia `" de {maximo}"` quando houvesse valor. **O
+`if` nunca foi verdadeiro uma vez sequer.** `.get` de chave inexistente devolve `None`,
+`_texto` virava `""`, e a saída degradava sozinha imprimindo só a nota. Ela nunca mentiu, e é
+exatamente por isso que o campo morto sobreviveu a uma suíte verde.
+
+**A medida que fechou a questão** está em `fixtures/moodle/grade_items_ptc3314.json`, captura
+real e higienizada de 15/09/2026:
+
+| medida | valor |
+|---|---:|
+| itens de nota | 20 |
+| chaves distintas por item | 26 |
+| chaves presentes nos 20 itens | 23 |
+| `cmid` | 17 de 20 |
+| `weightraw` / `weightformatted` | 10 de 20 |
+| `grademax` | **0 de 20** |
+
+A pergunta seguinte era se alguma chave carrega a nota máxima com outro nome. **Nenhuma.** As
+três que falam de nota, `graderaw`, `gradeformatted` e `percentageformatted`, dizem QUANTO se
+tirou; de quanto era, nenhuma diz. O fato foi para o §1.3, que é onde mora forma de API.
+
+**A escolha: removido, e não derivado.** Como não existe chave para apontar, sobravam duas
+saídas, e a segunda era derivar o máximo de `percentageformatted` sobre `graderaw`. Isso é
+percentual arredondado a duas casas sobre uma nota arredondada, e o resultado sairia impresso
+no mesmo lugar e com a mesma cara de um número recebido. Quem lê `"8,50 de 10,00"` não tem
+como saber qual dos dois o e-Disciplinas mandou. Inferência apresentada como dado é o que o
+Invariante 6 proíbe, e o próprio backlog já a classificava assim quando registrou a dívida.
+
+**A remoção alcançou tudo, porque campo morto pela metade custa mais do que inteiro:** o
+campo do dataclass `ItemDeNota`, a montagem, o ramo do renderizador, o aviso da visão geral
+que prometia "peso **e máximo**", o comentário de `politica.py`, o nome do teste N10, e a
+**descrição da ferramenta em `server.py`**, que é o texto que o modelo lê e prometia "a nota,
+**de quanto ela é** e quanto vale no total". Agora ela diz que o e-Disciplinas não manda o
+máximo do item: ausência declarada vale mais que ausência calada.
+
+**A docstring estava errada por mais do que `grademax`, e o erro tem reincidência.** Conferida
+contra a captura, ela descrevia o descarte de `averageformatted` (a média da turma) e
+explicava `percentageformatted` como `graderaw/grademax` já calculado. **`averageformatted`
+não existe na captura, em item nenhum.** É o mesmíssimo erro que o cabeçalho de
+`tests/moodle/test_forma_real.py` registra ter custado caro em 14/09, quando a razão de
+projeção saiu escrita contra um dicionário imaginado com `rank`, `maxrank` e
+`averageformatted`. Duas vezes o mesmo campo inventado, nos dois lados da mesma ferramenta.
+
+**O achado de teste é o que mais vale guardar, e ele é sobre a forma da guarda.** F1-F6 já
+garantiam que o **dublê não inventa** campo. Nada garantia que a **projeção não lê** um, e era
+exatamente esse o buraco por onde `grademax` passou: F2 estava verde porque
+`itens_de_nota_falsos` nunca montou a chave, e o código a lia assim mesmo. Uma regra e o seu
+espelho não são a mesma regra, e faltava o espelho:
+
+> toda chave que a projeção lê tem de existir na resposta real.
+
+F8 varre o fonte de `projetar_itens` e `projetar_visao_geral` por AST, coleta os literais de
+`<variável>.get("X")` e confere contra as chaves da captura, nível a nível. Lê o **fonte** e
+não a saída de propósito, e essa é a parte que não pode ser esquecida: um teste de saída veria
+a degradação correta e passaria, que foi precisamente o que aconteceu por um dia inteiro. F9
+sabota F8, pelo mesmo motivo que F7 sabota F1-F6, porque varredura quebrada devolve conjunto
+vazio e conjunto vazio não sobra nada em comparação nenhuma. Nenhuma entrada nova em
+`EXCECOES`: não há campo perdoado aqui, há campo que não existe.
+
+Verificado vermelho antes do conserto, pelo motivo certo:
+
+```
+AssertionError: a projeção lê de `grade_items_ptc3314.json` chave que a captura
+real não tem: {'projetar_itens/item em usergrades[].gradeitems[]': ['grademax']}
+```
+
+Fecha a linha de 15/09 do `BACKLOG-correcoes.md`, que era onde a dívida tinha sido registrada
+horas antes.
+
+---
+
+### 15/09/2026 — as treze ferramentas passam a dizer à máquina o que o Invariante 1 dizia em português
+
+Fecha o **D3** do `docs/decisions/ROADMAP-proximos-passos.md`. O Invariante 1 diz que este
+projeto é de leitura por padrão, e até aqui dizia isso só em português: no `CLAUDE.md`, na
+descrição de cada ferramenta, na cabeça de quem manteve o código. Um cliente MCP não lê
+português, e o protocolo tem bloco próprio para a mesma frase. Sem ele, as treze ferramentas
+chegavam ao cliente indistinguíveis de uma que apaga uma entrega.
+
+**O que passa a chegar ao fio**, verificado subindo os três processos e lendo o `tools/list`
+real:
+
+| ferramenta | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
+|---|---|---|---|---|
+| as doze de leitura | `true` | `false` | ausente | `true` |
+| `baixar_arquivo` | `false` | `false` | `true` | `true` |
+
+**`baixar_arquivo` não é read-only, e foi a decisão que mais custou pensamento.** Ela grava
+bytes em `~/.cache/usp-mcp/moodle/`: `deposito.gravar` faz `mkdir` e `write_bytes`. O campo do
+protocolo não pergunta *"escreve no Moodle?"*, pergunta *"modifica o seu ambiente?"*, e o
+disco de quem chama é ambiente. A leitura tentadora e errada seria *"ela não muda nada lá,
+logo é de leitura"*: ela cabe na política read-only do projeto, porque não escreve no
+e-Disciplinas, não entrega trabalho e não muda nota, e mesmo assim **não** é read-only no
+sentido do protocolo. As duas coisas convivem, e são os outros três campos que dizem o quanto
+essa escrita é inofensiva.
+
+**`destructiveHint` falso nas treze, explícito inclusive nas de leitura.** É redundante pela
+letra do protocolo, que dá significado ao campo só quando `readOnlyHint` é falso, e está
+escrito assim mesmo porque o **default dele é verdadeiro**: um cliente que leia só esse campo,
+sem aplicar a regra condicional, trataria as treze como destrutivas. Em `baixar_arquivo` o
+falso é substantivo: ela só cria, em caminho endereçado por conteúdo, e nunca sobrescreve nem
+apaga o que o dono tenha posto ali.
+
+**`idempotentHint` só em `baixar_arquivo`, e medido em vez de prometido.** O depósito endereça
+por `<fileid>-<timemodified>` e `ja_baixado` confere o tamanho, então a segunda chamada com os
+mesmos argumentos não rebaixa nem cria segundo arquivo. Fora dela o campo fica **de fora de
+propósito**: o protocolo só lhe dá significado quando `readOnlyHint` é falso, e declará-lo numa
+ferramenta de leitura seria campo sem referente, que custa bytes no fio, parece informação e
+não é nenhuma.
+
+**`openWorldHint` verdadeiro nas treze.** Era o campo com mais chance de virar promessa vazia,
+e a medição resolve: as treze, sem exceção, fazem requisição HTTP para um sistema que não é
+deste repositório. O domínio não é fechado, porque quais disciplinas existem, que arquivo o
+professor publicou hoje e o que o RU serve amanhã não estão enumerados em lugar nenhum daqui e
+mudam sem aviso. A allowlist limita **quais funções** chamamos, nunca que entidades existem do
+outro lado. O default do protocolo já é verdadeiro, então declarar não muda o comportamento de
+cliente nenhum; o que declarar resolve é a ambiguidade entre *"verdadeiro por omissão"* e
+*"ninguém olhou"*.
+
+**Onde o código mora, e por quê ali.** `usp_mcp/anotacoes.py` guarda os dois blocos
+(`SO_LEITURA` e `ESCREVE_NO_DEPOSITO`) com a razão de cada campo ao lado dele, uma vez só, pelo
+mesmo motivo do `adaptador.py`: três cópias de uma razão são duas que envelhecem caladas. O
+módulo não importa o SDK no topo, então `listar_ferramentas()` continua pura e a suíte continua
+rodando sem o pacote `mcp`. Cada descritor aponta para o bloco, e `main()` passa o bloco **do
+descritor** para o `servidor.tool()`, nunca um escrito à mão no ponto de registro. Descritor sem
+anotação devolve `None` em vez de levantar: matar o servidor na subida por falta de metadado
+trocaria uma degradação pequena por um servidor que não sobe, e quem guarda essa porta é o
+teste, que reprova antes do commit.
+
+**O teste olha o `tools/list` real** de cada servidor descoberto pelo glob `usp_mcp/*/server.py`,
+e não a introspecção do módulo (A1-A8, arquivo novo, nenhum teste existente editado). A razão é
+cicatriz: já custou caro aqui acreditar no declarado, porque o SDK deriva o schema da assinatura
+e não do `inputSchema`, e por isso nenhuma descrição de parâmetro viajava com a suíte inteira
+verde (§9, 31/08). Anotação declarada no descritor e esquecida no `servidor.tool()` teria
+exatamente essa cara, e é o A6 que a pega. Nada de lista escrita à mão: servidor novo ou
+ferramenta nova entra coberto no dia em que nascer, e entra **reprovando** se nascer sem
+anotação.
+
+O `main()` do Moodle ganhou um `_registrar()`, ponto único para as dez chamadas a
+`servidor.tool()`, pelo mesmo motivo do `_chamar()` que já estava lá: com a chamada repetida dez
+vezes, registrar nove anotadas e uma muda não quebraria nada visível. Continua indexando por
+**nome**, sem contar nem desempacotar por posição, que é o bug que já matou este servidor antes
+do handshake.
 
 ---
