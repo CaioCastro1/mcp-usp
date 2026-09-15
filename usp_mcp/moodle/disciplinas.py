@@ -35,6 +35,7 @@ resposta traz junto com as do semestre corrente.
 """
 from __future__ import annotations
 
+import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -46,9 +47,18 @@ from .texto import normalizar as _normalizar
 # Um semestre. Matrícula não muda entre duas perguntas sobre material.
 TTL_DISCIPLINAS = 60 * 60 * 24 * 120
 
-# `shortname` no e-Disciplinas é "SIGLA-ano[-turma]": PSI3323-2026,
-# PRO3811-202-2026, PSI3322-2026-REOF. A sigla é o primeiro segmento.
-_SEPARADOR = "-"
+# `shortname` no e-Disciplinas é "SIGLA<separador>ano[<separador>turma]", e o
+# separador NÃO é só o hífen. Medido em 15/09/2026 nas duas capturas desta
+# conta: em 74 matrículas aparecem `-` (69), `_` (2), espaço (1), `.` (1) e
+# nenhum separador (1) — `PSI3323-2026` e `PRO3811-202-2026` ao lado de
+# `PEA3301_2026_1sem`, `PSI3211 2025`, `2166.2023i` e `PCS3335`.
+#
+# Cortar só no hífen custou caro e não em teoria: `PEA3301_2026_1sem` (o
+# semestre corrente) virava a sigla `PEA330120261SEM` enquanto `PEA3301-2021`
+# ficava com `PEA3301` sozinha. Perguntar por "PEA3301" tinha UMA candidata, e
+# `material` respondia com 177 itens sobre a de 2021 — sem ambiguidade nenhuma
+# para detectar, porque do ponto de vista da resolução não havia.
+_SEPARADOR = re.compile(r"[\W_]+")
 
 
 @dataclass(frozen=True)
@@ -86,6 +96,25 @@ class Resolucao:
     motivo: str | None = None
 
 
+def sigla_de(rotulo: str) -> str:
+    """O primeiro pedaço alfanumérico do rótulo. "PTC3314-2026" -> "PTC3314".
+
+    Deliberadamente **sem forma**: não há aqui nenhum "três letras e quatro
+    dígitos". A convenção da USP não é a de outras instituições, e o que se pode
+    afirmar dos dois lados é só que a sigla, quando existe, vem primeiro. Cortar
+    no primeiro separador é uma regra que a USP satisfaz por construção e que
+    não inventa nada sobre quem não a segue.
+
+    O limite fica declarado no lugar certo: onde o primeiro pedaço NÃO é a sigla
+    ("2026S2-BIO-101" devolve "2026S2"), não há corte que conserte — quem acha a
+    disciplina é a busca pelo rótulo, em `resolver`.
+    """
+    for pedaco in _SEPARADOR.split(rotulo or ""):
+        if sigla := _normalizar(pedaco):
+            return sigla
+    return ""
+
+
 def projetar_disciplinas(bruto) -> list[Disciplina]:
     """29 chaves por disciplina viram 5. As outras 24 não respondem nada daqui.
 
@@ -100,7 +129,7 @@ def projetar_disciplinas(bruto) -> list[Disciplina]:
         lista.append(
             Disciplina(
                 courseid=curso.get("id"),
-                sigla=_normalizar(rotulo.split(_SEPARADOR)[0]),
+                sigla=sigla_de(rotulo),
                 rotulo=rotulo,
                 nome=curso.get("fullname") or "",
                 inicio=data_de(curso.get("startdate")),
@@ -110,22 +139,91 @@ def projetar_disciplinas(bruto) -> list[Disciplina]:
     return lista
 
 
-def resolver(disciplinas, termo: str) -> Resolucao:
-    """Sigla exata primeiro; depois começo de sigla ou pedaço do nome.
+def _dia(quando: datetime | None) -> str:
+    """"03/08/2026" — e o ANO aqui não é excesso.
 
-    A ordem importa: com match parcial primeiro, "PTC3312" casaria consigo mesma
-    e com qualquer PTC3312-XXX, virando ambiguidade onde havia resposta.
+    `texto.formatar_data` escreve prazo ("dom 06/09 23:59") e omite o ano de
+    propósito, porque prazo é de agora. Isto é vigência de matrícula, e uma
+    lista que cobre sete anos sem o ano não localiza nada: PMT3100 de 2023 e
+    PMT3100 de 2024 ficariam idênticas. São grafias diferentes porque são
+    coisas diferentes — J18 pede uma grafia só para a MESMA coisa.
+
+    Mora acima de `resolver` desde 15/09/2026 porque passou a ter dois leitores:
+    a lista da ferramenta e a lista de candidatas de uma ambiguidade. É o mesmo
+    período nos dois lugares, e J18 pede a mesma grafia para a mesma coisa.
+    """
+    return quando.strftime("%d/%m/%Y") if quando is not None else "?"
+
+
+def _periodo(disciplina: Disciplina) -> str:
+    return f"{_dia(disciplina.inicio)} a {_dia(disciplina.fim)}"
+
+
+def _rotulo_com_periodo(disciplina: Disciplina) -> str:
+    """O rótulo, e a vigência entre parênteses quando o Moodle declarou alguma.
+
+    Sem data nenhuma o parêntese sairia "(? a ?)", que ocupa espaço para dizer
+    que não sabe — e numa lista de desempate é justamente o ruído que atrapalha
+    quem está tentando distinguir duas matrículas.
+    """
+    if disciplina.inicio is None and disciplina.fim is None:
+        return disciplina.rotulo
+    return f"{disciplina.rotulo} ({_periodo(disciplina)})"
+
+
+# Uma matrícula sem vigência declarada não ganha nem a frente nem o fim da fila
+# por acidente: ela vai para o fim, onde "não sei quando foi" pertence.
+_SEM_VIGENCIA = datetime.min.replace(tzinfo=FUSO_SAO_PAULO)
+
+
+def _mais_recentes_primeiro(disciplinas):
+    """As candidatas ordenadas pela vigência, a mais recente na frente.
+
+    Ordenar é informação; escolher é decisão. Esta função faz a primeira e não
+    encosta na segunda — quem lê a lista encontra a matrícula do semestre
+    corrente onde o olho cai primeiro, e continua sendo quem escolhe.
+    """
+    por_rotulo = sorted(disciplinas, key=lambda d: d.rotulo)
+    return sorted(
+        por_rotulo,
+        key=lambda d: d.fim or d.inicio or _SEM_VIGENCIA,
+        reverse=True,
+    )
+
+
+def resolver(disciplinas, termo: str) -> Resolucao:
+    """Identificador exato primeiro; depois pedaço do rótulo ou do nome.
+
+    A ordem importa, e importa mais desde que o rótulo entrou na busca: com
+    match parcial primeiro, "PTC3312" casaria consigo mesma e com qualquer
+    PTC3312-XXX, virando ambiguidade onde havia resposta. O mesmo vale um nível
+    abaixo — "PCS3110-2S" é o rótulo INTEIRO de uma matrícula e pedaço do rótulo
+    de outra, e é por isso que rótulo exato entra no primeiro degrau ao lado da
+    sigla, e não junto do casamento por pedaço.
+
+    O rótulo entrou porque ele é o que a ferramenta `disciplinas` imprime na
+    tela, e copiá-lo de volta não achava nada: medido em 15/09/2026, 69 dos 74
+    rótulos desta conta não resolviam quando digitados inteiros. É também o que
+    torna a disciplina alcançável onde a sigla não é o primeiro pedaço do rótulo
+    (`2026S2-BIO-101` procurado como "BIO101").
+
+    Não há degrau para "começo de sigla": ele virou caso particular do pedaço de
+    rótulo. A sigla é, por construção, o primeiro pedaço do rótulo, então toda
+    sigla que começa com o termo tem o termo dentro do rótulo.
     """
     alvo = _normalizar(termo)
     if not alvo:
         return Resolucao(None, motivo="Nenhuma disciplina informada.")
 
-    exatas = [d for d in disciplinas if d.sigla == alvo]
+    exatas = [
+        d for d in disciplinas
+        if d.sigla == alvo or _normalizar(d.rotulo) == alvo
+    ]
     if len(exatas) == 1:
         return Resolucao(exatas[0])
     parciais = exatas or [
         d for d in disciplinas
-        if d.sigla.startswith(alvo) or alvo in _normalizar(d.nome)
+        if alvo in _normalizar(d.rotulo) or alvo in _normalizar(d.nome)
     ]
 
     if len(parciais) == 1:
@@ -134,13 +232,29 @@ def resolver(disciplinas, termo: str) -> Resolucao:
     if parciais:
         # Invariante 6: escolher uma entre várias é errar calado. O motivo lista
         # as candidatas porque "ambíguo" sozinho não diz a quem lê o que fazer.
-        rotulos = ", ".join(sorted({d.rotulo for d in parciais}))
+        #
+        # Desempatar pela data — "ela quis dizer a do semestre corrente" — foi
+        # recusado, e a recusa é o miolo desta correção: o defeito que ela
+        # conserta ERA uma escolha calada, e trocá-la por outra só mudaria de
+        # quem é a pergunta que passa a ser respondida errado. Além disso as
+        # datas daqui são as do espaço da disciplina e não as da matrícula
+        # oficial (trancamento não chega, e `enddate: 0` existe de verdade):
+        # desempatar por elas seria construir resposta confiante sobre um dado
+        # que este módulo já declara incerto. Ordena, mostra o período, e
+        # devolve a escolha.
+        candidatas = _mais_recentes_primeiro(parciais)
+        vistos, rotulos = set(), []
+        for d in candidatas:
+            if d.rotulo not in vistos:
+                vistos.add(d.rotulo)
+                rotulos.append(_rotulo_com_periodo(d))
         return Resolucao(
             None,
-            candidatas=tuple(parciais),
+            candidatas=tuple(candidatas),
             motivo=(
-                f"{termo!r} casa com mais de uma disciplina: {rotulos}. "
-                "Repita com a sigla completa."
+                f"{termo!r} casa com mais de uma disciplina: {'; '.join(rotulos)}. "
+                "Repita com o rótulo inteiro — é ele que distingue duas "
+                "matrículas da mesma sigla."
             ),
         )
 
@@ -284,22 +398,6 @@ def situacao_de(disciplina: Disciplina, momento: datetime) -> str:
     return EM_ANDAMENTO
 
 
-def _dia(quando: datetime | None) -> str:
-    """"03/08/2026" — e o ANO aqui não é excesso.
-
-    `texto.formatar_data` escreve prazo ("dom 06/09 23:59") e omite o ano de
-    propósito, porque prazo é de agora. Isto é vigência de matrícula, e uma
-    lista que cobre sete anos sem o ano não localiza nada: PMT3100 de 2023 e
-    PMT3100 de 2024 ficariam idênticas. São grafias diferentes porque são
-    coisas diferentes — J18 pede uma grafia só para a MESMA coisa.
-    """
-    return quando.strftime("%d/%m/%Y") if quando is not None else "?"
-
-
-def _periodo(disciplina: Disciplina) -> str:
-    return f"{_dia(disciplina.inicio)} a {_dia(disciplina.fim)}"
-
-
 def _linha_completa(disciplina: Disciplina) -> str:
     # Sigla primeiro porque é ela que se digita na próxima pergunta; o rótulo
     # ao lado porque é ele que desambigua duas matrículas da mesma sigla.
@@ -324,9 +422,10 @@ def _bloco_compacto(disciplinas) -> list[str]:
 
 
 _COMO_USAR = (
-    "Para perguntar sobre uma delas, use a SIGLA (a parte antes do primeiro "
-    "'-'): `material`, `notas`, `avisos`, `ja_entreguei`, `atrasadas` e "
-    "`o_que_mudou` aceitam a sigla."
+    "Para perguntar sobre uma delas, use a SIGLA ou o RÓTULO INTEIRO (o que "
+    "está entre parênteses): `material`, `notas`, `avisos`, `ja_entreguei`, "
+    "`atrasadas` e `o_que_mudou` aceitam os dois. Quando a mesma sigla aparece "
+    "em mais de um ano, só o rótulo distingue as duas matrículas."
 )
 
 _DE_ONDE_SAI = (
