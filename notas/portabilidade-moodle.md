@@ -137,6 +137,31 @@ Degrada bem para busca por nome ("biology" casa com o `fullname`), e o
 Invariante 6 segura o resto: a mensagem de "não achei" lista as siglas
 existentes. Mas é a diferença entre portável e quase-portável.
 
+**Corrigido em 15/09/2026 — e o 4.1 estava subestimado.** Ao medir as duas
+capturas desta conta para escrever a correção, os dois lados apareceram maiores
+do que esta seção dizia, e nenhum deles é de fora da USP:
+
+- **O rótulo fora da busca custava em casa.** Digitar o rótulo inteiro — que é
+  exatamente o que a ferramenta `disciplinas` imprime na tela — não achava nada
+  em **69 das 74** matrículas de `users_courses.json` (44 de 47 na captura de
+  15/09). Copiar da resposta e colar na pergunta seguinte devolvia "não
+  encontrei".
+- **O `split("-")` não era convenção da USP, era suposição sobre ela.** O
+  separador do `shortname` nesta conta é `-` (69), `_` (2), espaço (1), `.` (1)
+  e nenhum (1). E o estrago não foi "não acha": a conta tem
+  `PEA3301_2026_1sem` (cursando) e `PEA3301-2021`, a primeira recebia a sigla
+  `PEA330120261SEM` e a segunda ficava com `PEA3301` sozinha — então perguntar
+  por "PEA3301" tinha uma candidata só, e `material` ao vivo em 15/09 respondeu
+  com 177 itens sobre a de 2021. **Escolha calada, dentro da USP, em disciplina
+  do semestre corrente.**
+
+A sigla passou a ser o primeiro pedaço alfanumérico do rótulo (`PTC3314-2026`
+continua dando `PTC3314`), e o rótulo entrou na busca com exato antes de
+parcial nos dois níveis. O caso `2026S2-BIO-101` procurado como "BIO101"
+resolve — não porque a sigla ficou certa (ela ainda sai `2026S2`, e nenhum corte
+conserta isso), mas porque a busca passou a olhar o rótulo. Os outros três
+pontos do §4 continuam abertos.
+
 ### 4.2 Fuso fixo em −3
 
 `projecao.FUSO_SAO_PAULO = timezone(timedelta(hours=-3))`, com justificativa
