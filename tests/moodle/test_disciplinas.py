@@ -370,3 +370,288 @@ def test_di15_matricula_que_ainda_nao_comecou_nao_e_chamada_de_em_andamento():
     assert r.em_andamento == 0
     assert r.encerradas == 0
     assert "PTC3450" in r.texto
+
+
+# --------------------------------------------------------------------------
+# DI16-DI23 — a sigla e o rótulo na resolução
+#
+# Medido em 15/09/2026 sobre as duas capturas reais desta conta
+# (`users_courses.json`, de 31/08, com 74 matrículas; `users_courses_15-09.json`,
+# com 47) e confirmado ao vivo contra o e-Disciplinas no mesmo dia.
+#
+# Dois defeitos, e nenhum dos dois é hipotético:
+#
+# 1. A sigla saía de `rotulo.split("-")[0]`, e o hífen não é o único separador
+#    que esta conta usa. Em 74 matrículas aparecem `-` (69), `_` (2), espaço (1),
+#    `.` (1) e nenhum (1). As três que sobram do hífen são do DONO e de HOJE:
+#    `PEA3301_2026_1sem` e `PEA3306_2026_1sem` (semestre corrente) e
+#    `PSI3211 2025`.
+#
+#    O estrago medido ao vivo: a conta tem `PEA3301_2026_1sem` (o semestre
+#    corrente) e `PEA3301-2021` (cinco anos atrás). A regra do hífen dava
+#    `PEA330120261SEM` para a de 2026 e `PEA3301` para a de 2021 — então
+#    perguntar por "PEA3301" tinha UMA candidata só, e `material` respondia com
+#    177 itens sobre a de 2021, sem ambiguidade nenhuma para detectar. Não é
+#    "não acha": é acha a errada com confiança.
+#
+# 2. `resolver` nunca olhava o `rotulo`. Consequência medida: das 74 matrículas,
+#    digitar o RÓTULO INTEIRO — que é exatamente o que a própria ferramenta
+#    `disciplinas` imprime na tela — não achava nada em 69 delas (44 de 47 na
+#    captura de 15/09).
+# --------------------------------------------------------------------------
+
+# Um por formato de `shortname` medido nas duas capturas, mais o caso de outra
+# instituição que a nota de portabilidade descreve. O primeiro da lista é o que
+# não pode quebrar: é a convenção que os alunos da USP usam hoje.
+FORMATOS_REAIS = [
+    ("PTC3314-2026", "PTC3314"),
+    ("PRO3811-202-2026", "PRO3811"),
+    ("PSI3322-2026-REOF", "PSI3322"),
+    ("PEA3301_2026_1sem", "PEA3301"),
+    ("PEA3306_2026_1sem", "PEA3306"),
+    ("PSI3211 2025", "PSI3211"),
+    ("2166.2023i", "2166"),
+    ("PRO3200-2025.2", "PRO3200"),
+    ("PCS3110-2024_2", "PCS3110"),
+    ("PMT3100-2024-Primeiro Semestre", "PMT3100"),
+    ("PME3100-203-2023 - Prof. F. Trigo", "PME3100"),
+    ("PSI3322-2'2026", "PSI3322"),
+    ("PCS3335", "PCS3335"),
+    ("0303200-2025", "0303200"),
+    ("AEX-IF-00020.01", "AEX"),
+    # Fora da USP o primeiro pedaço não é a sigla, e nenhuma regra de corte
+    # conserta isso — quem conserta é a busca pelo rótulo (DI19).
+    ("2026S2-BIO-101", "2026S2"),
+]
+
+
+def _bruto(shortname, courseid=1, nome="Disciplina", inicio=None, fim=None):
+    """Só os cinco campos que `projetar_disciplinas` lê, todos presentes na
+    captura real — a conferência de forma de `test_forma_real` reprova
+    construtor de teste que invente campo."""
+    return {
+        "id": courseid,
+        "shortname": shortname,
+        "fullname": nome,
+        "startdate": inicio,
+        "enddate": fim,
+    }
+
+
+@pytest.mark.parametrize("rotulo,esperada", FORMATOS_REAIS, ids=[r for r, _ in FORMATOS_REAIS])
+def test_di16_a_sigla_sai_do_primeiro_pedaco_seja_qual_for_o_separador(rotulo, esperada):
+    """DI16 — o separador do `shortname` não é só o hífen.
+
+    A lista inteira é formato MEDIDO nas duas capturas desta conta, e não
+    formato imaginado. `PTC3314-2026 -> PTC3314` está em primeiro lugar de
+    propósito: é a convenção que os alunos da USP usam hoje, e é ela que uma
+    regra mais geral não pode quebrar para atender aos outros quinze.
+    """
+    (d,) = dis.projetar_disciplinas([_bruto(rotulo)])
+
+    assert d.sigla == esperada, (
+        f"o rótulo {rotulo!r} deu a sigla {d.sigla!r}. A sigla é o PRIMEIRO "
+        f"pedaço alfanumérico do rótulo, que aqui é {esperada!r} — corte no "
+        "primeiro separador, qualquer que ele seja, e não só no hífen."
+    )
+
+
+def test_di17_a_matricula_do_semestre_corrente_nao_fica_inalcancavel(disciplinas_brutas):
+    """DI17 — o defeito medido ao vivo, escrito como teste.
+
+    Esta conta tem `PEA3301_2026_1sem` (cursando) e `PEA3301-2021`. Enquanto a
+    sigla saía do corte no hífen, a de 2026 ficava com a sigla
+    `PEA330120261SEM` e "PEA3301" tinha uma candidata só — a de 2021. A resposta
+    saía confiante e sobre a disciplina errada.
+
+    O que este teste exige é que as duas passem a ter a MESMA sigla. Que a
+    resposta a "PEA3301" vire uma pergunta em vez de uma escolha é o assunto do
+    DI18; aqui o que se trava é que a de 2026 deixou de ser inalcançável pela
+    sigla dela.
+    """
+    lista = dis.projetar_disciplinas(disciplinas_brutas)
+    por_rotulo = {d.rotulo: d for d in lista}
+
+    corrente = por_rotulo["PEA3301_2026_1sem"]
+    antiga = por_rotulo["PEA3301-2021"]
+
+    assert corrente.sigla == "PEA3301", (
+        f"a matrícula do semestre corrente ficou com a sigla {corrente.sigla!r}: "
+        "nenhuma pergunta escrita por quem cursa a disciplina chega até ela. "
+        "Corte o rótulo no primeiro separador, e não no primeiro hífen."
+    )
+    assert corrente.sigla == antiga.sigla, (
+        "as duas matrículas de PEA3301 têm de cair na mesma sigla — é ter "
+        "siglas diferentes que faz a busca achar só a de 2021 e responder por "
+        "ela sem avisar que a outra existe."
+    )
+    assert dis.resolver(lista, "PEA3301_2026_1sem").disciplina is corrente, (
+        "o rótulo inteiro da matrícula do semestre corrente tem de resolver "
+        "para ela: é o que a resposta ambígua vai mandar repetir."
+    )
+
+
+def test_di18_duas_matriculas_da_mesma_sigla_viram_pergunta_e_nao_escolha(
+    disciplinas_brutas,
+):
+    """DI18 — e a escolha calada NÃO volta por outra porta.
+
+    Depois do DI17 "PEA3301" casa com duas. A saída certa é a que este projeto
+    já usa para ambiguidade: listar as candidatas e devolver a pergunta. Um
+    desempate por data — "ela quis dizer a de 2026" — foi recusado de propósito:
+    seria trocar uma escolha calada por outra, e as datas daqui são as do espaço
+    da disciplina, não as da matrícula oficial (DI8).
+    """
+    lista = dis.projetar_disciplinas(disciplinas_brutas)
+
+    r = dis.resolver(lista, "PEA3301")
+
+    assert r.disciplina is None, (
+        f"escolheu {r.disciplina.rotulo!r} entre duas matrículas de PEA3301 sem "
+        "perguntar. Devolva as candidatas no motivo e deixe quem pergunta "
+        "escolher — desempatar por data aqui é escolher calado do mesmo jeito."
+    )
+    assert {d.rotulo for d in r.candidatas} == {"PEA3301_2026_1sem", "PEA3301-2021"}
+    for rotulo in ("PEA3301_2026_1sem", "PEA3301-2021"):
+        assert rotulo in r.motivo, (
+            f"{rotulo!r} não está no motivo: quem lê 'ambíguo' sem a lista não "
+            "tem como formular a próxima pergunta."
+        )
+    assert r.candidatas[0].rotulo == "PEA3301_2026_1sem", (
+        "a candidata mais recente tem de vir primeiro na lista. Ordenar é "
+        "informação; o que não pode é ordenar e depois escolher sozinho."
+    )
+
+
+def test_di19_o_rotulo_entra_na_busca(disciplinas_brutas):
+    """DI19 — o caso que a nota de portabilidade descreve, e o caso de casa.
+
+    Num site cujo `shortname` seja `2026S2-BIO-101`, nenhuma regra de corte
+    produz a sigla "BIO101" — quem acha é a busca pelo rótulo. E o caso de casa,
+    medido: digitar o rótulo inteiro, que é o que a ferramenta `disciplinas`
+    imprime na tela, não achava nada em 69 das 74 matrículas desta conta.
+    """
+    fora_da_usp = dis.projetar_disciplinas(
+        [_bruto("2026S2-BIO-101", courseid=77, nome="Introducao a Biologia")]
+    )
+    r = dis.resolver(fora_da_usp, "BIO101")
+    assert r.disciplina is not None, (
+        "'BIO101' não achou o curso cujo shortname é '2026S2-BIO-101', com a "
+        f"string literalmente lá. Motivo devolvido: {r.motivo!r}. Procure "
+        "também dentro do `rotulo`, não só na sigla e no nome."
+    )
+    assert r.disciplina.courseid == 77
+
+    lista = dis.projetar_disciplinas(disciplinas_brutas)
+    perdidos = [
+        curso["shortname"]
+        for curso in disciplinas_brutas
+        if dis.resolver(lista, curso["shortname"]).disciplina is None
+    ]
+    assert not perdidos, (
+        f"{len(perdidos)} de {len(disciplinas_brutas)} rótulos não resolvem "
+        f"quando digitados inteiros: {perdidos[:5]}. O rótulo é o que a "
+        "ferramenta `disciplinas` mostra na tela — copiá-lo de volta tem de "
+        "funcionar."
+    )
+
+
+def test_di20_sigla_exata_continua_ganhando_de_casamento_parcial():
+    """DI20 — a não-regressão da ordem, agora que o rótulo entrou na busca.
+
+    A ordem exata-antes-de-parcial existe porque com parcial primeiro "PTC3312"
+    casaria consigo mesma e com qualquer PTC3312-XXX, virando ambiguidade onde
+    havia resposta. Pôr o rótulo no casamento parcial é exatamente o jeito de
+    ressuscitar isso, e é por isso que este teste está aqui.
+    """
+    lista = [
+        dis.Disciplina(courseid=1, sigla="PTC3312", rotulo="PTC3312", nome="Redes"),
+        dis.Disciplina(courseid=2, sigla="PTC3312", rotulo="PTC3312-202-2026",
+                       nome="Redes turma 202"),
+        dis.Disciplina(courseid=3, sigla="PTC3313", rotulo="PTC3313-2026", nome="Ondas"),
+    ]
+
+    r = dis.resolver(lista, "PTC3312")
+    assert r.disciplina is None, (
+        "duas matrículas com a sigla PTC3312 são ambiguidade de verdade, e a "
+        "resposta certa é listar as duas."
+    )
+    assert {d.courseid for d in r.candidatas} == {1, 2}, (
+        "a ambiguidade de sigla exata não pode arrastar a PTC3313 junto: quando "
+        "existe casamento exato, é ele que forma a lista de candidatas."
+    )
+
+    # E o caso que a ordem protege: sigla exata resolve mesmo com o rótulo de
+    # outra matrícula contendo o termo.
+    duas = [
+        dis.Disciplina(courseid=1, sigla="PTC3312", rotulo="PTC3312", nome="Redes"),
+        dis.Disciplina(courseid=3, sigla="PTC3313", rotulo="PTC3313-2026", nome="Ondas"),
+    ]
+    assert dis.resolver(duas, "PTC3312").disciplina.courseid == 1, (
+        "a sigla exata tem de resolver antes de qualquer casamento parcial"
+    )
+
+
+def test_di21_rotulo_exato_ganha_de_rotulo_que_apenas_o_contem():
+    """DI21 — o outro lado da mesma ordem, do lado do rótulo.
+
+    As duas formas existem nesta conta (`PCS3110-2S` e `PCS3111-2S-2025`): um
+    rótulo que é começo de outro. Se o rótulo entrasse só como pedaço, digitar
+    um rótulo INTEIRO e correto viraria ambiguidade — resposta virando pergunta,
+    que é o pior desfecho dos três.
+    """
+    lista = [
+        dis.Disciplina(courseid=1, sigla="PCS3110", rotulo="PCS3110-2S", nome="Redes"),
+        dis.Disciplina(courseid=2, sigla="PCS3110", rotulo="PCS3110-2S-2025",
+                       nome="Redes de novo"),
+    ]
+
+    r = dis.resolver(lista, "PCS3110-2S")
+
+    assert r.disciplina is not None, (
+        f"'PCS3110-2S' é o rótulo inteiro de uma das duas e virou ambiguidade: "
+        f"{r.motivo!r}. Rótulo exato é casamento EXATO, e resolve antes de "
+        "qualquer casamento por pedaço."
+    )
+    assert r.disciplina.courseid == 1
+
+
+def test_di22_a_ambiguidade_continua_listando_as_candidatas_e_dizendo_o_que_fazer():
+    """DI22 — o tratamento explícito de ambiguidade não pode ter virado outra coisa.
+
+    Duas exigências, e a segunda mudou com o conserto: o motivo lista as
+    candidatas, e manda repetir com o que de fato desempata. Antes era "a sigla
+    completa"; depois do DI17 a sigla é justamente o que ficou ambíguo, e quem
+    desempata é o rótulo — conselho que só passou a ser acionável porque o DI19
+    fez o rótulo funcionar na busca.
+    """
+    lista = [
+        dis.Disciplina(courseid=1, sigla="PMT3100", rotulo="PMT3100-2023", nome="Materiais"),
+        dis.Disciplina(courseid=2, sigla="PMT3100", rotulo="PMT3100-2024", nome="Materiais"),
+    ]
+
+    r = dis.resolver(lista, "PMT3100")
+
+    assert r.disciplina is None and len(r.candidatas) == 2
+    assert "PMT3100-2023" in r.motivo and "PMT3100-2024" in r.motivo
+    assert "rótulo" in r.motivo.lower(), (
+        "o motivo tem de dizer que é o RÓTULO que desempata. Mandar repetir com "
+        "'a sigla completa' é mandar repetir o que acabou de falhar."
+    )
+
+
+def test_di23_termo_que_nao_existe_continua_nao_casando(disciplinas_brutas):
+    """DI23 — a busca ficou mais larga; não pode ter ficado larga demais.
+
+    Casar de mais é pior do que casar de menos, porque transforma resposta em
+    pergunta. O piso: um termo que não está em rótulo nenhum nem em nome nenhum
+    continua caindo no "não achei" que lista o que existe.
+    """
+    lista = dis.projetar_disciplinas(disciplinas_brutas)
+
+    r = dis.resolver(lista, "XYZ9999")
+
+    assert r.disciplina is None and r.candidatas == (), (
+        f"'XYZ9999' passou a casar com {[d.rotulo for d in r.candidatas]}"
+    )
+    assert "XYZ9999" in r.motivo and "PSI3323" in r.motivo
