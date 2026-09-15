@@ -314,6 +314,7 @@ def status_de_entrega(
     arquivos: tuple[str, ...] = ("EC1-relatorio.pdf",),
     com_lastattempt: bool = True,
     com_texto_online: bool = True,
+    com_warning: bool = False,
 ) -> dict:
     """Uma resposta de `mod_assign_get_submission_status`, na forma documentada.
 
@@ -321,6 +322,14 @@ def status_de_entrega(
     (rascunho salvo e NÃO enviado), `submitted` e `reopened`. A distinção entre
     `draft` e `submitted` é a razão de a ferramenta existir — quem tem rascunho
     salvo acha que entregou.
+
+    `com_warning` enche o `warnings` da RAIZ, que já estava aqui vazio e existe
+    de verdade: `submission_status_ec1.json` (captura de 15/09) traz a chave no
+    topo, com `[]`. A captura não exercita o conteúdo da lista — esta conta não
+    tem entrega que o token não alcance —, então a FORMA de cada item vem de
+    `assign_ptc3314.json`, onde o mesmo campo veio preenchido pelo Moodle com
+    `item`, `itemid`, `warningcode` e `message`. Lista vazia não vira caminho na
+    varredura de `test_forma_real`, então nada aqui é campo inventado.
 
     `com_texto_online=False` produz a entrega SÓ DE ARQUIVO, que é a forma dos
     quatro `assign` reais de PTC3314. As duas existem porque o tamanho do cru
@@ -418,7 +427,18 @@ def status_de_entrega(
                 ],
             },
         },
-        "warnings": [],
+        "warnings": (
+            [
+                {
+                    "item": "module",
+                    "itemid": 6372370,
+                    "warningcode": "1",
+                    "message": "Sem direito de acesso a este módulo",
+                }
+            ]
+            if com_warning
+            else []
+        ),
     }
 
 
