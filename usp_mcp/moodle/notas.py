@@ -13,10 +13,27 @@ do código, à mão, e determinística:
 | pergunta | função | o que ela dá |
 |---|---|---|
 | sem disciplina | `gradereport_overview_get_course_grades` | a nota final de cada matrícula, três campos por linha |
-| com disciplina | `gradereport_user_get_grade_items` | item a item de UM curso, com peso e máximo |
+| com disciplina | `gradereport_user_get_grade_items` | item a item de UM curso, com a nota e o peso de cada um |
 
 A Regra de Ouro (§3.1) fica de pé: uma função por invocação, escolhida à mão,
 nunca as duas "para ter as duas visões" (N3).
+
+**O que esta ferramenta NÃO diz, e por quê: de quanto era a nota.** Até 15/09/2026
+o módulo montava um campo `maximo` a partir de `grademax` e o renderizador
+imprimia "8,50 de 10,00" quando houvesse valor. Nunca houve: a captura real de
+15/09 (`fixtures/moodle/grade_items_ptc3314.json`, 20 itens, 26 chaves
+distintas) não traz `grademax` em item nenhum, nem com esse nome nem com outro.
+Das três chaves que falam de nota, `graderaw`, `gradeformatted` e
+`percentageformatted` dizem QUANTO se tirou; de quanto era, nenhuma diz. O
+`.get` devolvia `None`, o campo nascia vazio e o `if` do renderizador comia a
+falta em silêncio — a saída nunca mentiu, e foi por isso que o campo morto
+sobreviveu a uma suíte verde. Ele saiu inteiro, com o texto que o prometia.
+
+Derivar de `percentageformatted` sobre `graderaw` foi considerado e descartado:
+duas casas decimais de percentual arredondado sobre uma nota arredondada devolvem
+um máximo aproximado, e um "de 10,00" calculado é indistinguível de um recebido
+para quem lê. Inferência apresentada como dado é o que o Invariante 6 proíbe.
+F8, em `tests/moodle/test_forma_real.py`, é o que impede a chave de voltar.
 
 **Os dois parâmetros que este módulo manda e a API não exige.** As duas funções
 declaram `userid [opt=0]`, e `grade_items` declara `courseid [opt=0]` — o
@@ -71,7 +88,6 @@ class ItemDeNota:
 
     nome: str
     nota: str
-    maximo: str
     peso: str
     oculta: bool = False
     total_do_curso: bool = False
@@ -124,10 +140,22 @@ def projetar_visao_geral(bruto, disciplinas) -> tuple[list[NotaDeCurso], int]:
 def projetar_itens(bruto, userid) -> tuple[list[ItemDeNota], int, int]:
     """`grade_items` → (itens, quantos têm comentário, blocos de terceiro ignorados).
 
-    Das 24 chaves por item sobram quatro. As descartadas não são gordura
-    acidental: `cmid`, `iteminstance` e `categoryid` são endereçamento interno,
-    `percentageformatted` é `graderaw/grademax` já calculado, e `averageformatted`
-    é a média da TURMA — desempenho de terceiros agregado, que não é a pergunta.
+    Das chaves por item sobram três — nome, nota e peso. A contagem exata da
+    captura de 15/09/2026, conferida item a item: 26 chaves distintas, das quais
+    23 vêm em todos os 20 itens, `cmid` em 17 e o par `weightraw`/`weightformatted`
+    em 10. É por isso que o peso degrada em vez de ser exigido: metade dos itens
+    desta disciplina não o traz, e item sem peso não é item quebrado.
+
+    As descartadas não são gordura acidental: `cmid`, `iteminstance` e
+    `categoryid` são endereçamento interno, e `percentageformatted` é a mesma
+    nota em percentual — responde "quanto tirei" de novo, com outra unidade.
+
+    Esta docstring já descreveu o descarte de `averageformatted` (a média da
+    turma) e a origem de `percentageformatted` como `graderaw/grademax`. Nenhum
+    dos dois campos existe na captura: era o mesmo erro que o cabeçalho de
+    `tests/moodle/test_forma_real.py` registra ter custado caro em 14/09 — razão
+    de projeção escrita contra um dicionário imaginado. Corrigido em 15/09 contra
+    a captura, que é também de onde sai a contagem acima.
     """
     itens: list[ItemDeNota] = []
     com_comentario = 0
@@ -151,7 +179,6 @@ def projetar_itens(bruto, userid) -> tuple[list[ItemDeNota], int, int]:
                     nome=_texto(item.get("itemname")).strip()
                     or ("Total do curso" if total else "(item sem nome)"),
                     nota=nota,
-                    maximo=_texto(item.get("grademax")).strip(),
                     peso=_texto(item.get("weightformatted")).strip(),
                     oculta=oculta,
                     total_do_curso=total,
@@ -179,7 +206,11 @@ def _formatar_item(item: ItemDeNota) -> str:
     elif item.nota in _SEM_NOTA:
         nota = "sem nota lançada"
     else:
-        nota = f"{item.nota}" + (f" de {item.maximo}" if item.maximo else "")
+        # A nota, e só a nota. O "de 10,00" que esta linha já tentou montar
+        # dependia de um `grademax` que a resposta não traz (ver o cabeçalho do
+        # módulo): o `if` que o protegia nunca foi verdadeiro uma vez sequer, e
+        # o que ele de fato fazia era esconder o campo morto.
+        nota = item.nota
     linha = f"  {item.nome}: {nota}"
     if item.peso and item.peso not in _SEM_NOTA and not item.total_do_curso:
         linha += f" (peso {item.peso})"
@@ -233,8 +264,8 @@ def _de_todas(cliente, disciplinas, userid) -> RespostaNotas:
             "e-Disciplinas devolve todas as matrículas e não as deste semestre."
         )
     avisos.append(
-        "Esta é a nota FINAL de cada disciplina. Para ver item a item, com "
-        "peso e máximo, pergunte de novo dizendo a disciplina."
+        "Esta é a nota FINAL de cada disciplina. Para ver item a item, com o "
+        "peso de cada um, pergunte de novo dizendo a disciplina."
     )
     avisos.extend(_avisos_de(bruto))
 
