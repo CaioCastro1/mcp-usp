@@ -3760,3 +3760,29 @@ vezes, registrar nove anotadas e uma muda não quebraria nada visível. Continua
 do handshake.
 
 ---
+
+### 15/09/2026 — a versão vai para 1.0.0, e o que esse número promete
+
+Decisão do dono: os três servidores deixam de anunciar `0.1.0` e passam a anunciar `1.0.0`.
+
+O número muda em quatro lugares que precisam concordar, e o P5 existe justamente para
+reprovar quando eles discordam: o `version` do `pyproject.toml` e o `version=` de cada
+`MCPServer`. Um cliente que lê `usp-mcp 1.0.0` no pacote e `0.1.0` no `initialize` está
+lendo duas verdades sobre o mesmo processo.
+
+O que este número promete, e é a parte que importa mais do que o incremento: nomes de
+ferramenta e formato de argumento passam a ser interface pública. Tirar uma ferramenta,
+renomear um parâmetro ou trocar o sentido de um valor deixa de ser refactor e passa a ser
+quebra, porque agora existe gente de fora com a configuração apontada para cá. O texto das
+respostas **não** entra nessa promessa: ele é lido por um modelo e não por um programa, e
+travá-lo congelaria justamente a parte que melhora com uso.
+
+O que NÃO mudou junto, para não parecer que mudou: a licença continua ausente, e a escrita
+continua desligada por padrão. Nenhuma das duas depende do número da versão.
+
+As menções a `0.1.0` que sobraram neste documento ficam onde estão. Elas são registro do
+que foi medido no dia, e a mesma passagem que cita a versão antiga também diz que o
+`tools/list` devolvia **uma** ferramenta. Atualizar o número ali transformaria medição em
+ficção.
+
+---

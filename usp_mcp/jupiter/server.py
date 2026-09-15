@@ -316,7 +316,7 @@ def main() -> None:
     # primeira: a segunda ferramenta ficava DECLARADA e não anunciada, e quem
     # pegou isso foi o handshake — a suíte em processo estava verde.
     por_nome = {f["name"]: f for f in listar_ferramentas()}
-    servidor = MCPServer(name="usp-mcp-jupiter", version="0.1.0")
+    servidor = MCPServer(name="usp-mcp-jupiter", version="1.0.0")
 
     # Sem decorator de tradução de erro, por mais tentador que seja: o SDK
     # deriva o schema da ASSINATURA, e um wrapper `*args/**kwargs` faz o modelo
