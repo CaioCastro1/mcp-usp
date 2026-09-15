@@ -21,7 +21,7 @@ implementa por iniciativa de quem lê: ela volta para o dono do repositório.
 
 ## P0 — fundação: barato, e destrava o resto
 
-### A1. Licença · **ADIADO por decisão de 14/09/2026**
+### A1. Licença · **FEITO em 15/09/2026: MIT**
 
 O repositório **não tem licença nenhuma**, e por ora vai continuar assim: a
 pergunta foi feita e a resposta foi "nenhuma por enquanto" (14/09/2026).
@@ -36,7 +36,13 @@ Vale reabrir junto com o B1, porque distribuir como pacote ou `.mcpb` torna a
 lacuna visível para quem não conhece o projeto. O comparável `loyaniu` também não
 tem licença; o `SaadRahman01/moodle-mcp` tem MIT.
 
-Com o A1 adiado, o P0 é **A2 + A3**.
+> **Decidido em 15/09/2026: MIT.** O que estava adiado era a escolha, não o
+> levantamento, e o que forçou a decisão foi o lançamento: publicar sem licença
+> entrega um projeto visível e legalmente inutilizável, inclusive para quem
+> seguir o README. A razão da MIT em vez de GPL está no `pyproject.toml`, ao
+> lado do campo. O arquivo `LICENSE` está na raiz.
+
+Com o A1 adiado, o P0 era **A2 + A3**, e os três estão fechados.
 
 ### A2. O furo no bloqueio permanente · trabalho · ~1 h
 

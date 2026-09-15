@@ -33,11 +33,22 @@ version = "1.0.0"
 description = "Ferramentas MCP para a vida acadêmica na USP — bandejão do RUCard, prazos e material do e-Disciplinas, catálogo do JupiterWeb. Projeto não-oficial, sem vínculo com a Universidade de São Paulo."
 readme = "README.md"
 
-# Sem `license` nem classificador de licença, e isso é escolha registrada, não
-# esquecimento: o A1 do ROADMAP foi ADIADO em 14/09/2026 com a resposta "nenhuma
-# por enquanto". Declarar uma aqui seria decidir por conta própria o que voltou
-# para o dono do repositório. O efeito prático — todos os direitos reservados —
-# está escrito no A1, e empacotar torna a lacuna mais visível, não menos.
+# MIT, decidida em 15/09/2026 (A1 do ROADMAP, que estava adiado desde 14/09).
+# A escolha é sobre o que se exige de quem pega o código, e aqui a resposta é
+# "nada além do crédito": este projeto não é biblioteca que outros embutem, é
+# ferramenta que uma pessoa instala no próprio assistente. GPL cobraria atrito
+# por uma garantia sem valor nesse uso, já que ninguém redistribui versão
+# modificada de um cliente de bandejão, e a cláusula de patente da Apache
+# protege contra um risco que este projeto não tem.
+#
+# `license-files` em vez do campo `license` de texto livre: desde a PEP 639 o
+# caminho declarado é o arquivo, e o classificador de licença está deprecado.
+#
+# O que a licença NÃO faz: ela não diz nada sobre a relação com a USP. Isso é
+# outro assunto, e quem o trata é o aviso de projeto não-oficial na descrição
+# acima e no README.
+license = "MIT"
+license-files = ["LICENSE"]
 
 # Piso medido, não estimado: 3.11 é a versão mais baixa em que a SUÍTE deste
 # projeto roda, porque `tomllib` (que `tests/test_pacote.py` usa para ler este
