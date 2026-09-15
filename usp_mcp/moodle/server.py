@@ -122,7 +122,10 @@ def listar_ferramentas() -> list[dict]:
                         "description": (
                             "Sigla da disciplina como no e-Disciplinas, por "
                             "exemplo PSI3323 ou PTC3314. Espaço e caixa não "
-                            "importam. Casa também com pedaço do nome."
+                            "importam. Aceita também o RÓTULO inteiro "
+                            "(PSI3323-2026), que é o que distingue duas "
+                            "matrículas da mesma sigla, e casa com pedaço do "
+                            "nome."
                         ),
                     },
                     "busca": {
@@ -158,8 +161,10 @@ def listar_ferramentas() -> list[dict]:
                         "type": "string",
                         "description": (
                             "Sigla da disciplina como no e-Disciplinas, por "
-                            "exemplo PSI3323. Espaço e caixa não importam. Casa "
-                            "também com pedaço do nome."
+                            "exemplo PSI3323. Espaço e caixa não importam. "
+                            "Aceita também o RÓTULO inteiro (PSI3323-2026), "
+                            "que é o que distingue duas matrículas da mesma "
+                            "sigla, e casa com pedaço do nome."
                         ),
                     },
                     "nome": {
@@ -236,8 +241,10 @@ def listar_ferramentas() -> list[dict]:
                         "type": "string",
                         "description": (
                             "Sigla da disciplina como no e-Disciplinas, por "
-                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
-                            "também com pedaço do nome."
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Aceita também o RÓTULO inteiro (PTC3314-2026), "
+                            "que é o que distingue duas matrículas da mesma "
+                            "sigla, e casa com pedaço do nome."
                         ),
                     },
                     "entrega": {
@@ -311,8 +318,10 @@ def listar_ferramentas() -> list[dict]:
                         "type": "string",
                         "description": (
                             "Sigla da disciplina como no e-Disciplinas, por "
-                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
-                            "também com pedaço do nome."
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Aceita também o RÓTULO inteiro (PTC3314-2026), "
+                            "que é o que distingue duas matrículas da mesma "
+                            "sigla, e casa com pedaço do nome."
                         ),
                     },
                 },
@@ -343,8 +352,10 @@ def listar_ferramentas() -> list[dict]:
                         "type": "string",
                         "description": (
                             "Sigla da disciplina como no e-Disciplinas, por "
-                            "exemplo PTC3314. Espaço e caixa não importam. Casa "
-                            "também com pedaço do nome."
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Aceita também o RÓTULO inteiro (PTC3314-2026), "
+                            "que é o que distingue duas matrículas da mesma "
+                            "sigla, e casa com pedaço do nome."
                         ),
                     },
                     "dias": {
