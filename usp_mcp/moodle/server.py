@@ -244,11 +244,13 @@ def listar_ferramentas() -> list[dict]:
             "description": (
                 "Mostra as suas notas no e-Disciplinas (Moodle da USP). Sem "
                 "disciplina, dá a nota final de cada uma. Com disciplina, abre "
-                "item a item: cada prova, lista e exercício com a nota, de "
-                "quanto ela é e quanto vale no total. Use para 'como estou de "
+                "item a item: cada prova, lista e exercício com a nota e quanto "
+                "ela pesa na final. Use para 'como estou de "
                 "nota', 'quanto tirei no EP1', 'minhas notas em PTC3314', 'qual "
                 "minha média'. Diz quando o professor lançou e ocultou a nota, "
-                "em vez de fingir que não existe. Não traz o comentário escrito "
+                "em vez de fingir que não existe. Não diz de quanto era a nota: "
+                "o e-Disciplinas não manda o máximo do item, só o valor tirado. "
+                "Não traz o comentário escrito "
                 "do professor, e não sabe de nota que ficou no papel e nunca "
                 "foi lançada no sistema. Custa UMA chamada ao Moodle."
             ),

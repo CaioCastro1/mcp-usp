@@ -1,4 +1,4 @@
-"""F1-F7: o dublê não inventa campo que o e-Disciplinas não tem.
+"""F1-F9: nem o dublê monta, nem o código lê, campo que o e-Disciplinas não tem.
 
 A suíte do Moodle monta as respostas com **construtores** (`conftest.py`), e não
 com arquivo estático, porque cada teste precisa de um cenário próprio: com
@@ -22,12 +22,22 @@ O contrário **não** é exigido. O construtor pode omitir à vontade: o que ele
 monta é o que o teste não precisava, e exigir cobertura total transformaria cada
 campo novo do Moodle num vermelho que não diz nada.
 
-As sete fixturas são captura real de 15/09/2026, higienizadas pelo §3.3. Elas
-não são lidas pelos testes das ferramentas: existem só para esta conferência de
-forma, que é o papel que a suíte irmã do Jupiter dá às dela.
+F8 e F9 fecham a porta do outro lado, descoberta em 15/09/2026. F1-F6 garantem
+que o construtor não INVENTA campo; nada garantia que a PROJEÇÃO não LÊ um. E ela
+lia: `projetar_itens` montava o máximo de cada item a partir de `grademax`, que
+nenhum dos 20 itens da captura traz. `.get` de chave inexistente devolve `None`,
+o renderizador degradava sozinho, a saída nunca mentiu — e por isso ninguém viu.
+A regra espelhada é igualmente estreita:
+
+    toda chave que a projeção lê tem de existir na resposta real.
+
+As fixturas são captura real de 15/09/2026, higienizadas pelo §3.3. Elas não são
+lidas pelos testes das ferramentas: existem só para esta conferência de forma,
+que é o papel que a suíte irmã do Jupiter dá às dela.
 """
 from __future__ import annotations
 
+import ast
 import json
 import pathlib
 
@@ -35,7 +45,8 @@ import pytest
 
 from tests.moodle import conftest as c
 
-FIXTURES = pathlib.Path(__file__).resolve().parents[2] / "fixtures" / "moodle"
+RAIZ = pathlib.Path(__file__).resolve().parents[2]
+FIXTURES = RAIZ / "fixtures" / "moodle"
 
 pytestmark = pytest.mark.contrato
 
@@ -156,4 +167,116 @@ def test_f7_a_conferencia_pega_campo_inventado():
     assert "grades[]" not in vazio, (
         "lista vazia virou amostra: isso faria a conferência acusar campo que a "
         "captura apenas não exercita"
+    )
+
+
+# --------------------------------------------------------------------------
+# O outro lado da regra: o CÓDIGO também não lê campo que a captura não tem
+# --------------------------------------------------------------------------
+
+
+def _chaves_lidas(modulo: str, funcao: str, variavel: str) -> set[str]:
+    """Os literais de `<variavel>.get("X")` dentro de `<funcao>`, lidos do fonte.
+
+    Vai ao fonte e não ao comportamento de propósito: `.get` de chave que não
+    existe devolve `None` em silêncio, e é justamente esse silêncio que precisa
+    virar vermelho. Um teste que só olhasse a SAÍDA veria a degradação correta e
+    passaria, que foi o que aconteceu com `grademax` por um dia inteiro.
+    """
+    fonte = (RAIZ / modulo).read_text(encoding="utf-8")
+    corpo = [
+        no
+        for no in ast.walk(ast.parse(fonte))
+        if isinstance(no, ast.FunctionDef) and no.name == funcao
+    ]
+    assert len(corpo) == 1, f"`{funcao}` não é única em {modulo}: {len(corpo)} achadas"
+
+    return {
+        no.args[0].value
+        for no in ast.walk(corpo[0])
+        if isinstance(no, ast.Call)
+        and isinstance(no.func, ast.Attribute)
+        and no.func.attr == "get"
+        and isinstance(no.func.value, ast.Name)
+        and no.func.value.id == variavel
+        and no.args
+        and isinstance(no.args[0], ast.Constant)
+        and isinstance(no.args[0].value, str)
+    }
+
+
+_NOTAS = "usp_mcp/moodle/notas.py"
+
+# `caminho da captura -> (função da projeção, variável que percorre aquele nível)`
+LEITURAS = {
+    "grade_items_ptc3314": {
+        "usergrades[]": ("projetar_itens", "bloco"),
+        "usergrades[].gradeitems[]": ("projetar_itens", "item"),
+    },
+    "grades_overview": {
+        "grades[]": ("projetar_visao_geral", "grade"),
+    },
+}
+
+
+@pytest.mark.parametrize("nome_fixture", sorted(LEITURAS))
+def test_f8_a_projecao_de_notas_nao_le_campo_que_a_captura_nao_tem(nome_fixture):
+    """F8 — o espelho de F1-F6, do lado do código.
+
+    O defeito medido em 15/09/2026: a projeção lia `grademax` para preencher o
+    "máximo" de cada item e a captura não traz esse campo em nenhum dos 20 itens
+    — nem com esse nome nem com outro. Das 26 chaves distintas, `graderaw`,
+    `gradeformatted` e `percentageformatted` dizem QUANTO se tirou, e nenhuma diz
+    de quanto era. O campo morto foi removido; este teste é o que impede que ele
+    volte calado, aqui ou em qualquer chave nova que alguém suponha existir.
+
+    A degradação do renderizador NÃO é a defesa: ela é o que esconde o defeito.
+    """
+    real = _mapa(_real(nome_fixture))
+
+    inexistentes = {}
+    for caminho, (funcao, variavel) in LEITURAS[nome_fixture].items():
+        assert caminho in real, (
+            f"a captura `{nome_fixture}.json` não tem amostra em `{caminho}`: "
+            "sem amostra esta conferência ficaria verde sem conferir nada"
+        )
+        lidas = _chaves_lidas(_NOTAS, funcao, variavel)
+        assert lidas, (
+            f"nenhuma chave lida por `{funcao}` via `{variavel}.get(...)` — a "
+            "varredura do fonte quebrou, e um verde aqui não vale nada"
+        )
+        if sobrando := sorted(lidas - real[caminho]):
+            inexistentes[f"{funcao}/{variavel} em {caminho}"] = sobrando
+
+    assert not inexistentes, (
+        f"a projeção lê de `{nome_fixture}.json` chave que a captura real não "
+        f"tem: {inexistentes}\n"
+        "O pai dessas chaves existe na captura com amostra, então a ausência é "
+        "informação e não falta de dado. `.get` de chave inexistente devolve "
+        "`None`, o campo nasce vazio e o renderizador degrada sozinho: o defeito "
+        "não aparece na saída, só no que o código promete e não entrega.\n"
+        "Se a chave existe de verdade e a captura é que está velha, recapture "
+        "com `./scripts/capture.sh` e diga isso no §9."
+    )
+
+
+def test_f9_a_conferencia_pega_leitura_de_campo_inexistente():
+    """F9 — sabotagem de F8, pelo mesmo motivo de F7.
+
+    Uma varredura de fonte quebrada devolve conjunto vazio, e conjunto vazio não
+    sobra nada em comparação nenhuma: F8 ficaria verde sem ter lido o código.
+    """
+    lidas = _chaves_lidas(_NOTAS, "projetar_itens", "item")
+    assert "gradeformatted" in lidas and "gradeishidden" in lidas, (
+        f"a varredura não achou as leituras que existem em `projetar_itens`: {lidas}"
+    )
+    assert "grademax" not in lidas, (
+        "`grademax` voltou a ser lido: a captura de 15/09 não tem esse campo em "
+        "item nenhum, e o renderizador esconde a falta em vez de acusá-la"
+    )
+
+    # E o isolamento: uma variável que aquela função não percorre não traz chave
+    # emprestada de outra, o que faria F8 acusar campo no caminho errado.
+    assert not _chaves_lidas(_NOTAS, "projetar_itens", "grade"), (
+        "a varredura não separou por variável: `grade` é de `projetar_visao_geral`"
     )

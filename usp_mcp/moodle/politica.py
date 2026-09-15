@@ -49,7 +49,9 @@ from dataclasses import dataclass
 # sobre serem DUAS: as duas visões de nota do e-Disciplinas não competem, se
 # complementam (catálogo §3.7). `gradereport_overview_get_course_grades` dá a
 # nota final de cada matrícula; `gradereport_user_get_grade_items` dá item a
-# item de UM curso, com peso e máximo. Nenhuma das duas responde o que a outra
+# item de UM curso, com a nota e o peso de cada um — o máximo do item não vem
+# nesta resposta, e a medida que fechou isso está no cabeçalho de `notas.py`
+# (captura de 15/09/2026). Nenhuma das duas responde o que a outra
 # responde, e a ferramenta escolhe UMA por invocação — nunca as duas.
 #
 # As duas são leitura. A família tem escrita (`gradereport_*_view_grade_report`,
