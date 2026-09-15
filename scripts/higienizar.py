@@ -30,12 +30,34 @@ import sys
 from typing import Any
 
 # Campos cujo *valor* é dado pessoal ou identificador do dono (§3.3).
-CAMPOS_IDENTIFICADOR = {"userid", "userrole", "usermodified"}
+CAMPOS_IDENTIFICADOR = {
+    "userid", "userrole", "usermodified",
+    # 15/09/2026: `useridnumber` é o NÚMERO USP, e chega em
+    # `gradereport_user_get_grade_items` como string de dígitos. Ficava de fora
+    # por dois motivos somados: não estava na lista, e o ramo abaixo só tratava
+    # `int`. É identificador mais forte que o `userid` interno, porque vale fora
+    # do Moodle.
+    "useridnumber",
+}
 CAMPOS_NOME = {
     "fullname", "fullnamedisplay", "firstname", "lastname", "username",
     "displayname", "author", "authorfullname", "userfullname",
+    # 15/09/2026: `usermodifiedfullname` chega em `mod_forum_get_forum_discussions`
+    # e ficava de fora, porque a lista era escrita nome a nome e ninguém tinha
+    # capturado fórum ainda. Vazou o nome real de um professor para a fixture.
+    "usermodifiedfullname",
 }
+
+# A lista acima envelhece a cada resposta nova do Moodle, e foi assim que o nome
+# do professor escapou. O sufixo é a rede: no core, campo terminado em `fullname`
+# é nome de pessoa ou de curso, e os dois são higienizados aqui de qualquer jeito.
+SUFIXOS_NOME = ("fullname",)
 CAMPOS_EMAIL = {"email", "useremail"}
+# Campos que são esvaziados em vez de substituídos: blob serializado do PHP que
+# consumidor nenhum lê e que carrega o que o Moodle quiser pôr lá dentro. Em
+# 15/09/2026 o `customdata` de PTC3314 guardava o nome de um professor 50 vezes,
+# e a projeção do projeto já o descartava — ninguém perde nada esvaziando.
+CAMPOS_OPACOS = {"customdata"}
 CAMPOS_NOTA = {"grade", "rawgrade", "gradeformatted", "graderaw", "finalgrade"}
 # Texto escrito por pessoa: pode nomear professor, sala, colega.
 CAMPOS_TEXTO_LIVRE = {
@@ -132,11 +154,19 @@ def higienizar(no: Any, chave: str | None = None) -> Any:
         return no
     k = chave.lower()
 
+    if k in CAMPOS_IDENTIFICADOR and isinstance(no, bool):
+        return no
     if k in CAMPOS_IDENTIFICADOR and isinstance(no, int) and no != 0:
         return _id_sintetico(no)
+    # Mesmo campo, forma de string: o `useridnumber` chega assim. Preserva o
+    # número de dígitos, para a fixture continuar parecendo o que é.
+    if k in CAMPOS_IDENTIFICADOR and isinstance(no, str) and no.isdigit():
+        return str(_id_sintetico(int(no)))
+    if k in CAMPOS_OPACOS and isinstance(no, str):
+        return ""
     if k in CAMPOS_EMAIL and isinstance(no, str):
         return _email_sintetico(no)
-    if k in CAMPOS_NOME and isinstance(no, str):
+    if isinstance(no, str) and (k in CAMPOS_NOME or k.endswith(SUFIXOS_NOME)):
         return _nome_sintetico(no)
     if k in CAMPOS_NOTA and isinstance(no, (int, float)) and not isinstance(no, bool):
         return round(_semente(no) % 1001 / 100, 2)
