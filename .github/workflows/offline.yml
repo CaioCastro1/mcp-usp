@@ -36,7 +36,24 @@ permissions:
 
 jobs:
   gate:
-    runs-on: ubuntu-latest
+    # macOS, e não o `ubuntu-latest` que seria o reflexo. Foi medido, e o
+    # primeiro Linux que rodou esta suíte reprovou: o `test_g3` cria uma pasta
+    # acentuada em NFD e pergunta ao git sobre a MESMA pasta escrita em NFC,
+    # que é a forma que o Python entrega. Isso só é a mesma pasta num sistema
+    # de arquivos insensível a normalização, como o do Mac do dono — onde o
+    # defeito que o teste reproduz de fato acontece. No ext4 do runner as duas
+    # formas são dois nomes, o segundo não existe, e o teste morre antes de
+    # chegar ao que ele mede. 735 de 736 passaram; a que faltou não tem
+    # relação com a mudança que a PR traz, que é exatamente o "reprovar por
+    # motivo errado" que este CI existe para não fazer.
+    #
+    # Rodar onde o projeto roda também é o mais honesto: o dono desenvolve e
+    # usa os três servidores num Mac. O preço é que minuto de macOS conta a
+    # 10x num repositório privado — a suíte leva ~16 s, então o gasto está no
+    # preparo do runner, não nela. Levar o CI para Linux é possível e mais
+    # barato no dia em que o `test_g3` souber pular declarando o motivo em vez
+    # de quebrar; ficou registrado no backlog de correções, com a medida.
+    runs-on: macos-latest
 
     # A suíte inteira leva ~16 s na máquina do dono. Dez minutos é folga de
     # sobra, e existe por um defeito já visto aqui: o `tests/test_gate.py` roda
