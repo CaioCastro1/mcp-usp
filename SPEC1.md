@@ -3786,3 +3786,37 @@ que foi medido no dia, e a mesma passagem que cita a versão antiga também diz 
 ficção.
 
 ---
+
+### 15/09/2026 — a licença é MIT, e a pergunta que ela responde
+
+O A1 do roadmap estava adiado desde 14/09 com a resposta "nenhuma por enquanto". Reaberto e
+fechado hoje, com MIT.
+
+O que forçou a decisão não foi argumento novo, foi o lançamento. Sem arquivo de licença o
+padrão legal é todos os direitos reservados, e publicar assim entrega um repositório
+visível e legalmente inutilizável, inclusive para quem seguir o README. A ausência deixou
+de ser adiamento e virou defeito no dia em que a publicação entrou na mesa.
+
+A escolha entre as três candidatas é uma pergunta só: **o que se exige de quem pega o
+código.** MIT exige o crédito. Apache exige o crédito e acrescenta cláusula de patente. GPL
+exige que trabalho derivado distribuído também abra o código.
+
+MIT porque este projeto não é biblioteca que outros embutem: é ferramenta que uma pessoa
+instala no próprio assistente. Nesse uso a GPL cobra atrito real (dúvida jurídica de quem
+lê, recusa em contexto corporativo) por uma garantia sem valor, já que ninguém redistribui
+versão modificada de um cliente de bandejão. A cláusula de patente da Apache protege contra
+um risco que este projeto não tem. Some-se que o comparável mais próximo, o
+`SaadRahman01/moodle-mcp`, usa MIT, então quem chega já sabe o que esperar.
+
+Declarada como `license = "MIT"` com `license-files`, e **não** como classificador: desde a
+PEP 639 o caminho é o arquivo, e o classificador está deprecado. Conferido no metadado do
+pacote depois de reinstalar: `License-Expression: MIT`.
+
+O que a licença **não** faz, para ninguém achar que faz: ela não diz nada sobre a relação
+com a USP. Isso é outro assunto, e quem o trata é o aviso de projeto não-oficial na
+descrição do pacote e no README.
+
+O copyright nomeia os dois autores. O histórico tem 180 commits de `CaioCastro1` e 86 de
+`JoaoPedroBPG`, então a obra é conjunta e a linha de copyright precisa dizer isso.
+
+---
