@@ -53,6 +53,11 @@ CAMPOS_NOME = {
 # é nome de pessoa ou de curso, e os dois são higienizados aqui de qualquer jeito.
 SUFIXOS_NOME = ("fullname",)
 CAMPOS_EMAIL = {"email", "useremail"}
+# Campos que são esvaziados em vez de substituídos: blob serializado do PHP que
+# consumidor nenhum lê e que carrega o que o Moodle quiser pôr lá dentro. Em
+# 15/09/2026 o `customdata` de PTC3314 guardava o nome de um professor 50 vezes,
+# e a projeção do projeto já o descartava — ninguém perde nada esvaziando.
+CAMPOS_OPACOS = {"customdata"}
 CAMPOS_NOTA = {"grade", "rawgrade", "gradeformatted", "graderaw", "finalgrade"}
 # Texto escrito por pessoa: pode nomear professor, sala, colega.
 CAMPOS_TEXTO_LIVRE = {
@@ -157,6 +162,8 @@ def higienizar(no: Any, chave: str | None = None) -> Any:
     # número de dígitos, para a fixture continuar parecendo o que é.
     if k in CAMPOS_IDENTIFICADOR and isinstance(no, str) and no.isdigit():
         return str(_id_sintetico(int(no)))
+    if k in CAMPOS_OPACOS and isinstance(no, str):
+        return ""
     if k in CAMPOS_EMAIL and isinstance(no, str):
         return _email_sintetico(no)
     if isinstance(no, str) and (k in CAMPOS_NOME or k.endswith(SUFIXOS_NOME)):
