@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from .cliente import ClienteJupiter, transporte_http
 from .erros import ErroJupiter
-from .ferramentas import disciplina, requisitos
+from .ferramentas import agrupar_curriculos, disciplina, requisitos, resolver_secoes
 
 _NOME_FERRAMENTA = "disciplina"
 _NOME_REQUISITOS = "requisitos"
@@ -39,13 +39,15 @@ def listar_ferramentas() -> list[dict]:
         {
             "name": _NOME_FERRAMENTA,
             "description": (
-                "Consulta o catálogo público do JupiterWeb (USP): créditos, "
-                "carga horária, ementa, objetivos, programa, bibliografia e "
-                "critério de avaliação de uma disciplina, pela sigla. Se você "
-                "informar o curso, traz também o pré-requisito — que depende do "
-                "curso, não só da disciplina. Use para 'quantos créditos tem "
-                "PTC3314', 'qual a ementa de MAT2454', 'o que preciso ter feito "
-                "antes dessa matéria'. NÃO traz horário de aula, sala nem vagas."
+                "Ficha de uma disciplina no catálogo público do JupiterWeb (USP), "
+                "pela sigla: nome, créditos e carga horária sempre, e sob pedido "
+                "ementa, objetivos, programa, bibliografia e avaliação. Use para "
+                "'quantos créditos tem PTC3314', 'qual a ementa de MAT2454', 'o "
+                "que cai em PME3344' (programa), 'como é a avaliação'. Por padrão "
+                "vem só nome, créditos e ementa — peça as outras partes em "
+                "`secoes`. Para pré-requisito use a ferramenta `requisitos`. NÃO "
+                "traz horário de aula, sala nem vagas, e não busca por nome: "
+                "precisa da sigla."
             ),
             "inputSchema": {
                 "type": "object",
@@ -58,17 +60,23 @@ def listar_ferramentas() -> list[dict]:
                             "importam."
                         ),
                     },
-                    "codcur": {
-                        "type": "string",
+                    "secoes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "ementa", "objetivos", "programa",
+                                "bibliografia", "avaliacao", "todas",
+                            ],
+                        },
                         "description": (
-                            "Código do curso, para o pré-requisito. Opcional: "
-                            "sem ele a resposta diz que não consultou, em vez "
-                            "de afirmar que não há pré-requisito."
+                            "Quais partes da ficha vir além de nome, créditos e "
+                            "carga horária. Padrão: só a ementa. 'avaliacao' "
+                            "junta método, critério e recuperação; 'objetivos' e "
+                            "'programa' são os textos mais longos. Use ['todas'] "
+                            "para a ficha inteira."
                         ),
-                    },
-                    "codhab": {
-                        "type": "string",
-                        "description": "Código da habilitação. Padrão '0'.",
+                        "default": ["ementa"],
                     },
                     "ingles": {
                         "type": "boolean",
@@ -159,14 +167,17 @@ def formatar(ficha: dict) -> str:
         f"Tipo: {ficha['tipo']} · Ativação: {ficha['ativacao']}",
     ]
 
-    exigencias = ficha.get("pre_requisito")
-    if exigencias:
-        for r in exigencias:
-            linhas.append(f"{rotulo_de(r)}: {r['sigla']} ({r['nome']})")
-
     for campo, rotulo in _ROTULOS:
         if ficha.get(campo):
             linhas.append(f"\n{rotulo}:\n{ficha[campo]}")
+
+    # Invariante 7 na ficha: o que não veio é dito, para o modelo saber que
+    # existe mais e como pedir.
+    if ficha.get("secoes_omitidas"):
+        linhas.append(
+            "\n(Seções não incluídas: " + ", ".join(ficha["secoes_omitidas"])
+            + '. Peça-as em secoes, ou secoes=["todas"].)'
+        )
 
     # Invariante 7: o que a ferramenta NÃO sabe vai junto, nunca por omissão.
     for aviso in ficha.get("avisos") or ():
@@ -175,37 +186,50 @@ def formatar(ficha: dict) -> str:
     return "\n".join(linhas)
 
 
-def formatar_requisitos(ficha: dict) -> str:
-    """Texto para o modelo ler, agrupado por currículo.
+def _cabecalho_do_grupo(chave: tuple) -> str:
+    """As exigências de um grupo, agrupadas por rótulo: `Rótulo: A — nome; B — nome`."""
+    if not chave:
+        return "• (a página não traz linha de exigência para estes)"
+    por_rotulo: dict[str, list[str]] = {}
+    for sigla, nome, tipo, _rotulo in chave:
+        por_rotulo.setdefault(rotulo_de({"tipo": tipo}), []).append(f"{sigla} — {nome}")
+    return "• " + " | ".join(f"{r}: {'; '.join(itens)}" for r, itens in por_rotulo.items())
 
-    O agrupamento não é estética: o tipo da exigência é propriedade do
-    currículo (MAT2454 é duro em Minas e fraco em Elétrica), e uma lista
-    achatada apagaria justamente o que decide a matrícula.
-    """
-    # Sem currículo, o cabeçalho prometeria uma lista que não vem — e promessa
-    # não cumprida na primeira linha é o que faz o modelo preencher o resto.
-    linhas = (
-        [f"Exigências para cursar {ficha['sigla']}, por currículo:"]
-        if ficha["curriculos"]
-        else [f"Não há exigência listada para {ficha['sigla']} — leia o aviso:"]
+
+def _linha_do_curriculo(c: dict) -> str:
+    marca = " [curso de ingresso]" if c["ingresso"] else ""
+    return (
+        f"    {c['codcur']} {c['habilitacao']} "
+        f"({c['periodo']}, {c['periodo_ideal']}º período ideal){marca}"
     )
 
-    for c in ficha["curriculos"]:
-        marca = (
-            "curso de ingresso"
-            if c["ingresso"]
-            else "não consta na lista de ingresso"
-        )
-        linhas.append(
-            f"\n• {c['codcur']} — {c['habilitacao']} ({c['periodo']}), "
-            f"{c['periodo_ideal']}º período ideal [{marca}]"
-        )
-        if not c["exigencias"]:
-            linhas.append("    (a página não traz linha de exigência para este)")
-        for e in c["exigencias"]:
-            linhas.append(
-                f"    {rotulo_de(e)}: {e['sigla']} — {e['nome']}"
-            )
+
+def formatar_requisitos(ficha: dict) -> str:
+    """Texto para o modelo ler, agrupado por COMBINAÇÃO de exigências.
+
+    O agrupamento não é estética: o tipo da exigência é propriedade do currículo
+    (MAT2454 é dura em Minas e fraca em Elétrica), e a chave do grupo carrega o
+    tipo — 3250 fica sozinho justamente por isso. O que sai é a repetição: em
+    MAT2455, 18 dos 23 currículos tinham as mesmas duas linhas (§9, 14/09).
+    """
+    curriculos = ficha["curriculos"]
+    # Sem currículo, o cabeçalho prometeria uma lista que não vem — e promessa
+    # não cumprida na primeira linha é o que faz o modelo preencher o resto.
+    if not curriculos:
+        linhas = [f"Não há exigência listada para {ficha['sigla']} — leia o aviso:"]
+    else:
+        grupos = agrupar_curriculos(curriculos)
+        if len(curriculos) == 1:
+            linhas = [f"Exigências para cursar {ficha['sigla']}, por currículo:"]
+        else:
+            linhas = [
+                f"Exigências para cursar {ficha['sigla']} — {len(curriculos)} "
+                f"currículos, {len(grupos)} combinações diferentes:"
+            ]
+        for chave, membros in grupos:
+            linhas.append("")
+            linhas.append(_cabecalho_do_grupo(chave))
+            linhas.extend(_linha_do_curriculo(c) for c in membros)
 
     for aviso in ficha.get("avisos") or ():
         linhas.append(f"\n⚠ {aviso}")
@@ -237,12 +261,12 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
     if nome == _NOME_REQUISITOS:
         return formatar_requisitos(requisitos(argumentos["sigla"], cliente=cliente))
 
-    codcur = argumentos.get("codcur")
-    curso = (codcur, argumentos.get("codhab", "0")) if codcur else None
     idiomas = ("pt", "en") if argumentos.get("ingles") else ("pt",)
-
     return formatar(
-        disciplina(argumentos["sigla"], curso, cliente=cliente, idiomas=idiomas)
+        disciplina(
+            argumentos["sigla"], cliente=cliente,
+            secoes=resolver_secoes(argumentos.get("secoes")), idiomas=idiomas,
+        )
     )
 
 
@@ -277,6 +301,8 @@ def main() -> None:
             "`listar_ferramentas` e `chamar_ferramenta` funcionam sem ele."
         ) from exc
 
+    from typing import Literal
+
     from usp_mcp.adaptador import anotar
 
     # Por nome, nunca por índice. `listar_ferramentas()[0]` registrava só a
@@ -298,13 +324,12 @@ def main() -> None:
     # Só `ErroJupiter` é traduzido: `except Exception` devolveria o stack trace
     # que aquela classe existe para descartar, 116x o custo.
 
-    def _disciplina(sigla, codcur=None, codhab="0", ingles=False) -> str:
+    def _disciplina(sigla, secoes=None, ingles=False) -> str:
         # Assinatura explícita em vez de **kwargs: o SDK deriva daqui o schema
         # que o modelo vê, e **kwargs produziria ferramenta sem parâmetro.
         try:
             return chamar_ferramenta(
-                _NOME_FERRAMENTA,
-                {"sigla": sigla, "codcur": codcur, "codhab": codhab, "ingles": ingles},
+                _NOME_FERRAMENTA, {"sigla": sigla, "secoes": secoes, "ingles": ingles}
             )
         except ErroJupiter as exc:
             raise ToolError(str(exc)) from exc
@@ -320,7 +345,13 @@ def main() -> None:
     anotar(
         _disciplina,
         por_nome[_NOME_FERRAMENTA]["inputSchema"],
-        {"sigla": str, "codcur": str | None, "codhab": str, "ingles": bool},
+        {
+            "sigla": str,
+            "secoes": list[Literal[
+                "ementa", "objetivos", "programa", "bibliografia", "avaliacao", "todas"
+            ]] | None,
+            "ingles": bool,
+        },
     )
     anotar(_requisitos, por_nome[_NOME_REQUISITOS]["inputSchema"], {"sigla": str})
 
@@ -350,17 +381,30 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
 
     import inspect
 
-    declarados = set(listar_ferramentas()[0]["inputSchema"]["properties"])
     servidor = _M(name="verificacao", version="0.0.0")
 
     @servidor.tool(name="disciplina", description="verificação")
-    def _sonda(sigla: str, codcur: str | None = None, codhab: str = "0",
-               ingles: bool = False) -> str:
+    def _sonda_disciplina(sigla: str, secoes: list[str] | None = None,
+                          ingles: bool = False) -> str:
         return ""
 
-    reais = set(inspect.signature(_sonda).parameters)
-    print("schema x assinatura  :", "OK" if declarados == reais else f"DIVERGEM {declarados ^ reais}")
-    return 0 if declarados == reais else 1
+    @servidor.tool(name="requisitos", description="verificação")
+    def _sonda_requisitos(sigla: str) -> str:
+        return ""
+
+    # Uma sonda por ferramenta declarada, nunca só a [0]: foi esse índice que
+    # deixou a segunda ferramenta declarada e não anunciada em 14/09.
+    sondas = {"disciplina": _sonda_disciplina, "requisitos": _sonda_requisitos}
+    tudo_ok = True
+    for ferramenta in listar_ferramentas():
+        declarados = set(ferramenta["inputSchema"]["properties"])
+        sonda = sondas.get(ferramenta["name"])
+        reais = set(inspect.signature(sonda).parameters) if sonda else set()
+        ok = declarados == reais
+        tudo_ok = tudo_ok and ok
+        print(f"schema x assinatura  : {ferramenta['name']:11}",
+              "OK" if ok else f"DIVERGEM {declarados ^ reais}")
+    return 0 if tudo_ok else 1
 
 
 if __name__ == "__main__":  # pragma: no cover

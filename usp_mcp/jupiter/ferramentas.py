@@ -13,14 +13,21 @@ que o JavaScript oficial do JupiterWeb calcula. Quem lê o campo devolve **zero
 hora com cara de resposta certa**: o silêncio do Invariante 6 sem erro nenhum
 no caminho.
 
-**O pré-requisito é condicional ao curso.** Os créditos são incondicionais; o
-pré-requisito exige `codcur`+`codhab` (§5.2 do recon). Sem curso, esta
-ferramenta **não responde e diz que não respondeu** — omitir calado é o que o
-Invariante 7 proíbe.
+**O pré-requisito não é desta ferramenta.** Ele depende do currículo, e o único
+`codcur` que a API deixa descobrir devolve zero linha para as disciplinas do dono
+(§9, 14/09). `requisitos(sigla)` responde sem código de curso; esta ficha só aponta
+para lá — e não oferece `codcur` no schema para o modelo não trilhar o caminho errado.
+
+**A ficha vem por seção.** "Quantos créditos" é o cabeçalho (139 B); a ficha inteira
+de PTC3314 são 3.880 B, 38% deles a lista de competências dos objetivos. Por padrão
+sai só a ementa, o resto sob pedido — e o que ficou de fora é declarado no fim.
 """
 from __future__ import annotations
 
+import re
+
 from . import requisitos as _recorte
+from .erros import ErroJupiter
 
 # O nome da consulta NUNCA aparece nesta camada: quem o conhece é a política.
 # Uma ferramenta que aceite o nome da consulta como argumento deixa de ter
@@ -30,7 +37,7 @@ CAMPOS_PT = (
     "sigla", "nome", "creditos_aula", "creditos_trabalho", "carga_horaria_total",
     "tipo", "ativacao", "ementa", "objetivos", "programa", "bibliografia",
     "metodo_avaliacao", "criterio_avaliacao", "norma_recuperacao",
-    "pre_requisito", "avisos",
+    "secoes", "secoes_omitidas", "avisos",
 )
 CAMPOS_EN = ("nome_en", "ementa_en", "objetivos_en", "programa_en")
 CAMPOS_SAIDA = frozenset(CAMPOS_PT + CAMPOS_EN)
@@ -54,9 +61,27 @@ _TEXTO_EN = (
     ("programa_en", "pgmdisigl"),
 )
 
-# §5.1 do recon: a mesma habilitação aparece com códigos diferentes conforme a
-# superfície. Não investigado, e não se inventa explicação — declara-se.
-_DISCREPANCIA_CODCUR = {"3032": "3033", "3033": "3032"}
+# As seções da ficha que o modelo pode pedir, na ordem em que a pessoa lê. O
+# cabeçalho (sigla, nome, créditos, carga, tipo, ativação) vem sempre e não é
+# seção: é a resposta de "quantos créditos". `avaliacao` junta três campos
+# porque ninguém pergunta "qual a norma de recuperação" separado do resto.
+SECOES: tuple[str, ...] = ("ementa", "objetivos", "programa", "bibliografia", "avaliacao")
+SECOES_PADRAO: tuple[str, ...] = ("ementa",)
+_CAMPOS_DA_SECAO: dict[str, tuple[str, ...]] = {
+    "ementa": ("ementa", "ementa_en"),
+    "objetivos": ("objetivos", "objetivos_en"),
+    "programa": ("programa", "programa_en"),
+    "bibliografia": ("bibliografia",),
+    "avaliacao": ("metodo_avaliacao", "criterio_avaliacao", "norma_recuperacao"),
+}
+
+# Curto e fixo: a descrição da ferramenta já diz o mesmo, e o aviso existe para
+# a resposta não parecer completa quando a pergunta era sobre pré-requisito.
+AVISO_PRE_REQUISITO = (
+    "Pré-requisito não vem por aqui: use a ferramenta requisitos com a mesma sigla."
+)
+
+_PARAGRAFO = re.compile(r"\n\s*\n")
 
 
 def normalizar_sigla(bruta: str) -> str:
@@ -64,19 +89,59 @@ def normalizar_sigla(bruta: str) -> str:
     return "".join(bruta.split()).upper()
 
 
-def _preencher(destino: dict, cru: dict, pares) -> None:
+def resolver_secoes(pedidas) -> tuple[str, ...]:
+    """Lista pedida pelo modelo → seções válidas, na ordem fixa da ficha.
+
+    Vazio é o padrão (só a ementa); 'todas' expande; nome desconhecido é erro
+    legível citando as válidas, não silêncio (Invariante 6).
+    """
+    if not pedidas:
+        return SECOES_PADRAO
+    escolhidas: set[str] = set()
+    for pedida in pedidas:
+        chave = str(pedida).strip().lower()
+        if chave == "todas":
+            return SECOES
+        if chave not in SECOES:
+            raise ErroJupiter(
+                f"seção {pedida!r} não existe na ficha. Use "
+                f"{', '.join(SECOES)} ou 'todas'."
+            )
+        escolhidas.add(chave)
+    return tuple(s for s in SECOES if s in escolhidas)
+
+
+def _sem_paragrafos_repetidos(texto: str) -> str:
+    """A fonte às vezes repete um parágrafo inteiro — a bibliografia de PTC3314
+    vem duplicada. Parágrafo idêntico (comparado sem diferença de espaçamento)
+    sai uma vez, na primeira posição. Não é perda: é a fonte que se repetiu."""
+    vistos: set[str] = set()
+    saida: list[str] = []
+    for paragrafo in _PARAGRAFO.split(texto.strip()):
+        chave = re.sub(r"\s+", " ", paragrafo).strip()
+        if chave and chave not in vistos:
+            vistos.add(chave)
+            saida.append(paragrafo.strip())
+    return "\n\n".join(saida)
+
+
+def _preencher(destino: dict, cru: dict, pares, campos: set[str]) -> None:
     for saida, campo in pares:
+        if saida not in campos:
+            continue
         valor = cru.get(campo)
-        if valor not in ("", None):
-            destino[saida] = valor
+        if valor in ("", None):
+            continue
+        destino[saida] = _sem_paragrafos_repetidos(valor) if isinstance(valor, str) else valor
 
 
-def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
+def disciplina(sigla: str, *, cliente, secoes: tuple[str, ...] = SECOES_PADRAO,
                idiomas: tuple[str, ...] = ("pt",)) -> dict:
-    """Ficha da disciplina, e o pré-requisito dela **se o curso for informado**.
+    """Ficha da disciplina: cabeçalho sempre, e as seções pedidas.
 
-    `curso` é o par `(codcur, codhab)`. Resolver "Poli elétrica" para esse par é
-    outra fatia; enquanto ela não existe, esta ferramenta não finge que resolve.
+    Pré-requisito não é desta ferramenta desde 14/09 (§9): o único `codcur` que
+    a API deixa descobrir devolve zero linha, e `requisitos(sigla)` responde sem
+    código de curso. O aviso fixo aponta para lá, e o schema não oferece `codcur`.
     """
     sigla = normalizar_sigla(sigla)
     cru = cliente.obter_disciplina(sigla)
@@ -92,65 +157,19 @@ def disciplina(sigla: str, curso: tuple[str, str] | None = None, *, cliente,
         "tipo": _TIPOS.get(cru["tipdis"], cru["tipdis"]),
         "ativacao": cru["dtaatvdis"],
     }
-    _preencher(ficha, cru, _TEXTO_PT)
+
+    campos = {campo for secao in secoes for campo in _CAMPOS_DA_SECAO[secao]}
+    _preencher(ficha, cru, _TEXTO_PT, campos)
     if "en" in idiomas:
-        _preencher(ficha, cru, _TEXTO_EN)
+        # O nome em inglês é cabeçalho, não seção: vem sempre que inglês é pedido.
+        _preencher(ficha, cru, _TEXTO_EN, campos | {"nome_en"})
     # Espanhol nunca sai: os quatro campos vêm vazios nas duas amostras da
     # Fase 1, e campo vazio é token gasto para dizer nada.
 
-    avisos: list[str] = []
-
-    if curso is None:
-        ficha["pre_requisito"] = None
-        avisos.append(
-            "Pré-requisito não consultado por aqui: ele depende do currículo, "
-            "não só da disciplina. Use a ferramenta `requisitos` com a mesma "
-            "sigla — ela mostra TODOS os currículos de uma vez, sem precisar "
-            "de código de curso. Medido em 14/09: o código que a API deixa "
-            "descobrir é justamente o que devolve lista vazia aqui."
-        )
-    else:
-        codcur, codhab = curso
-        if codcur in _DISCREPANCIA_CODCUR:
-            avisos.append(
-                f"O código {codcur} e o {_DISCREPANCIA_CODCUR[codcur]} são o "
-                "mesmo curso em gerações diferentes de currículo — medido em "
-                "14/09, e não mais uma discrepância sem explicação. O que muda "
-                "entre eles: 3033 é quem tem a **grade** curricular (67 "
-                "disciplinas, 1º ao 5º semestre) e 3032 é quem tem os "
-                "**requisitos**; a grade de 3032 vem vazia. Usei "
-                f"{codcur} como veio, sem traduzir."
-            )
-        bruto = cliente.listar_requisito(coddis=sigla, codcur=codcur, codhab=codhab)
-        ficha["pre_requisito"] = [
-            {
-                "sigla": r["coddisreq"],
-                "nome": r["nomdisreq"],
-                "tipo": r["tipreq"],
-                "grupo": r.get("numgrpreq"),
-                # `stamtrrcp="S"` é o que a página do JupiterWeb chama de
-                # "Requisito fraco": dá para matricular devendo. Ficou fora da
-                # fatia de 31/08 por não ter sido medido, e a ferramenta
-                # anunciava exigência dura onde não havia (§9, 14/09).
-                "fraco": r.get("stamtrrcp") == "S",
-            }
-            for r in bruto
-        ]
-        if not ficha["pre_requisito"]:
-            avisos.append(
-                f"A consulta de requisito no curso {codcur}-{codhab} não trouxe "
-                "nenhuma linha, e isso tem TRÊS causas possíveis — não duas. "
-                "Além de (a) não haver exigência e (b) a disciplina não "
-                "pertencer a esse currículo, há (c) o código ser de outra "
-                "geração do mesmo currículo: medido em 14/09, PTC3314 devolve "
-                "zero linha em 3033 e devolve PTC3213+PSI3213 em 3032, que são "
-                "o mesmo Ciclo Básico da Elétrica em gerações diferentes. A (c) "
-                "é a mais provável quando o código veio da lista de cursos de "
-                "ingresso. Use a ferramenta `requisitos` com a sigla: ela "
-                "mostra todos os currículos e dispensa o código."
-            )
-
-    ficha["avisos"] = avisos
+    ficha["secoes"] = list(secoes)
+    # Invariante 7: o que ficou de fora é dito, não omitido.
+    ficha["secoes_omitidas"] = [s for s in SECOES if s not in secoes]
+    ficha["avisos"] = [AVISO_PRE_REQUISITO]
     return ficha
 
 
@@ -247,3 +266,23 @@ def requisitos(sigla: str, *, cliente) -> dict:
         )
 
     return {"sigla": sigla, "curriculos": curriculos, "avisos": avisos}
+
+
+def agrupar_curriculos(curriculos: list[dict]) -> list[tuple[tuple, list[dict]]]:
+    """Currículos com o MESMO conjunto de exigências, nos mesmos termos, juntos.
+
+    A chave é o conjunto ordenado de (sigla, nome, tipo, rótulo). O tipo entra
+    de propósito: MAT2454 é dura em 3250 e fraca em 3032, e os dois NÃO podem
+    cair no mesmo grupo — é a informação que decide a matrícula (§9, 14/09).
+    Em MAT2455, 23 currículos viram 4 grupos sem perder um currículo nem um tipo.
+
+    Maiores primeiro; o grupo sem exigência (`()`) por último; dentro do grupo,
+    a ordem em que vieram (a da página, crescente de codcur).
+    """
+    grupos: dict[tuple, list[dict]] = {}
+    for curriculo in curriculos:
+        chave = tuple(
+            sorted((e["sigla"], e["nome"], e["tipo"], e["rotulo"]) for e in curriculo["exigencias"])
+        )
+        grupos.setdefault(chave, []).append(curriculo)
+    return sorted(grupos.items(), key=lambda item: (item[0] == (), -len(item[1]), item[0]))
