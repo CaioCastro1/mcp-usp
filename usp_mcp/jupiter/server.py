@@ -19,6 +19,7 @@ offline.** Sem credencial, basta injetar o transporte e a fixture responde.
 """
 from __future__ import annotations
 
+from ..anotacoes import SO_LEITURA, para_o_sdk
 from .cliente import ClienteJupiter, transporte_http
 from .erros import ErroJupiter
 from .ferramentas import agrupar_curriculos, disciplina, requisitos, resolver_secoes
@@ -90,6 +91,10 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["sigla"],
                 "additionalProperties": False,
             },
+            # Catálogo público, e o DWR por trás só tem consulta: não existe
+            # rota que matricule, tranque ou altere nada. A razão de cada campo
+            # de `SO_LEITURA` mora ao lado dele.
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_REQUISITOS,
@@ -119,6 +124,8 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["sigla"],
                 "additionalProperties": False,
             },
+            # Mesma leitura do mesmo catálogo público, por outro recorte.
+            "annotations": SO_LEITURA,
         },
     ]
 
@@ -359,8 +366,14 @@ def main() -> None:
         (por_nome[_NOME_FERRAMENTA], _disciplina),
         (por_nome[_NOME_REQUISITOS], _requisitos),
     ):
+        # `annotations` sai do MESMO descritor que a descrição e o schema, e o
+        # laço garante que ferramenta nova não fique de fora por esquecimento:
+        # quem entra na tupla acima entra anotada. Quem obriga o bloco do
+        # descritor e o que sai no fio a concordarem é o A6.
         servidor.tool(
-            name=descritor["name"], description=descritor["description"]
+            name=descritor["name"],
+            description=descritor["description"],
+            annotations=para_o_sdk(descritor),
         )(funcao)
 
     servidor.run(transport="stdio")
