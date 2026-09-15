@@ -31,7 +31,7 @@ def test_r38_descricao_fala_a_lingua_de_quem_pergunta():
             f"{vazamento!r} na descrição: o modelo escolhe a ferramenta lendo "
             "isto, e ninguém pergunta em nome de rota."
         )
-    for vocabulario in ("bandejão", "almoço", "jantar", "hoje"):
+    for vocabulario in ("bandejão", "almoço", "jantar", "hoje", "prefeitura", "sexta", "semana"):
         assert vocabulario in descricao.lower()
 
     # Invariante 7 na própria descrição: o que a ferramenta NÃO tem evita que o
@@ -52,11 +52,13 @@ def test_r38b_o_schema_declara_os_quatro_rus_e_nao_convida_a_inventar_id():
     assert propriedades["dia"].get("default") == "hoje"
 
     enumerado = propriedades["restaurantes"]["items"]["enum"]
-    assert enumerado == ["6", "7", "8", "9"], (
-        "o schema é onde o modelo aprende que só existem quatro RUs aqui. Sem "
-        "enum, ele inventa id e recebe negativa da allowlist — erro certo pela "
-        "via mais cara."
+    assert enumerado == ["central", "prefeitura", "fisica", "quimicas"], (
+        "o schema é onde o modelo aprende que só existem quatro RUs aqui, e "
+        "pelo NOME que a pessoa fala — id numérico é detalhe da API. Sem enum, "
+        "ele inventa e recebe negativa da allowlist: erro certo pela via mais cara."
     )
+    descricao_do_dia = propriedades["dia"]["description"].lower()
+    assert "sexta" in descricao_do_dia and "semana" in descricao_do_dia
     assert set(propriedades["refeicao"]["enum"]) == {
         "almoco", "jantar", "cafe", "todas"
     }
@@ -112,3 +114,121 @@ def test_r41b_o_texto_declara_o_que_nao_sabe(gravador, respostas_da_fatia):
     )
     assert "⚠" in texto, "o aviso do Invariante 7 sumiu na formatação"
     assert "24/08/2026" in texto
+
+
+@pytest.mark.contrato
+def test_r47_item_comum_a_todas_as_refeicoes_sai_uma_vez_no_rodape(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta("bandejao", {"dia": "24/08/2026"}, cliente=cliente)
+
+    # Em 24/08 os sete pratos abertos têm "Minipão / refresco" e o arroz: uma vez cada.
+    assert texto.count("Minipão / refresco") == 1
+    assert texto.count("Arroz / feijão / arroz integral") == 1
+    (rodape,) = [l for l in texto.splitlines() if l.startswith("Em todas as refeições acima:")]
+    assert "Minipão / refresco" in rodape and "Arroz / feijão / arroz integral" in rodape
+    assert "Iscas de tilápia empanadas" in texto, "o que varia continua na linha"
+
+
+@pytest.mark.contrato
+def test_r47b_com_uma_refeicao_so_nao_ha_rodape_e_a_linha_fica_inteira(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao",
+        {"dia": "24/08/2026", "refeicao": "almoco", "restaurantes": ["central"]},
+        cliente=cliente,
+    )
+    assert "Em todas as refeições" not in texto
+    linha = next(l for l in texto.splitlines() if "Iscas de tilápia" in l)
+    assert "Minipão / refresco" in linha and "Arroz / feijão / arroz integral" in linha
+
+
+@pytest.mark.contrato
+def test_r46_dia_semana_e_uma_chamada_de_ferramenta_com_os_sete_dias(
+    gravador, respostas_da_fatia
+):
+    transporte = gravador(respostas_da_fatia)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "almoco"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    assert texto.startswith("Bandejão — semana de 24/08/2026 a 30/08/2026")
+    assert "sex 28/08" in texto
+    assert "Lombo com molho de limão" in texto, "terça no Central: um dia que não é hoje"
+    assert "CENTRAL · almoço" in texto and "QUÍMICAS · almoço" in texto
+    assert "jantar" not in texto.lower()
+    assert sorted(transporte.rotas()) == ["menu/6", "menu/7", "menu/8", "menu/9", "restaurants"]
+
+
+@pytest.mark.contrato
+def test_r46b_dia_fechado_na_semana_e_uma_palavra_nao_um_paragrafo(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao",
+        {"dia": "semana", "refeicao": "almoco", "restaurantes": ["central"]},
+        cliente=cliente, hoje=SEGUNDA,
+    )
+    linha = next(l for l in texto.splitlines() if l.strip().startswith("sáb 29/08"))
+    assert linha.strip() == "sáb 29/08: não serve"
+
+
+@pytest.mark.contrato
+@pytest.mark.parametrize("refeicao,teto", [("almoco", 6_500), ("todas", 11_000)])
+def test_r46c_o_texto_semanal_tem_teto(gravador, respostas_da_fatia, refeicao, teto):
+    # Medido em 14/09/2026 sobre as fixtures da Fase 1: 4.818 B (almoço) e
+    # 8.381 B (almoço e jantar), 4 RUs × 7 dias. Folga de ~30%.
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": refeicao}, cliente=cliente, hoje=SEGUNDA
+    )
+    assert len(texto.encode()) <= teto, f"{refeicao}: {len(texto.encode())} B"
+    assert len(texto.splitlines()) < 80
+
+
+@pytest.mark.contrato
+def test_r48_horario_constante_na_semana_sobe_pro_cabecalho_do_ru(
+    gravador, respostas_da_fatia
+):
+    # Medido em 14/09/2026: o horário é igual em todos os dias abertos para 6
+    # dos 7 pares RU+refeição da fixture — só o jantar do 9 varia (dia útil até
+    # 19:45, sábado até 19:00). Repetir um horário constante 5 a 7 vezes por
+    # semana é o mesmo desperdício que a fatoração de itens já corrigia.
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "todas"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    (cabecalho_central,) = [l for l in texto.splitlines() if l.startswith("CENTRAL · almoço")]
+    assert "11:15 às 14:15" in cabecalho_central
+    linha_segunda = next(
+        l for l in texto.splitlines() if l.strip().startswith("seg 24/08") and "Iscas" in l
+    )
+    assert "11:15" not in linha_segunda, "horário constante não repete na linha do dia"
+
+
+@pytest.mark.contrato
+def test_r48b_horario_que_varia_entre_dia_util_e_sabado_continua_na_linha_do_dia(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    texto = server.chamar_ferramenta(
+        "bandejao", {"dia": "semana", "refeicao": "todas"}, cliente=cliente, hoje=SEGUNDA
+    )
+
+    (cabecalho_jantar_quimicas,) = [
+        l for l in texto.splitlines() if l.startswith("QUÍMICAS · jantar")
+    ]
+    assert "17:30" not in cabecalho_jantar_quimicas, (
+        "o jantar do 9 varia entre dia útil e sábado: um horário só no "
+        "cabeçalho mentiria no sábado (§ design, R48b)"
+    )
+    linha_sabado = next(
+        l for l in texto.splitlines() if l.strip().startswith("sáb 29/08") and "19:00" in l
+    )
+    assert "17:30 às 19:00" in linha_sabado

@@ -21,7 +21,7 @@ import pytest
 from tests.rucard.conftest import HASH_DE_TESTE, texto
 from usp_mcp.rucard import ferramentas
 from usp_mcp.rucard.cliente import ClienteRucard
-from usp_mcp.rucard.erros import RucardIndisponivel
+from usp_mcp.rucard.erros import ErroRucard, RucardIndisponivel
 
 pytestmark = pytest.mark.contrato
 
@@ -458,3 +458,104 @@ def test_r42g_refeicao_sem_comunicado_tem_a_lista_vazia_e_nenhum_aviso(chamar):
             if dados["situacao"] == "aberto":
                 assert dados["avisos_publicados"] == []
     assert not [a for a in resposta["avisos"] if "publicado no cardápio" in a]
+
+
+# --- R43: o dia como a pessoa fala -------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "pedido,esperado",
+    [
+        ("sexta", datetime.date(2026, 8, 28)),
+        ("sexta-feira", datetime.date(2026, 8, 28)),
+        ("na sexta", datetime.date(2026, 8, 28)),
+        ("SEX", datetime.date(2026, 8, 28)),
+        ("segunda", datetime.date(2026, 8, 24)),  # já passou na quarta: mesma semana
+        ("terca", datetime.date(2026, 8, 25)),
+        ("sábado", datetime.date(2026, 8, 29)),
+        ("no sabado", datetime.date(2026, 8, 29)),
+        ("dom", datetime.date(2026, 8, 30)),
+        ("depois de amanhã", datetime.date(2026, 8, 28)),
+    ],
+)
+def test_r43_nome_de_dia_resolve_para_o_dia_dessa_semana(pedido, esperado):
+    assert ferramentas.resolver_dia(pedido, hoje=QUARTA) == esperado
+
+
+def test_r43b_dias_da_semana_vao_de_segunda_a_domingo():
+    dias = ferramentas.dias_da_semana(QUARTA)
+    assert len(dias) == 7
+    assert dias[0] == SEGUNDA and dias[-1] == DOMINGO
+
+
+def test_r43c_no_domingo_segunda_ainda_e_a_semana_que_o_rucard_publica():
+    # No domingo 30/08 o RUCard ainda publica 24/08–30/08: "segunda" é 24/08, não 31/08.
+    assert ferramentas.resolver_dia("segunda", hoje=DOMINGO) == SEGUNDA
+
+
+def test_r43d_semana_nao_e_um_dia_e_a_funcao_diz_isso():
+    with pytest.raises(ErroRucard) as exc:
+        ferramentas.resolver_dia("semana", hoje=QUARTA)
+    assert "bandejao_semana" in str(exc.value)
+
+
+# --- R44: o restaurante como a pessoa fala -----------------------------------
+
+
+def test_r44_restaurante_por_nome_ou_por_id():
+    assert ferramentas.resolver_restaurantes(["Prefeitura", "6", "fisica"]) == ["7", "6", "8"]
+    assert ferramentas.resolver_restaurantes(["Químicas", "quimicas", "9"]) == ["9"]
+    assert ferramentas.resolver_restaurantes(["PUSP-CB", "pusp"]) == ["7"]
+    assert ferramentas.resolver_restaurantes(None) == ["6", "7", "8", "9"]
+    assert ferramentas.resolver_restaurantes([]) == ["6", "7", "8", "9"]
+
+
+def test_r44b_nome_desconhecido_e_erro_legivel_citando_os_quatro():
+    with pytest.raises(ErroRucard) as exc:
+        ferramentas.resolver_restaurantes(["each"])
+    for palavra in ("each", "central", "prefeitura", "fisica", "quimicas"):
+        assert palavra in str(exc.value)
+
+
+def test_r44c_bandejao_aceita_o_nome_e_so_pede_aquele_ru(chamar):
+    resposta, transporte = chamar(restaurantes=["prefeitura"], refeicao="almoco")
+    assert [ru["id"] for ru in resposta["restaurantes"]] == ["7"]
+    assert transporte.rotas() == ["restaurants", "menu/7"]
+
+
+def test_r44d_o_enum_declarado_e_exatamente_a_lista_de_nomes():
+    assert ferramentas.NOMES_RU == ("central", "prefeitura", "fisica", "quimicas")
+    assert set(ferramentas.ALIASES_RU.values()) == set(ferramentas.NOMES_RU_PARA_ID.values())
+    for nome in ferramentas.NOMES_RU:
+        assert nome in ferramentas.ALIASES_RU
+
+
+# --- R45: a semana inteira numa chamada --------------------------------------
+
+
+def test_r45_bandejao_semana_tem_sete_dias_e_avisos_sem_repeticao(
+    gravador, respostas_da_fatia
+):
+    cliente = ClienteRucard(gravador(respostas_da_fatia), hash_rucard=HASH_DE_TESTE)
+    semana = ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=QUARTA)
+
+    assert set(semana) == set(ferramentas.CAMPOS_SEMANA)
+    assert semana["inicio"] == "24/08/2026" and semana["fim"] == "30/08/2026"
+    assert [d["dia_semana"] for d in semana["dias"]] == [
+        "seg", "ter", "qua", "qui", "sex", "sáb", "dom"
+    ]
+    assert semana["refeicoes"] == ["almoco", "jantar"]
+    assert len(semana["avisos"]) == len(set(semana["avisos"])), "aviso repetido entre dias"
+    # O domingo do 9 tem almoço e não tem jantar (R29b), visto pela semana.
+    domingo = semana["dias"][6]
+    (ru9,) = [r for r in domingo["restaurantes"] if r["id"] == "9"]
+    assert ru9["refeicoes"]["almoco"]["situacao"] == "aberto"
+    assert ru9["refeicoes"]["jantar"]["situacao"] == "nao_serve"
+
+
+def test_r45b_a_semana_inteira_custa_cinco_requisicoes(gravador, respostas_da_fatia):
+    transporte = gravador(respostas_da_fatia)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+    ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=SEGUNDA)
+    # Invariante 5: o /menu já devolve a semana, e o cliente cacheia por RU.
+    assert sorted(transporte.rotas()) == ["menu/6", "menu/7", "menu/8", "menu/9", "restaurants"]
