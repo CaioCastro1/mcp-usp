@@ -12,9 +12,28 @@ ligada (§2.2 — "sem flag que libere"). Ela existe porque a allowlist já nega
 essas funções por omissão; o bloqueio permanente documenta *por quê*, e
 garante que um erro futuro na allowlist (uma função entrando nela por engano)
 ainda não libere um destes nomes.
+
+`ESCRITA_CONFIRMADA` é o terceiro conjunto, e o mais novo (15/09/2026). Ele
+existe porque o §2.2 foi REABERTO por decisão do dono, com a condição dele —
+confirmação humana explícita —, e o desenho inteiro está em
+`docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`. Duas das
+cinco funções que aquela lista recusava por escrito saíram dela e vieram para
+cá: `mod_assign_save_submission` e `mod_assign_submit_for_grading`. As três de
+questionário ficaram, e a razão é de desenho e não de conforto — para entrega de
+atividade existe estado anterior legível e rascunho que se sobrescreve, então dá
+para mostrar um plano fiel antes de escrever; para tentativa de questionário não
+existe rascunho e `start_attempt` já é irreversível.
+
+Um nome deste conjunto passa por DUAS condições, e nenhuma das duas é a
+allowlist: a variável de ambiente `USP_MCP_ENTREGA` ligada, e o call site
+declarando que passou pela confirmação. A flag é nova de propósito.
+`USP_MCP_ALLOW_WRITES` está documentada nos três servidores como a flag que
+**não** abre nada, e os testes de cada um afirmam isso; reaproveitá-la mudaria
+em silêncio o significado de uma linha que existe em três arquivos.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 # Onze funções, todas de leitura. Crescer isso é decisão de §9, não
@@ -113,9 +132,12 @@ BLOQUEIO_PERMANENTE: frozenset[str] = frozenset(
         "tool_mobile_get_tokens_for_qr_login",
         "tiny_premium_get_api_key",
         "mod_lti_get_tool_launch_data",
-        # entregam em nome do usuário
-        "mod_assign_save_submission",
-        "mod_assign_submit_for_grading",
+        # entregam em nome do usuário. Eram QUATRO até 15/09/2026; as duas que
+        # saíram (`save_submission` e `submit_for_grading`) estão em
+        # `ESCRITA_CONFIRMADA`, com as duas condições que as governam. Estas
+        # duas ficam: `start_submission` abre tentativa nova sem plano possível
+        # (o estado anterior é justamente o que ela destrói), e
+        # `remove_submission` apaga o que já foi enviado.
         "mod_assign_start_submission",
         "mod_assign_remove_submission",
         # mesmo raciocínio das tentativas de quiz
@@ -168,6 +190,39 @@ BLOQUEIO_PERMANENTE: frozenset[str] = frozenset(
 )
 
 
+# A variável de ambiente que liga a escrita de entrega, e só ela. Desligada por
+# padrão, e só no Moodle — nem o RUCard nem o Jupiter têm escrita para ligar.
+#
+# O nome está aqui como constante, e não escrito à mão em cada mensagem, porque
+# ele aparece em três lugares que precisam concordar: a leitura do ambiente, o
+# motivo da recusa que o modelo lê, e o descritor das duas ferramentas. Um nome
+# de variável escrito errado numa mensagem de erro é uma cura que não cura.
+NOME_DA_FLAG = "USP_MCP_ENTREGA"
+
+# As duas funções de escrita que saíram do bloqueio permanente em 15/09/2026.
+# Elas NÃO estão na `ALLOWLIST` e nunca devem estar: a allowlist é a superfície
+# de leitura, e um nome nela passa por igualdade exata sem mais nenhuma
+# condição. Aqui as condições são o assunto.
+ESCRITA_CONFIRMADA: frozenset[str] = frozenset(
+    {
+        "mod_assign_save_submission",
+        "mod_assign_submit_for_grading",
+    }
+)
+
+
+def entrega_habilitada() -> bool:
+    """A flag está ligada NESTE processo?
+
+    Lida do ambiente a cada chamada, e não no import: o servidor stdio lê o
+    `.env` dentro de `chamar_ferramenta`, depois de o módulo já estar
+    importado, e um valor congelado no import responderia sobre o ambiente de
+    antes. Igualdade exata com "1" — "true", "sim" e "0" não ligam nada, e uma
+    flag que liga escrita irreversível não é lugar para adivinhar intenção.
+    """
+    return os.environ.get(NOME_DA_FLAG) == "1"
+
+
 @dataclass(frozen=True)
 class Decisao:
     """Resultado de `decidir`. `motivo` existe para o Invariante 6: erro legível
@@ -177,15 +232,31 @@ class Decisao:
     motivo: str
 
 
-def decidir(funcao: str, permitir_escrita: bool = False) -> Decisao:
+def decidir(
+    funcao: str, permitir_escrita: bool = False, *, confirmada: bool = False
+) -> Decisao:
     """Decide se `funcao` pode ser chamada.
 
-    `permitir_escrita` é a flag do Invariante 1 (USP_MCP_ALLOW_WRITES) — ela
-    não é usada aqui para *liberar* nada: o bloqueio permanente ignora essa
-    flag por definição (§2.2), e a allowlist atual não contém função de
-    escrita para ela liberar. O parâmetro existe para deixar essa ausência de
-    efeito explícita no call site, em vez de a política simplesmente não
-    aceitar a flag.
+    Três caminhos, nesta ordem, e a ordem é a decisão:
+
+    1. **Bloqueio permanente.** Nega antes de olhar qualquer outra coisa, e
+       nega mesmo com as duas flags ligadas (§2.2).
+    2. **Escrita confirmada.** Permite só com `USP_MCP_ENTREGA=1` no ambiente
+       **e** `confirmada=True` vindo do call site. As duas condições são
+       independentes de propósito: a flag é do dono da máquina e vale para o
+       processo inteiro; a confirmação é por chamada, e quem a declara é o
+       código que acabou de conferir que o plano mostrado ainda é o plano real.
+    3. **Allowlist.** Igualdade exata de nome, sem mais nenhuma condição — é a
+       superfície de leitura, e ela não ganhou caso novo aqui.
+
+    `permitir_escrita` é a flag do Invariante 1 (USP_MCP_ALLOW_WRITES) e
+    continua sem *liberar* nada: o bloqueio permanente a ignora por definição, a
+    allowlist não contém função de escrita, e o caminho 2 não a consulta — quem
+    o governa é `USP_MCP_ENTREGA`. O parâmetro existe para deixar essa ausência
+    de efeito explícita no call site.
+
+    `confirmada` sozinho não abre nada, e é o ponto: um call site que declare
+    confirmação com a flag desligada recebe a mesma recusa de quem não declarou.
     """
     if funcao in BLOQUEIO_PERMANENTE:
         return Decisao(
@@ -193,6 +264,34 @@ def decidir(funcao: str, permitir_escrita: bool = False) -> Decisao:
             motivo=(
                 f"{funcao} está no bloqueio permanente — negada mesmo com "
                 "permitir_escrita=True, pois não há configuração que libere."
+            ),
+        )
+
+    if funcao in ESCRITA_CONFIRMADA:
+        if not entrega_habilitada():
+            return Decisao(
+                permitida=False,
+                motivo=(
+                    f"{funcao} escreve no e-Disciplinas em seu nome, e a escrita "
+                    f"está desligada neste servidor. Quem a liga é a variável de "
+                    f"ambiente {NOME_DA_FLAG}=1, e ligá-la é decisão de quem é "
+                    "dono do token — não deste processo."
+                ),
+            )
+        if not confirmada:
+            return Decisao(
+                permitida=False,
+                motivo=(
+                    f"{funcao} escreve no e-Disciplinas em seu nome e não passou "
+                    "pela confirmação. Peça o plano primeiro e repita a chamada "
+                    "com o código que ele devolveu."
+                ),
+            )
+        return Decisao(
+            permitida=True,
+            motivo=(
+                f"{funcao} está liberada para esta chamada: a escrita está "
+                "ligada neste servidor e a confirmação foi declarada."
             ),
         )
 

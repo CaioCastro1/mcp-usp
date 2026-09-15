@@ -167,8 +167,41 @@ class ClienteMoodle:
         A política roda antes de qualquer I/O: uma função negada nunca chega
         a tocar o transporte (T21), nem mesmo com `permitir_escrita=True`
         (T22 — essa flag não abre o bloqueio permanente do §2.2).
+
+        **Este caminho nunca declara confirmação.** Uma função de
+        `ESCRITA_CONFIRMADA` chamada por aqui é recusada pela política como
+        qualquer outra — a porta da escrita é `escrever`, e ela tem nome
+        próprio justamente para não ser aberta por engano por código que só
+        queria ler.
         """
-        decisao = politica.decidir(funcao, permitir_escrita=self.permitir_escrita)
+        return self._requisitar(funcao, params, confirmada=False)
+
+    def escrever(self, funcao: str, **params) -> dict:
+        """A ÚNICA porta que declara confirmação à política (15/09/2026).
+
+        Verbo separado, e não um parâmetro de `chamar`, pelo mesmo motivo que
+        `salvar_rascunho` e `entregar` são duas ferramentas e não um enum: um
+        booleano põe as duas intenções a uma letra de distância na cabeça de
+        quem gera a chamada, e a segunda não tem volta. Com um método próprio,
+        todo código que escreve é achável por uma busca pelo nome, e nenhum
+        caminho de leitura consegue escrever mesmo se quiser.
+
+        Quem chama isto é `entrega.py`, depois de ter mostrado um plano e
+        conferido que ele não mudou. Chamar daqui sem essa conferência é
+        contornar a camada que o desenho inteiro existe para ter.
+        """
+        return self._requisitar(funcao, params, confirmada=True)
+
+    def _requisitar(self, funcao: str, params: dict, *, confirmada: bool) -> dict:
+        """O transporte e a tradução de erro, um lugar só para os dois verbos.
+
+        Duplicar isto criaria duas mensagens diferentes para `invalidtoken`, e a
+        divergência só apareceria no dia em que o token expirasse — que é o
+        mesmo motivo pelo qual `_levantar_se_erro` já é função e não bloco.
+        """
+        decisao = politica.decidir(
+            funcao, permitir_escrita=self.permitir_escrita, confirmada=confirmada
+        )
         if not decisao.permitida:
             raise FuncaoBloqueada(decisao.motivo)
 
