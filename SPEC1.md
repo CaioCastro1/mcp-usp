@@ -3358,6 +3358,16 @@ registrava que já havia pedido para reabri-la. Agora registra: em 15/09/2026 a 
 chamáveis sob condição; `mod_quiz_start_attempt`, `mod_quiz_save_attempt` e
 `mod_quiz_process_attempt` continuam recusadas.
 
+**Duas de `mod_assign`, e não as quatro: o §2.2 bloqueia mais do que o spec abre.** A lista
+nomeia `mod_assign_save_submission`, `mod_assign_submit_for_grading`,
+`mod_assign_start_submission` e `mod_assign_remove_submission`. O spec trata das duas
+primeiras e é **silencioso sobre as outras duas**, que portanto continuam recusadas sem
+condição nenhuma. Para `start_submission` isso é coerente com o §2.2, que já a descreve como
+o análogo exato de `start_attempt` por ligar o cronômetro da entrega cronometrada; para
+`remove_submission` o silêncio é só silêncio, e quem for implementar precisa decidir se
+apagar entrega entra ou fica. Registrado aqui para não ser lido como "as de entrega
+abriram".
+
 **Isto é spec e não código, e a diferença é verificável.** O que entrou foi
 `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`, 225 linhas, zero de
 produção. O `BLOQUEIO_PERMANENTE` de `usp_mcp/moodle/politica.py` **continua com 40 nomes
