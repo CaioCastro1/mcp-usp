@@ -34,6 +34,14 @@ from . import politica
 # `o_que_vence`, e dizer "não funciona" seria mentir sobre duas das três. O teste
 # D4 trava a união disto contra a allowlist, que é o que impede a tabela de
 # envelhecer calada quando uma função nova entrar.
+#
+# `salvar_rascunho` e `entregar` (15/09/2026) NÃO entram aqui, e a omissão é
+# decidida: esta tabela responde "o que este servidor sempre oferece funciona no
+# seu Moodle?", e as duas só existem com `USP_MCP_ENTREGA=1`. Listá-las com a
+# flag desligada anunciaria, dentro de um texto que o modelo lê, duas
+# ferramentas que não estão no `tools/list` — que é exatamente o que o desenho
+# delas evita ao não aparecer. D4 continua travando a união contra a allowlist,
+# e as funções que as duas chamam não estão nela de propósito.
 FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
     "o_que_vence": ("core_calendar_get_action_events_by_timesort",),
     "material": (
@@ -160,9 +168,11 @@ def formatar(info, disponiveis: frozenset[str]) -> str:
 
     vivas = sorted(politica.BLOQUEIO_PERMANENTE & disponiveis)
     if vivas:
-        # O número, não a lista: nomear 40 funções perigosas num texto que um
+        # O número, não a lista: nomear 38 funções perigosas num texto que um
         # modelo lê é dar a ele o vocabulário exato que a política existe para
-        # negar. A contagem já diz o que importa.
+        # negar. A contagem já diz o que importa. Eram 40 até 15/09/2026, quando
+        # duas saíram para o conjunto de escrita confirmada — o número aqui é
+        # calculado, e só este comentário precisava acompanhar.
         linhas.append(
             f"\n⚠ {len(vivas)} das {len(politica.BLOQUEIO_PERMANENTE)} funções do "
             "bloqueio permanente existem neste site e são alcançáveis por este "

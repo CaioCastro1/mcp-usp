@@ -114,8 +114,13 @@ BLOQUEIO_PERMANENTE = [
     # mintam ou vazam credencial
     "tool_mobile_get_autologin_key", "tool_mobile_get_tokens_for_qr_login",
     "tiny_premium_get_api_key", "mod_lti_get_tool_launch_data",
-    # entregam em nome do usuário
-    "mod_assign_save_submission", "mod_assign_submit_for_grading",
+    # entregam em nome do usuário. Eram quatro até 15/09/2026: `save_submission`
+    # e `submit_for_grading` saíram por decisão registrada e estão em
+    # `ESCRITA_CONFIRMADA` (E1-E6, abaixo). Estas duas ficaram, e o spec da
+    # mudança era SILENCIOSO sobre elas — silêncio em spec de política se
+    # resolve pelo padrão do projeto, que é negar. `start_submission` liga o
+    # cronômetro de uma entrega cronometrada (análogo exato de
+    # `mod_quiz_start_attempt`), e `remove_submission` apaga o que já foi feito.
     "mod_assign_start_submission", "mod_assign_remove_submission",
     # mesmo raciocínio das tentativas de quiz
     "mod_lesson_launch_attempt", "mod_lesson_process_page", "mod_lesson_finish_attempt",
@@ -303,9 +308,16 @@ def test_p2_nenhum_nome_bloqueado_aparece_na_camada_live():
     cobre o que está ao alcance da mão.
     """
     fonte = _fonte_live()
-    presentes = sorted(n for n in politica.BLOQUEIO_PERMANENTE if n in fonte)
+    # `ESCRITA_CONFIRMADA` entra na varredura junto com o bloqueio permanente,
+    # e isso é o ponto desde 15/09/2026: as duas funções que saíram da lista de
+    # bloqueio não podem ter perdido esta guarda ao sair. Elas escrevem no
+    # e-Disciplinas, e a camada live roda com o token do dono — um nome desses
+    # escrito aqui está a uma linha de ser chamado de verdade, e a escrita ao
+    # vivo é justamente o que a suíte não faz em circunstância nenhuma.
+    vigiados = politica.BLOQUEIO_PERMANENTE | politica.ESCRITA_CONFIRMADA
+    presentes = sorted(n for n in vigiados if n in fonte)
     assert not presentes, (
-        f"nomes do bloqueio permanente (§2.2) no fonte de {FONTE_LIVE.name}: "
+        f"nomes de função de escrita no fonte de {FONTE_LIVE.name}: "
         f"{presentes}. Esta camada roda com o token pessoal do dono e cada "
         "chamada fica no log da conta."
     )
