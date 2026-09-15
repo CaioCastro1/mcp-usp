@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 
+from ..anotacoes import ESCREVE_NO_DEPOSITO, SO_LEITURA, para_o_sdk
 from ..env import carregar_env
 from .arquivo import baixar_arquivo
 from .atrasadas import atrasadas
@@ -90,6 +91,12 @@ def listar_ferramentas() -> list[dict]:
                 },
                 "additionalProperties": False,
             },
+            # Consulta e nada mais, como em todas as `SO_LEITURA` abaixo: as
+            # cinco funções da allowlist são de leitura, e a lista de bloqueio
+            # permanente não é aberta por flag. A razão de cada campo do bloco
+            # mora ao lado dele em `usp_mcp/anotacoes.py`, uma vez só — nove
+            # cópias desta explicação seriam oito que envelhecem caladas.
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_MATERIAL,
@@ -131,6 +138,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina"],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_ARQUIVO,
@@ -176,6 +184,12 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina", "nome"],
                 "additionalProperties": False,
             },
+            # A ÚNICA das treze que não é read-only no sentido do protocolo:
+            # ela grava o arquivo baixado no disco desta máquina. O campo
+            # pergunta "modifica o seu ambiente?", e o disco de quem chama é
+            # ambiente — a decisão inteira, e o que os outros três campos
+            # compensam, está escrita em `usp_mcp/anotacoes.py`.
+            "annotations": ESCREVE_NO_DEPOSITO,
         },
         {
             "name": _NOME_DIAGNOSTICO,
@@ -197,6 +211,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_JA_ENTREGUEI,
@@ -238,6 +253,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina"],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_NOTAS,
@@ -270,6 +286,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_AVISOS,
@@ -302,6 +319,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina"],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_MUDOU,
@@ -342,6 +360,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina"],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_DISCIPLINAS,
@@ -374,6 +393,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
         {
             "name": _NOME_ATRASADAS,
@@ -413,6 +433,7 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
         },
     ]
 
@@ -575,6 +596,30 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         except ErroMoodle as exc:
             raise ToolError(str(exc)) from exc
 
+    def _registrar(porta: dict, funcao) -> None:
+        """Um ponto só de registro, pelo mesmo motivo do `_chamar` acima.
+
+        São dez chamadas a `servidor.tool()` neste `main()`, e cada campo novo
+        do protocolo é a décima primeira chance de esquecer uma. `annotations`
+        acabou de ser esse campo: com a chamada repetida dez vezes, registrar
+        nove anotadas e uma muda não quebraria nada visível — a ferramenta
+        continuaria funcionando, só chegaria ao cliente sem a dica de que é de
+        leitura, que é a forma de defeito mais fácil de não ver.
+
+        O bloco sai do descritor, e não é escrito aqui: a razão de cada campo
+        está ao lado da declaração, e a segunda cópia é a que envelhece calada.
+        Quem obriga descritor e fio a concordarem é o A6.
+
+        `porta` é o descritor inteiro, sempre obtido do dicionário por NOME.
+        Nada aqui é contado nem desempacotado por posição — foi assim que este
+        `main()` morreu antes do handshake quando a quarta ferramenta entrou.
+        """
+        servidor.tool(
+            name=porta["name"],
+            description=porta["description"],
+            annotations=para_o_sdk(porta),
+        )(funcao)
+
     def _o_que_vence(dias=14, limite=None) -> str:
         # Assinatura explícita em vez de `**kwargs`: o SDK deriva o schema que
         # o modelo vê a partir dela, e um `**kwargs` produziria uma ferramenta
@@ -585,7 +630,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     # O SDK lê a ASSINATURA, não o inputSchema declarado (§9, 31/08/2026). Sem
     # isto, "Padrão 14" e a explicação de `limite` não chegam ao modelo.
     anotar(_o_que_vence, descritor["inputSchema"], {"dias": int, "limite": int | None})
-    servidor.tool(name=descritor["name"], description=descritor["description"])(_o_que_vence)
+    _registrar(descritor, _o_que_vence)
 
     def _material(disciplina, busca=None) -> str:
         # `disciplina` SEM default de propósito: no SDK é a ausência de default
@@ -599,7 +644,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     # Mesmo motivo: sem `anotar`, "Espaço e caixa não importam" e a explicação de
     # `busca` não chegam ao modelo — ele veria só {"title": "Disciplina"}.
     anotar(_material, porta_material["inputSchema"], {"disciplina": str, "busca": str | None})
-    servidor.tool(name=porta_material["name"], description=porta_material["description"])(_material)
+    _registrar(porta_material, _material)
 
     def _baixar_arquivo(disciplina, nome, todos=False) -> str:
         # `disciplina` e `nome` SEM default: no SDK é a ausência de default que
@@ -616,9 +661,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         porta_arquivo["inputSchema"],
         {"disciplina": str, "nome": str, "todos": bool},
     )
-    servidor.tool(
-        name=porta_arquivo["name"], description=porta_arquivo["description"]
-    )(_baixar_arquivo)
+    _registrar(porta_arquivo, _baixar_arquivo)
 
     def _diagnostico() -> str:
         # Sem parâmetro nenhum, e é de propósito: a pergunta é sobre o site
@@ -630,9 +673,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
             raise ToolError(str(exc)) from exc
 
     anotar(_diagnostico, porta_diagnostico["inputSchema"], {})
-    servidor.tool(
-        name=porta_diagnostico["name"], description=porta_diagnostico["description"]
-    )(_diagnostico)
+    _registrar(porta_diagnostico, _diagnostico)
 
     def _ja_entreguei(disciplina, entrega=None) -> str:
         # `disciplina` SEM default: é a ausência de default que torna o
@@ -648,9 +689,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         porta_ja_entreguei["inputSchema"],
         {"disciplina": str, "entrega": str | None},
     )
-    servidor.tool(
-        name=porta_ja_entreguei["name"], description=porta_ja_entreguei["description"]
-    )(_ja_entreguei)
+    _registrar(porta_ja_entreguei, _ja_entreguei)
 
     def _notas(disciplina=None) -> str:
         # `disciplina` COM default, ao contrário das outras três: aqui ela é
@@ -659,9 +698,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         return _chamar(porta_notas["name"], {"disciplina": disciplina})
 
     anotar(_notas, porta_notas["inputSchema"], {"disciplina": str | None})
-    servidor.tool(
-        name=porta_notas["name"], description=porta_notas["description"]
-    )(_notas)
+    _registrar(porta_notas, _notas)
 
     def _avisos(disciplina) -> str:
         # `disciplina` SEM default, como em `material` e `ja_entreguei`: é a
@@ -671,9 +708,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         return _chamar(porta_avisos["name"], {"disciplina": disciplina})
 
     anotar(_avisos, porta_avisos["inputSchema"], {"disciplina": str})
-    servidor.tool(
-        name=porta_avisos["name"], description=porta_avisos["description"]
-    )(_avisos)
+    _registrar(porta_avisos, _avisos)
 
     def _o_que_mudou(disciplina, dias=7) -> str:
         # `disciplina` SEM default e `dias` COM: é a assinatura que o SDK lê para
@@ -685,9 +720,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     anotar(
         _o_que_mudou, porta_mudou["inputSchema"], {"disciplina": str, "dias": int}
     )
-    servidor.tool(
-        name=porta_mudou["name"], description=porta_mudou["description"]
-    )(_o_que_mudou)
+    _registrar(porta_mudou, _o_que_mudou)
 
     def _disciplinas(todas=False) -> str:
         # `todas` COM default, como o `disciplina` de `notas`: o parâmetro é
@@ -697,9 +730,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         return _chamar(porta_disciplinas["name"], {"todas": todas})
 
     anotar(_disciplinas, porta_disciplinas["inputSchema"], {"todas": bool})
-    servidor.tool(
-        name=porta_disciplinas["name"], description=porta_disciplinas["description"]
-    )(_disciplinas)
+    _registrar(porta_disciplinas, _disciplinas)
 
     def _atrasadas(disciplina=None) -> str:
         # `disciplina` COM default, como em `notas`: a pergunta comum ("tem
@@ -708,9 +739,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
         return _chamar(porta_atrasadas["name"], {"disciplina": disciplina})
 
     anotar(_atrasadas, porta_atrasadas["inputSchema"], {"disciplina": str | None})
-    servidor.tool(
-        name=porta_atrasadas["name"], description=porta_atrasadas["description"]
-    )(_atrasadas)
+    _registrar(porta_atrasadas, _atrasadas)
 
     servidor.run(transport="stdio")
 

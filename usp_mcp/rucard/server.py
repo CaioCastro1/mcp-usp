@@ -17,6 +17,7 @@ importa o SDK — import de topo quebraria a suíte, que roda sem ele.
 """
 from __future__ import annotations
 
+from ..anotacoes import SO_LEITURA, para_o_sdk
 from .cliente import ClienteRucard, transporte_http
 from .erros import ErroRucard
 from .ferramentas import SEMANA, bandejao, bandejao_semana
@@ -97,6 +98,10 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            # Cardápio é consulta e nada mais: não há rota de escrita nesta API,
+            # e a política deste servidor já proíbe saldo, extrato e recarga.
+            # A razão de cada campo de `SO_LEITURA` mora ao lado dele.
+            "annotations": SO_LEITURA,
         }
     ]
 
@@ -389,7 +394,16 @@ def main() -> None:  # pragma: no cover — casca stdio
             "restaurantes": list[Literal["central", "prefeitura", "fisica", "quimicas"]] | None,
         },
     )
-    servidor.tool(name=descritor["name"], description=descritor["description"])(_bandejao)
+    # `annotations` vem do MESMO descritor que a descrição e o schema. Registrar
+    # aqui um bloco escrito à mão seria criar a segunda cópia que envelhece
+    # calada — quem obriga as duas fontes a concordarem é o A6. O import fica no
+    # topo, e não aqui dentro como o do SDK, porque `usp_mcp.anotacoes` é
+    # dicionário puro: ele só toca o SDK dentro de `para_o_sdk`.
+    servidor.tool(
+        name=descritor["name"],
+        description=descritor["description"],
+        annotations=para_o_sdk(descritor),
+    )(_bandejao)
 
     servidor.run(transport="stdio")
 
