@@ -149,6 +149,16 @@ comparável não tem nenhuma das duas.
 
 ### B3. "Preencher atividade" · **DECISÃO, não trabalho**
 
+> **RESPONDIDO em 15/09/2026, e o encaminhamento abaixo foi seguido.** A resposta
+> foi **sim parcial**: as duas de `mod_assign` passam a ser chamáveis sob
+> condição, as três de questionário continuam recusadas. Como manda o último
+> parágrafo deste item, a resposta veio como **spec antes de uma linha de
+> código** — `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`
+> (PR #58) — e a decisão está no §9 do `SPEC1.md`, com a data. O texto abaixo
+> fica como estava porque é o levantamento que sustentou a pergunta; o que mudou
+> é que ela tem resposta. **A implementação não foi feita**: o
+> `BLOQUEIO_PERMANENTE` continua com 40 nomes até ela entrar.
+
 Este item colide de frente com o desenho do projeto, e por isso volta para o dono
 antes de virar tarefa.
 
@@ -235,7 +245,14 @@ Uma disciplina que agrupe as listas numa Pasta é justamente o caso que `materia
 precisa acertar e pode estar errando em silêncio hoje. Medir isso fecha a questão
 com dado, que é como o §9 fecha as outras.
 
-### D3. Anotações de ferramenta no protocolo · ~1 h
+### D3. Anotações de ferramenta no protocolo · **FEITO em 15/09/2026**
+
+Entrou na PR #63, e a decisão está registrada no §9 do `SPEC1.md` (15/09). As
+treze ferramentas declaram `readOnlyHint`, `destructiveHint` e `openWorldHint`, e
+`baixar_arquivo` declara também `idempotentHint`. O que o item não previa, e é o
+que sobrou de aprendizado: `baixar_arquivo` **não** é read-only no sentido do
+protocolo, porque ela grava no depósito em disco de quem chama, e o campo
+pergunta se a ferramenta modifica o ambiente e não se ela escreve no Moodle.
 
 `readOnlyHint` e `destructiveHint` são campos do MCP que o cliente lê para saber
 que uma ferramenta é segura. O `SaadRahman01` declara; nós não. O Invariante 1
@@ -244,7 +261,15 @@ dizer a mesma coisa de um jeito que a máquina entende.
 
 Encaixe perfeito com a filosofia do projeto e uma das coisas mais baratas da lista.
 
-### D4. CI · ~2 h
+### D4. CI · **FEITO em 15/09/2026**
+
+Entrou na PR #60, e a decisão está registrada no §9 do `SPEC1.md` (15/09).
+`.github/workflows/offline.yml` roda o `scripts/gate.sh` em cada push e em cada
+pull request, em 3.11 e 3.14, com a camada `live` de fora como o item mandava. O
+runner é **macOS**, e isso não é preferência: o primeiro CI que existiu rodou em
+Linux e reprovou por 735 de 736, num teste que depende do sistema de arquivos não
+separar NFD de NFC. Fechar essa linha do `BACKLOG-correcoes.md` libera o runner
+Linux, que custa 10x menos minuto.
 
 O `gate.sh` é melhor que o CI dos dois comparáveis — e só roda quando alguém
 lembra. Uma action que rode a camada offline em cada push custa pouco. A camada
