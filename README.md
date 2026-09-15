@@ -272,7 +272,7 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, treze ferramentas. Comunicação por
+Três servidores MCP, treze ferramentas — quinze com a escrita de entrega ligada. Comunicação por
 stdio, JSON-RPC, um processo por servidor. Nove delas foram exercitadas contra a USP de
 verdade; `avisos`, `o_que_mudou`, `disciplinas` e `atrasadas` são de 14/09 e ainda não rodaram
 contra a USP. As duas primeiras nasceram contra resposta escrita à mão; `disciplinas`
@@ -284,12 +284,22 @@ lista de entregas) e metade escrita à mão (o estado de cada entrega). Nenhuma 
 |---|---|
 | `usp-rucard` | `bandejao` |
 | `usp-moodle` | `o_que_vence`, `material`, `baixar_arquivo`, `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas`, `atrasadas` |
+| `usp-moodle`, só com `USP_MCP_ENTREGA=1` | `salvar_rascunho`, `entregar` |
 | `usp-jupiter` | `disciplina`, `requisitos` |
 
 A superfície é allowlist: só saem daqui as funções nomeadas nela, por igualdade exata de
 nome, e o default é negar. Sobre ela existe o bloqueio permanente do §2.2, que vale mesmo
 com `USP_MCP_ALLOW_WRITES` ligada. A sua chave alcança 447 funções neste site, e é esse
 número que faz as duas camadas existirem.
+
+**As duas ferramentas que escrevem não existem por padrão.** `salvar_rascunho` e `entregar`
+só aparecem no `tools/list` com `USP_MCP_ENTREGA=1` no ambiente — desligada, elas não
+existem, e não é o caso de uma ferramenta visível que recusa. Ligada, cada uma ainda exige
+duas chamadas: a primeira devolve um plano do que mudaria, com um código; a segunda,
+repetindo o código, é a que escreve. Se o estado mudar no e-Disciplinas entre as duas, o
+código não confere e a resposta traz o plano novo em vez de escrever. Isso é forte contra
+acidente e **fraco contra um modelo com shell**, e essa fraqueza é conhecida e aceita: quem
+liga a flag precisa saber o que ligou.
 
 `baixar_arquivo` entrega o caminho e não o conteúdo. Um blob em base64 custaria cerca de
 302k tokens no PDF médio, e extrair o texto no servidor perderia as figuras. Numa lista

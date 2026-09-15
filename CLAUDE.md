@@ -112,9 +112,15 @@ contrário. Os que mordem em toda sessão:
 2. **Allowlist, nunca denylist** (Invariante 2). `tool_mobile_call_external_functions`
    é bloqueio permanente sem flag que libere — ela anula qualquer filtro por nome.
    O campo `type` do Moodle não é fronteira de segurança, e glob não é blindagem.
-3. **Read-only por padrão** (Invariante 1). Escrita só atrás de `USP_MCP_ALLOW_WRITES=1`,
-   e nunca implícita numa ferramenta de leitura. A lista de bloqueio permanente do
-   §2.2 não é liberada por essa flag.
+3. **Read-only por padrão** (Invariante 1), e nunca escrita implícita numa ferramenta
+   de leitura. `USP_MCP_ALLOW_WRITES` continua sendo a flag que **não** abre nada,
+   nos três servidores, e a lista de bloqueio permanente do §2.2 não é liberada por
+   flag nenhuma. A exceção, e é uma só, entrou em 15/09/2026: duas funções de
+   `mod_assign` saíram daquela lista para um conjunto próprio, e alcançá-las exige
+   `USP_MCP_ENTREGA=1` **e** uma confirmação declarada por chamada. Sem a flag, as
+   duas ferramentas que as usam não existem no `tools/list`. O desenho e o que ele
+   não protege estão em
+   `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`.
 4. **Nenhum segredo no repositório** (Invariante 3). Nunca leia, imprima ou ecoe o
    valor de `MOODLE_TOKEN`. Fixture do Moodle só entra no git depois da higienização
    do §3.3 — nome, e-mail, `userid`, `fullname` de turma e notas viram valor sintético

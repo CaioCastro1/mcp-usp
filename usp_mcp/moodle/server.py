@@ -17,8 +17,16 @@ from __future__ import annotations
 
 import os
 
-from ..anotacoes import ESCREVE_NO_DEPOSITO, SO_LEITURA, para_o_sdk
+from ..anotacoes import (
+    ENTREGA_SEM_DESFAZER,
+    ESCREVE_NO_DEPOSITO,
+    ESCREVE_RASCUNHO,
+    SO_LEITURA,
+    para_o_sdk,
+)
 from ..env import carregar_env
+from . import entrega as entrega_mod
+from . import politica
 from .arquivo import baixar_arquivo
 from .atrasadas import atrasadas
 from .avisos import avisos
@@ -51,6 +59,131 @@ _NOME_MUDOU = "o_que_mudou"
 _NOME_DISCIPLINAS = "disciplinas"
 _NOME_ATRASADAS = "atrasadas"
 
+# As duas de 15/09/2026, e as únicas que escrevem. Só aparecem com
+# `USP_MCP_ENTREGA=1` — ver `_ferramentas_de_entrega`.
+_NOME_RASCUNHO = "salvar_rascunho"
+_NOME_ENTREGAR = "entregar"
+
+
+def _ferramentas_de_entrega() -> list[dict]:
+    """As duas de escrita, ou lista vazia quando a flag está desligada.
+
+    **Desaparecer é melhor do que recusar.** Uma ferramenta que aparece no
+    `tools/list` e sempre responde "não posso" ensina o modelo a tentar: ele a
+    vê na lista, escolhe, gasta uma chamada, lê a negativa e tenta contornar.
+    Com ela fora da lista o padrão continua sendo negar, e nada no que o modelo
+    lê sugere que existe um caminho de escrita para procurar.
+    """
+    if not politica.entrega_habilitada():
+        return []
+    return [
+        {
+            "name": _NOME_RASCUNHO,
+            "description": (
+                "Salva o TEXTO do rascunho de uma entrega no e-Disciplinas "
+                "(Moodle da USP), sem enviar para correção. Use para 'salva "
+                "isso como rascunho no EP1', 'guarda esse texto na entrega'. "
+                "Rascunho salvo NÃO é entrega feita: o professor não recebe "
+                "nada até você usar `entregar`. Funciona em DUAS chamadas: a "
+                "primeira não escreve nada e devolve um plano do que mudaria "
+                "com um código; a segunda, repetindo o código, é que grava. Se "
+                "alguma coisa mudar no e-Disciplinas entre uma e outra, o "
+                "código não confere e a resposta traz o plano novo. Só entrega "
+                "de TEXTO online: entrega por arquivo é recusada com esse "
+                "motivo, porque este servidor não sobe arquivo. Entrega de "
+                "grupo também é recusada."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam."
+                        ),
+                    },
+                    "entrega": {
+                        "type": "string",
+                        "description": (
+                            "Pedaço do nome da entrega — 'EP1', 'EC-2'. Se "
+                            "casar com mais de uma, a resposta lista os "
+                            "candidatos em vez de escolher por você."
+                        ),
+                    },
+                    "texto": {
+                        "type": "string",
+                        "description": (
+                            "O texto do rascunho. Ele SUBSTITUI o que estiver "
+                            "lá — o conteúdo anterior não volta."
+                        ),
+                    },
+                    "confirmacao": {
+                        "type": "string",
+                        "description": (
+                            "O código que o plano devolveu na chamada anterior. "
+                            "Sem ele nada é escrito: a resposta é o plano."
+                        ),
+                    },
+                },
+                "required": ["disciplina", "entrega", "texto"],
+                "additionalProperties": False,
+            },
+            "annotations": ESCREVE_RASCUNHO,
+        },
+        {
+            "name": _NOME_ENTREGAR,
+            "description": (
+                "ENVIA uma entrega para correção no e-Disciplinas (Moodle da "
+                "USP) — o botão de entregar, com tudo o que ele significa. Use "
+                "para 'entrega o EP1', 'manda o EC-1 para correção'. Isto NÃO "
+                "tem como ser desfeito por este servidor: depois de enviada, a "
+                "entrega está com o professor. Funciona em DUAS chamadas: a "
+                "primeira não escreve nada e devolve um plano — estado atual, "
+                "prazo, arquivos anexados, o que muda — com um código; a "
+                "segunda, repetindo o código, é que envia. Se alguma coisa "
+                "mudar no e-Disciplinas entre uma e outra (arquivo novo, prazo "
+                "prorrogado, entrega já enviada), o código não confere e a "
+                "resposta traz o plano novo em vez de enviar. Recusa, e diz por "
+                "quê: entrega de grupo, entrega travada, entrega já enviada, "
+                "envio não permitido pelo site, e entrega sem nenhum arquivo "
+                "anexado. NÃO anexa arquivo — para ver o que já está anexado, "
+                "use `ja_entreguei`."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam."
+                        ),
+                    },
+                    "entrega": {
+                        "type": "string",
+                        "description": (
+                            "Pedaço do nome da entrega — 'EP1', 'EC-2'. Se "
+                            "casar com mais de uma, a resposta lista os "
+                            "candidatos em vez de escolher por você: enviar a "
+                            "errada não tem desfazer."
+                        ),
+                    },
+                    "confirmacao": {
+                        "type": "string",
+                        "description": (
+                            "O código que o plano devolveu na chamada anterior. "
+                            "Sem ele nada é enviado: a resposta é o plano."
+                        ),
+                    },
+                },
+                "required": ["disciplina", "entrega"],
+                "additionalProperties": False,
+            },
+            "annotations": ENTREGA_SEM_DESFAZER,
+        },
+    ]
+
 
 def listar_ferramentas() -> list[dict]:
     """Descreve a ferramenta como o MODELO a vê: nome, descrição, parâmetros.
@@ -58,6 +191,13 @@ def listar_ferramentas() -> list[dict]:
     A descrição usa o vocabulário de quem pergunta ("entrega", "prazo",
     "vence"), não o nome da função do Moodle por trás (T43) — é isso que faz
     o modelo escolher a ferramenta certa diante de uma pergunta em português.
+
+    **Depende do ambiente desde 15/09/2026**, e é a única função deste projeto
+    que depende: com `USP_MCP_ENTREGA=1` a lista tem doze itens, sem ela tem
+    dez. Continua pura (lê `os.environ`, não escreve em lugar nenhum) e
+    continua não exigindo o SDK. Quem carrega o `.env` antes de perguntar é
+    `main()`, no começo do processo — aqui dentro um `carregar_env()` seria
+    efeito colateral numa função que a suíte inteira chama.
     """
     return [
         {
@@ -189,7 +329,8 @@ def listar_ferramentas() -> list[dict]:
                 "required": ["disciplina", "nome"],
                 "additionalProperties": False,
             },
-            # A ÚNICA das treze que não é read-only no sentido do protocolo:
+            # A única das dez de leitura que não é read-only no sentido do
+            # protocolo (as duas de escrita, quando existem, também não são):
             # ela grava o arquivo baixado no disco desta máquina. O campo
             # pergunta "modifica o seu ambiente?", e o disco de quem chama é
             # ambiente — a decisão inteira, e o que os outros três campos
@@ -446,16 +587,26 @@ def listar_ferramentas() -> list[dict]:
             },
             "annotations": SO_LEITURA,
         },
+        *_ferramentas_de_entrega(),
     ]
 
 
-def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
+def chamar_ferramenta(
+    nome: str, argumentos: dict, *, cliente=None, perguntar=None
+) -> str:
     """Despacha para a ferramenta pedida pelo nome, ou levanta erro legível.
 
     Nome desconhecido é a fronteira do Invariante 6 (T44): não devolve lista
     vazia nem `None` silencioso — levanta `ErroMoodle` citando o nome pedido,
     porque "ferramenta não existe" e "ferramenta existe mas não achou nada"
-    têm curas diferentes para quem lê o erro.
+    têm curas diferentes para quem lê o erro. Com `USP_MCP_ENTREGA` desligada é
+    por aqui que `salvar_rascunho` e `entregar` também deixam de existir: elas
+    não estão em `listar_ferramentas()`, e este `if` é a mesma porta.
+
+    `perguntar` é a função que abre a pergunta de confirmação no cliente, e só
+    as duas de escrita a usam. `None` — o default, e o que toda chamada de
+    leitura passa — significa "não há como perguntar", que a saída distingue de
+    "perguntei e disseram não".
     """
     conhecidas = tuple(f["name"] for f in listar_ferramentas())
     if nome not in conhecidas:
@@ -478,6 +629,34 @@ def chamar_ferramenta(nome: str, argumentos: dict, *, cliente=None) -> str:
             token=os.environ.get("MOODLE_TOKEN", ""),
             url=os.environ.get("MOODLE_URL", _URL_PADRAO),
         )
+
+    if nome in (_NOME_RASCUNHO, _NOME_ENTREGAR):
+        # `asyncio.run` aqui, e não `async def chamar_ferramenta`: esta função é
+        # a fronteira síncrona que a suíte inteira e os outros nove caminhos
+        # usam, e torná-la corrotina obrigaria todos eles a mudar por causa de
+        # duas ferramentas. Na produção quem chama as corrotinas de
+        # `entrega.py` é `main()`, que já está num laço de eventos e as aguarda
+        # direto — as duas portas terminam na MESMA corrotina.
+        import asyncio
+
+        if nome == _NOME_ENTREGAR:
+            corrotina = entrega_mod.entregar(
+                cliente,
+                argumentos["disciplina"],
+                argumentos["entrega"],
+                confirmacao=argumentos.get("confirmacao"),
+                perguntar=perguntar,
+            )
+        else:
+            corrotina = entrega_mod.salvar_rascunho(
+                cliente,
+                argumentos["disciplina"],
+                argumentos["entrega"],
+                argumentos["texto"],
+                confirmacao=argumentos.get("confirmacao"),
+                perguntar=perguntar,
+            )
+        return asyncio.run(corrotina).texto
 
     if nome == _NOME_DIAGNOSTICO:
         return diagnostico(cliente)
@@ -554,6 +733,15 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     nenhum dos dois alcançava — os dois exercitam o caminho feliz e o handshake,
     e a fronteira ficou muda por uma versão inteira do SDK sem ninguém ver.
     """
+    # O `.env` é lido AQUI, antes de perguntar quais ferramentas existem. Desde
+    # 15/09/2026 `listar_ferramentas()` depende do ambiente (`USP_MCP_ENTREGA`),
+    # e a flag mora no mesmo arquivo que o token — sem esta linha, ligá-la no
+    # `.env` produziria o pior defeito possível: a ferramenta chamável e fora do
+    # `tools/list`, ou o contrário, conforme a ordem em que as coisas
+    # acontecessem. `carregar_env` usa `setdefault`, então quem já está no
+    # ambiente continua ganhando do arquivo.
+    carregar_env()
+
     try:
         from mcp.server import MCPServer
         # `ToolError` existe no 2.0.0 e no 2.2.0, e entra no MESMO try: sem o
@@ -752,6 +940,120 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     anotar(_atrasadas, porta_atrasadas["inputSchema"], {"disciplina": str | None})
     _registrar(porta_atrasadas, _atrasadas)
 
+    # ------------------------------------------------- as duas de escrita
+    #
+    # Registradas só quando existem: `portas` vem de `listar_ferramentas()`, que
+    # devolve dez sem `USP_MCP_ENTREGA=1`. Indexar por nome sem checar mataria o
+    # servidor antes do handshake com a flag desligada — que é exatamente a
+    # forma de falha que o desempacotamento posicional já produziu uma vez.
+    if _NOME_ENTREGAR in portas:
+        from mcp.server.mcpserver import Context
+
+        from pydantic import BaseModel, Field as CampoPydantic
+
+        class _Confirmacao(BaseModel):
+            """O esquema de um campo só que a pergunta usa.
+
+            Um booleano, e não texto livre: o protocolo só aceita tipo
+            primitivo aqui, e a pergunta que importa tem duas respostas.
+            """
+
+            confirmo: bool = CampoPydantic(
+                description="Confirma esta escrita no e-Disciplinas?"
+            )
+
+        async def _perguntar(ctx, mensagem: str) -> bool:
+            """`Context.elicit`, e o que fazer quando ele não existe do outro lado.
+
+            Cliente que não suporta elicitação levanta daqui uma
+            `ElicitacaoIndisponivel`, que o fluxo trata como "não pude
+            perguntar" — nunca como "disseram não". Os dois casos saem escritos
+            com palavras diferentes na resposta, e é essa distinção que impede
+            um cliente sem elicitação de ver toda entrega cancelada sem motivo.
+
+            `except Exception` aqui é deliberado e estreito no efeito: a lista
+            de erros que um cliente pode devolver ao recusar uma capacidade não
+            é fechada, e o pior caso desta captura é perguntar menos — nunca
+            escrever mais.
+            """
+            if ctx is None:
+                raise entrega_mod.ElicitacaoIndisponivel
+            try:
+                resultado = await ctx.elicit(mensagem, _Confirmacao)
+            except Exception as exc:  # noqa: BLE001 — ver docstring
+                raise entrega_mod.ElicitacaoIndisponivel from exc
+            if resultado.action != "accept":
+                return False
+            return bool(getattr(resultado.data, "confirmo", False))
+
+        def _cliente_com_credencial():
+            """O mesmo cliente que `chamar_ferramenta` monta quando não recebe um.
+
+            Montado aqui porque estas duas não passam por `chamar_ferramenta`:
+            elas precisam aguardar a pergunta, e `chamar_ferramenta` é síncrona.
+            """
+            carregar_env()
+            return ClienteMoodle(
+                token=os.environ.get("MOODLE_TOKEN", ""),
+                url=os.environ.get("MOODLE_URL", _URL_PADRAO),
+            )
+
+        porta_entregar = portas[_NOME_ENTREGAR]
+        porta_rascunho = portas[_NOME_RASCUNHO]
+
+        async def _entregar(disciplina, entrega, confirmacao=None, ctx=None) -> str:
+            try:
+                resposta = await entrega_mod.entregar(
+                    _cliente_com_credencial(),
+                    disciplina,
+                    entrega,
+                    confirmacao=confirmacao,
+                    perguntar=lambda mensagem: _perguntar(ctx, mensagem),
+                )
+            except ErroMoodle as exc:
+                raise ToolError(str(exc)) from exc
+            return resposta.texto
+
+        anotar(
+            _entregar,
+            porta_entregar["inputSchema"],
+            {"disciplina": str, "entrega": str, "confirmacao": str | None},
+        )
+        # `anotar` substitui `__annotations__` inteiro, e o `ctx` não é
+        # parâmetro do modelo: o SDK o injeta por tipo e o deixa fora do schema.
+        # Reposto aqui, depois, para que as duas coisas valham ao mesmo tempo.
+        _entregar.__annotations__["ctx"] = Context
+        _registrar(porta_entregar, _entregar)
+
+        async def _salvar_rascunho(
+            disciplina, entrega, texto, confirmacao=None, ctx=None
+        ) -> str:
+            try:
+                resposta = await entrega_mod.salvar_rascunho(
+                    _cliente_com_credencial(),
+                    disciplina,
+                    entrega,
+                    texto,
+                    confirmacao=confirmacao,
+                    perguntar=lambda mensagem: _perguntar(ctx, mensagem),
+                )
+            except ErroMoodle as exc:
+                raise ToolError(str(exc)) from exc
+            return resposta.texto
+
+        anotar(
+            _salvar_rascunho,
+            porta_rascunho["inputSchema"],
+            {
+                "disciplina": str,
+                "entrega": str,
+                "texto": str,
+                "confirmacao": str | None,
+            },
+        )
+        _salvar_rascunho.__annotations__["ctx"] = Context
+        _registrar(porta_rascunho, _salvar_rascunho)
+
     servidor.run(transport="stdio")
 
 
@@ -838,6 +1140,20 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_atrasadas(disciplina: str | None = None) -> str:
         return ""
 
+    # As duas de escrita só entram na conta quando existem. `listar_ferramentas`
+    # não as devolve com a flag desligada, e o laço abaixo só cobra sonda do que
+    # ela devolveu — registrá-las sempre criaria duas ferramentas de verificação
+    # que o servidor de verdade não tem.
+    @servidor.tool(name="entregar", description="verificação")
+    def _sonda_entregar(disciplina: str, entrega: str, confirmacao: str | None = None) -> str:
+        return ""
+
+    @servidor.tool(name="salvar_rascunho", description="verificação")
+    def _sonda_rascunho(
+        disciplina: str, entrega: str, texto: str, confirmacao: str | None = None
+    ) -> str:
+        return ""
+
     sondas = {
         "o_que_vence": _sonda_vence,
         "material": _sonda_material,
@@ -849,6 +1165,8 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "o_que_mudou": _sonda_mudou,
         "disciplinas": _sonda_disciplinas,
         "atrasadas": _sonda_atrasadas,
+        "entregar": _sonda_entregar,
+        "salvar_rascunho": _sonda_rascunho,
     }
     divergiu = False
     for ferramenta in listar_ferramentas():

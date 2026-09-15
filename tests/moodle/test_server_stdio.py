@@ -60,18 +60,17 @@ def test_t78_main_registra_todas_as_ferramentas(servidor_montado):
     """
     ferramentas = asyncio.run(servidor_montado["servidor"].list_tools())
 
-    assert sorted(f.name for f in ferramentas) == [
-        "atrasadas",
-        "avisos",
-        "baixar_arquivo",
-        "diagnostico",
-        "disciplinas",
-        "ja_entreguei",
-        "material",
-        "notas",
-        "o_que_mudou",
-        "o_que_vence",
-    ]
+    # Derivado de `listar_ferramentas()` e não escrito à mão desde 15/09: com
+    # `USP_MCP_ENTREGA=1` são doze e sem ela são dez, e uma lista fixa aqui
+    # reprovaria numa das duas configurações. Quem trava o CONJUNTO exato, nas
+    # duas, é o T42 — este teste é sobre `main()` registrar tudo que declarou,
+    # que é o bug histórico, e comparar com a declaração é exatamente isso.
+    assert sorted(f.name for f in ferramentas) == sorted(
+        f["name"] for f in server.listar_ferramentas()
+    )
+    assert len(ferramentas) >= 10, (
+        f"main() registrou {len(ferramentas)} ferramentas — dez existem sempre"
+    )
     assert servidor_montado["transporte"] == "stdio", (
         "o adaptador deixou de escutar em stdio — o .mcp.json fala stdio"
     )
