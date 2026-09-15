@@ -136,8 +136,8 @@ class ClienteRucard:
             # requisição, e a instrução de correção vai junto do fato.
             raise HashAusente(
                 "RUCARD_HASH ausente ou vazia — copie o .env.example para .env. "
-                "O valor é público (§1.2 do SPEC1): a hash é compartilhada e "
-                "embutida no app oficial, não é credencial de ninguém."
+                "O valor é público: a hash é compartilhada e embutida no app "
+                "oficial, não é credencial de ninguém."
             )
         self._chave = chave
         self._transporte = transporte

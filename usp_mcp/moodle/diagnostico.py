@@ -106,10 +106,10 @@ def formatar(info, disponiveis: frozenset[str]) -> str:
         # negar. A contagem já diz o que importa.
         linhas.append(
             f"\n⚠ {len(vivas)} das {len(politica.BLOQUEIO_PERMANENTE)} funções do "
-            "bloqueio permanente (§2.2) existem neste site e são alcançáveis por "
-            "este token. Elas não são chamadas — a allowlist nega por omissão e o "
-            "§2.2 nega de novo — e é justamente esse número que faz as duas "
-            "camadas valerem a pena."
+            "bloqueio permanente existem neste site e são alcançáveis por este "
+            "token. Elas não são chamadas — a lista de permitidas nega por "
+            "omissão e o bloqueio permanente nega de novo — e é justamente esse "
+            "número que faz as duas camadas valerem a pena."
         )
 
     return "\n".join(linhas)

@@ -171,7 +171,7 @@ def carregar(cliente, agora=None) -> list[Disciplina]:
             "O e-Disciplinas não devolveu o `userid` do token em "
             "`core_webservice_get_site_info`. Sem ele não dá para listar as "
             "disciplinas, e chutar um valor devolveria lista vazia com cara de "
-            "'você não tem matrícula' (§9, 28/08)."
+            "'você não tem matrícula'."
         )
 
     bruto = cliente.chamar("core_enrol_get_users_courses", userid=userid)
