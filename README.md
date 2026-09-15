@@ -162,11 +162,13 @@ sua pergunta. Por isso as descrições são escritas na linguagem de quem pergun
 o nome técnico da função por trás.
 
 O acesso à USP é limitado de propósito. De todas as operações que a sua chave permitiria,
-só um punhado está liberado aqui, e todas são de leitura. Coisas como começar uma prova,
-entregar um trabalho ou mandar mensagem em seu nome estão bloqueadas e continuam
-bloqueadas mesmo se alguém ligar a permissão de escrita. O motivo é simples: quem escolhe
-o que chamar é um assistente interpretando uma frase ambígua, e "manda ver a lista de
-exercícios" não pode ter caminho até entregar o trabalho.
+só um punhado está liberado aqui, e por padrão todas são de leitura. Começar uma prova,
+responder questionário ou mandar mensagem em seu nome estão bloqueados e continuam
+bloqueados mesmo se alguém ligar a permissão de escrita. Entregar trabalho é a única
+exceção que pode ser ligada, e a seção *Entregando trabalho* explica com que cuidados. O
+motivo de tanta cerca é simples: quem escolhe o que chamar é um assistente interpretando
+uma frase ambígua, e "manda ver a lista de exercícios" não pode ter caminho até entregar o
+trabalho.
 
 A sua chave do e-Disciplinas fica só no seu computador. Ela não vai para nenhum servidor,
 nem para a nuvem. É por isso que o e-Disciplinas só funciona rodando local.
@@ -174,6 +176,37 @@ nem para a nuvem. É por isso que o e-Disciplinas só funciona rodando local.
 As respostas da USP são enxugadas antes de chegar ao assistente. A lista de disciplinas,
 por exemplo, sai de 104.712 bytes para 7.816: o resto é metadado que não responde pergunta
 nenhuma e só ocuparia espaço.
+
+## Entregando trabalho
+
+Por padrão o projeto só lê. Entregar trabalho no e-Disciplinas é a única exceção que pode
+ser ligada, e ela vem desligada: enquanto você não ligar, essas ferramentas nem aparecem
+para o assistente.
+
+Para ligar, ponha `USP_MCP_ENTREGA=1` no arquivo `.env` e reinicie.
+
+Aparecem então duas coisas separadas: salvar rascunho e entregar para correção. São duas
+de propósito, porque "salva aí" e "entrega isso" estão a uma palavra de distância e só uma
+das duas tem volta.
+
+Entregar nunca acontece no primeiro pedido. O primeiro devolve um plano: qual atividade,
+que arquivos estão anexados, qual é o prazo e o que exatamente vai mudar. Só o segundo
+pedido, confirmando aquele plano, escreve. Se alguma coisa mudou entre um e outro, a
+confirmação é recusada e o plano volta atualizado.
+
+Três coisas para saber antes de ligar:
+
+- Entregar para correção não tem desfazer, nem aqui nem pelo site.
+- Salvar rascunho só funciona em atividade de texto online. Enviar arquivo não existe neste
+  projeto, e é o formato mais comum na prática. Essa metade vai recusar a maioria dos casos,
+  dizendo o motivo.
+- Trabalho em grupo é recusado, porque a entrega valeria também por pessoas que não estão
+  na conversa.
+
+A confirmação em duas etapas protege contra acidente e contra frase ambígua. Ela não é um
+cadeado: quem roda o projeto dentro de um assistente que também tem acesso ao terminal
+pode contornar qualquer trava que o programa tente impor. Ligar ou não é decisão sua, e
+vale tomá-la sabendo disso.
 
 ## O que o projeto não responde, e por quê
 
