@@ -187,21 +187,66 @@ def test_a2_toda_ferramenta_declara_read_only_hint(anunciadas):
     )
 
 
-def test_a3_nenhuma_ferramenta_se_declara_destrutiva(anunciadas):
-    # Nenhuma das treze escreve no e-Disciplinas: a allowlist tem cinco funções
-    # de leitura e a lista de bloqueio permanente não é aberta por flag nenhuma.
-    # Este teste é o alarme para o dia em que isso deixar de ser verdade.
-    achadas = {
-        modulo: destrutivas(ferramentas)
-        for modulo, ferramentas in _colheita(anunciadas).items()
-        if destrutivas(ferramentas)
+# As ÚNICAS ferramentas do projeto autorizadas a se declararem destrutivas, e o
+# porquê de cada uma. Escrita à mão de propósito: derivar esta lista do que os
+# servidores anunciam faria o teste concordar com qualquer coisa que aparecesse
+# destrutiva amanhã, que é o oposto do alarme que ele é.
+#
+# Até 15/09/2026 A3 dizia "nenhuma", e estava certo: nada aqui escrevia no
+# e-Disciplinas. Naquele dia duas funções saíram do bloqueio permanente por
+# decisão registrada, e estas duas ferramentas nasceram — as duas escrevem, e as
+# duas fazem escrita que não é acréscimo. A regra não foi afrouxada para
+# acomodá-las: ela ficou mais estreita. Antes dizia "ninguém"; agora diz "estas
+# duas, nomeadas, e elas TÊM de declarar" — uma terceira aparecendo destrutiva
+# reprova, e uma destas duas se declarando inofensiva também.
+DESTRUTIVAS_AUTORIZADAS = {
+    "salvar_rascunho": (
+        "substitui o texto do rascunho no e-Disciplinas, e o conteúdo anterior "
+        "não volta por nenhuma função da API"
+    ),
+    "entregar": (
+        "envia a entrega para correção, e não há função no e-Disciplinas que "
+        "desfaça isso"
+    ),
+}
+
+
+def test_a3_so_as_duas_de_escrita_se_declaram_destrutivas(anunciadas):
+    # O campo é por onde o cliente decide o que chama sozinho e o que para e
+    # pergunta. As dez de leitura declarando falso é o que faz o verdadeiro
+    # destas duas significar alguma coisa — se tudo fosse destrutivo, nada seria.
+    colheita = _colheita(anunciadas)
+
+    intrusas = {
+        modulo: sobrando
+        for modulo, ferramentas in colheita.items()
+        if (sobrando := sorted(set(destrutivas(ferramentas)) - set(DESTRUTIVAS_AUTORIZADAS)))
     }
-    assert not achadas, (
-        f"ferramenta com `destructiveHint` verdadeiro: {achadas}. Nenhuma "
-        "ferramenta daqui escreve no Moodle hoje. Se alguma passou a escrever, "
-        "esta linha não é o lugar de resolver: a escrita só existe atrás de "
-        "`USP_MCP_ALLOW_WRITES=1` e a decisão precisa estar registrada antes."
+    assert not intrusas, (
+        f"ferramenta com `destructiveHint` verdadeiro fora da lista: {intrusas}. "
+        "Escrita irreversível no e-Disciplinas é decisão registrada antes do "
+        "código, não efeito colateral de uma ferramenta nova. Se esta é mesmo "
+        "uma delas, ela entra em DESTRUTIVAS_AUTORIZADAS com o motivo ao lado."
     )
+
+    # E a metade que costuma faltar: quem está na lista tem de declarar mesmo.
+    # Sem isto, `entregar` poderia passar a se dizer inofensiva e este teste
+    # ficaria verde — o cliente pararia de perguntar antes de uma entrega que
+    # não tem volta, e nada aqui acusaria.
+    for modulo, ferramentas in colheita.items():
+        presentes = {f["name"] for f in ferramentas}
+        declaradas = set(destrutivas(ferramentas))
+        for nome, motivo in DESTRUTIVAS_AUTORIZADAS.items():
+            if nome not in presentes:
+                # Com `USP_MCP_ENTREGA` desligada as duas não existem no
+                # `tools/list`, e é assim que tem de ser: ausência aqui é o
+                # padrão do projeto, não defeito.
+                continue
+            assert nome in declaradas, (
+                f"{modulo}: {nome!r} está no `tools/list` e NÃO se declara "
+                f"destrutiva. Ela {motivo} — declarar falso pede ao cliente que "
+                "a trate como consulta."
+            )
 
 
 def test_a4_toda_ferramenta_declara_open_world_hint(anunciadas):

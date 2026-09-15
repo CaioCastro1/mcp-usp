@@ -11,6 +11,8 @@ Nada aqui itera sobre lista de funções — um sweep sobre as 447 passa por
 from __future__ import annotations
 
 import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -103,3 +105,83 @@ def test_o_anexo_da_entrega_ainda_chega_com_os_campos_que_o_acervo_usa(
         anexos[0]
     )
     assert not faltando, f"campos sumiram da API desde 12/09/2026: {sorted(faltando)}"
+
+
+# --------------------------------------------------------------------------
+# E13 — o plano de uma atividade REAL bate com o que o site diz, SEM ESCREVER.
+#
+# **Escrita ao vivo não entra nesta suíte, em circunstância nenhuma.** Um teste
+# que entregue atividade de verdade é o próprio acidente que o desenho da
+# confirmação existe para evitar, e o token é a credencial pessoal do dono. Por
+# isso este teste exercita só a metade de leitura: as duas chamadas que montam o
+# plano já estavam na allowlist antes desta trilha, e o plano é função pura
+# delas.
+#
+# As duas chamadas são literais e feitas AQUI, e não escondidas dentro de uma
+# função do módulo, de propósito: é assim que as guardas da camada 1 (P1 e P3)
+# enxergam o que esta camada alcança. Nenhum nome de função de escrita aparece
+# neste arquivo, e P2 reprova se aparecer.
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(
+    os.environ.get("USP_MCP_ENTREGA") != "1",
+    reason=(
+        "E13 é o canário da trilha de entrega e só roda com USP_MCP_ENTREGA=1 "
+        "além de USP_MCP_LIVE=1. Ele NÃO escreve nada — as duas chamadas são de "
+        "leitura e já existiam na allowlist —, e exigir a flag mesmo assim é "
+        "deliberado: quem liga a flag é quem decidiu que esta trilha está em uso."
+    ),
+)
+def test_e13_o_plano_de_uma_entrega_real_bate_com_o_site_sem_escrever(cliente_real):
+    from usp_mcp.moodle import entrega as ent
+
+    atividades_cruas = cliente_real.chamar(
+        "mod_assign_get_assignments", **{"courseids[0]": 142036}
+    )
+    atividades = ent.projetar_atividades(atividades_cruas)
+    assert atividades, "PTC3314 não tem mais nenhuma entrega"
+
+    alvo = atividades[0]
+    status_cru = cliente_real.chamar(
+        "mod_assign_get_submission_status", assignid=alvo.assignid
+    )
+    plano = ent.montar_plano(status_cru, alvo, "PTC3314")
+
+    # Cada campo do plano contra o lugar de onde ele veio. Comparar o plano com
+    # ele mesmo provaria só que o dataclass guarda o que recebeu; o que importa
+    # é que a LEITURA de cada campo bate com a resposta viva, porque é a leitura
+    # que decide se a escrita seria recusada ou liberada.
+    ultima = status_cru["lastattempt"]
+    submissao = ultima.get("submission") or {}
+
+    assert plano.status == (submissao.get("status") or "")
+    assert plano.travada == bool(ultima["locked"])
+    assert plano.pode_enviar == bool(ultima["cansubmit"])
+    assert plano.pode_editar == bool(ultima["canedit"])
+    assert plano.em_grupo == (bool(ultima["teamsubmission"]) or alvo.em_grupo)
+    assert plano.tempo_limite == (ultima.get("timelimit") or 0)
+
+    arquivos_vivos = [
+        arquivo["filename"]
+        for plugin in submissao.get("plugins") or ()
+        for area in plugin.get("fileareas") or ()
+        for arquivo in area.get("files") or ()
+        if arquivo.get("filename")
+    ]
+    assert [a.nome for a in plano.arquivos] == arquivos_vivos
+
+    # O código é estável sobre a MESMA leitura: se ele variasse, a segunda
+    # chamada seria impossível contra o site de verdade, e isso é coisa que só
+    # o dado vivo mostra.
+    assert ent.codigo_do_plano(plano) == ent.codigo_do_plano(
+        ent.montar_plano(status_cru, alvo, "PTC3314")
+    )
+
+    # E a saída não vaza endereço de arquivo com credencial colada atrás.
+    texto = ent.texto_do_plano(
+        plano,
+        verbo="entrega",
+        agora=datetime.now(ZoneInfo("America/Sao_Paulo")),
+    )
+    assert "pluginfile.php" not in texto

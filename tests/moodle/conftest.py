@@ -184,7 +184,21 @@ class ClienteFalso:
         self._respostas = respostas
         self._arquivos = arquivos or {}
         self.chamadas: list[tuple[str, dict]] = []
+        self.escritas: list[tuple[str, dict]] = []
         self.downloads: list[str] = []
+
+    def escrever(self, funcao: str, **params):
+        """A porta de escrita do cliente real, dublada — e gravada SEPARADO.
+
+        `escritas` é lista própria e não um filtro sobre `chamadas` porque a
+        pergunta que os testes de entrega fazem é "escreveu?", e ela tem de ser
+        respondível sem saber o nome da função por trás. Um teste que
+        procurasse `mod_assign_submit_for_grading` dentro de `chamadas` passaria
+        a mentir no dia em que o nome mudasse — e daria verde para uma escrita
+        feita pela porta errada.
+        """
+        self.escritas.append((funcao, params))
+        return self.chamar(funcao, **params)
 
     def chamar(self, funcao: str, **params):
         self.chamadas.append((funcao, params))
@@ -315,6 +329,13 @@ def status_de_entrega(
     com_lastattempt: bool = True,
     com_texto_online: bool = True,
     com_warning: bool = False,
+    tamanho: int = 218453,
+    travada: bool = False,
+    pode_enviar: bool | None = None,
+    pode_editar: bool | None = None,
+    em_grupo: bool = False,
+    tempo_limite: int = 0,
+    comecou: bool = False,
 ) -> dict:
     """Uma resposta de `mod_assign_get_submission_status`, na forma documentada.
 
@@ -334,6 +355,22 @@ def status_de_entrega(
     `com_texto_online=False` produz a entrega SÓ DE ARQUIVO, que é a forma dos
     quatro `assign` reais de PTC3314. As duas existem porque o tamanho do cru
     depende inteiramente de qual delas é — e o lado projetado, não (J6).
+
+    Os seis últimos parâmetros entraram em 15/09/2026, com as ferramentas de
+    escrita, e todos os campos que eles mexem existem na captura real: `locked`,
+    `cansubmit`, `canedit`, `teamsubmission` e `timelimit` estão em
+    `lastattempt`, e `timestarted` em `lastattempt.submission`. Nenhum é campo
+    inventado — o que muda é só o valor, que a captura traz numa combinação só.
+
+    `pode_enviar` e `pode_editar` aceitam `None` (derivar do `status`, como
+    sempre foi) ou um booleano que GANHA do status. O booleano existe porque as
+    recusas da camada de entrega precisam de `cansubmit` falso com `status`
+    ainda `draft` — uma combinação que o site produz (prazo final passado,
+    matrícula suspensa) e que a derivação por status não sabe montar.
+
+    `em_grupo` põe em `teamsubmission` o objeto da submissão do grupo, que é o
+    que o site devolve — não `True`. A captura de 15/09 é de uma entrega de
+    grupo real, e é dela que a forma vem.
     """
     plugin_texto = {
         "type": "onlinetext",
@@ -355,7 +392,7 @@ def status_de_entrega(
         "attemptnumber": 0,
         "timecreated": timemodified - 7200,
         "timemodified": timemodified,
-        "timestarted": None,
+        "timestarted": (timemodified - 3600) if comecou else None,
         "status": status,
         "groupid": 0,
         "assignment": 577509,
@@ -372,7 +409,7 @@ def status_de_entrega(
                             {
                                 "filename": nome,
                                 "filepath": "/",
-                                "filesize": 218453,
+                                "filesize": tamanho,
                                 "fileurl": (
                                     "https://edisciplinas.usp.br/webservice/"
                                     f"pluginfile.php/9599793/assignsubmission_file/"
@@ -395,15 +432,20 @@ def status_de_entrega(
             # `submission` ausente é como o Moodle responde quando o aluno nunca
             # abriu a entrega — não é `status: "new"` com objeto vazio.
             **({"submission": submissao} if com_lastattempt else {}),
-            "teamsubmission": None,
-            "submissiongroup": None,
+            "teamsubmission": submissao if em_grupo else None,
+            "submissiongroup": 471716 if em_grupo else None,
             "submissiongroupmemberswhoneedtosubmit": [],
             "submissionsenabled": True,
-            "locked": False,
+            "locked": travada,
             "graded": gradingstatus == "graded",
-            "canedit": status in ("new", "draft"),
+            "canedit": (
+                status in ("new", "draft") if pode_editar is None else pode_editar
+            ),
             "caneditowner": status in ("new", "draft"),
-            "cansubmit": status in ("new", "draft"),
+            "cansubmit": (
+                status in ("new", "draft") if pode_enviar is None else pode_enviar
+            ),
+            "timelimit": tempo_limite,
             "extensionduedate": extensionduedate,
             "blindmarking": False,
             "gradingstatus": gradingstatus,
@@ -827,12 +869,27 @@ def mudancas_falsas(instancias=None, *, com_warning=False, contextlevel="module"
 # bytes medida contra este payload mede o que a nossa projeção descarta de uma
 # resposta DESTA FORMA. Os números do §9 de `atrasadas` que se apoiam em payload
 # real dizem isso explicitamente, e os que não, também.
-def entregas_falsas(por_curso, *, com_warning=False) -> dict:
+def entregas_falsas(
+    por_curso,
+    *,
+    com_warning=False,
+    em_grupo=False,
+    declaracao="",
+    tempo_limite=0,
+) -> dict:
     """`por_curso` é uma lista de `(courseid, [(assignid, nome, duedate, nosub)])`.
 
     `nosubmissions` é o campo que diz que a atividade NÃO aceita envio pelo
     e-Disciplinas (as provas presenciais que o professor cria só para ter data),
     e ele é a diferença entre uma consulta economizada e uma acusação falsa.
+
+    Os três últimos parâmetros entraram em 15/09/2026, com as ferramentas de
+    escrita, e valem para TODOS os assign do lote — quem precisa de dois estados
+    diferentes monta dois lotes. Os três campos existem em `assign_ptc3314.json`
+    e a captura os traz preenchidos: a entrega real de PTC3314 é de grupo
+    (`teamsubmission: 1`) e exige declaração assinada. O default aqui é o
+    contrário do real de propósito: o caminho feliz da escrita é a entrega
+    individual, e ele precisava de um lote que a captura não oferece.
     """
     return {
         "courses": [
@@ -847,6 +904,10 @@ def entregas_falsas(por_curso, *, com_warning=False) -> dict:
                         "cutoffdate": 0,
                         "nosubmissions": nosub,
                         "introattachments": [],
+                        "teamsubmission": 1 if em_grupo else 0,
+                        "requiresubmissionstatement": 1 if declaracao else 0,
+                        "submissionstatement": declaracao,
+                        "timelimit": tempo_limite,
                     }
                     for assignid, nome, duedate, nosub in assigns
                 ],

@@ -28,6 +28,7 @@ roda no gate, ao lado da suíte offline, e não atrás de `USP_MCP_LIVE=1`.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import select
 import subprocess
@@ -83,6 +84,7 @@ class ClienteStdio:
         modulo: str,
         comando: list[str] | None = None,
         cwd: pathlib.Path | str | None = None,
+        env: dict[str, str] | None = None,
     ):
         # `comando`/`cwd` existem para a suíte do lançador (L1/L2), que precisa
         # subir o MESMO servidor por outro caminho e a partir de um cwd que não
@@ -92,6 +94,14 @@ class ClienteStdio:
         self._modulo = modulo
         self._comando = comando or [sys.executable, "-m", modulo]
         self._cwd = str(cwd) if cwd is not None else str(RAIZ)
+        # `env` existe para o E14, que precisa subir o MESMO servidor com
+        # `USP_MCP_ENTREGA` explicitamente ligada e explicitamente desligada.
+        # O default continua sendo herdar o ambiente, que é como o cliente MCP
+        # de verdade sobe o processo — herdar é o comportamento sob teste em
+        # todo o resto desta suíte, e não podia virar exceção por causa de um
+        # teste. Passar um `env` é dizer "esta propriedade não depende de quem
+        # rodou a suíte", que é exatamente o que E14 afirma.
+        self._env = env
         self._proc: subprocess.Popen | None = None
         self._id = 0
         self.info: dict = {}
@@ -103,6 +113,7 @@ class ClienteStdio:
         self._proc = subprocess.Popen(
             self._comando,
             cwd=self._cwd,
+            env=({**os.environ, **self._env} if self._env is not None else None),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

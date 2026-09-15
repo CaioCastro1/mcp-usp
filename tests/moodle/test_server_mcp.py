@@ -12,7 +12,7 @@ import pytest
 import json
 
 from tests.moodle.conftest import FIXTURE_DISCIPLINAS, ENTREGAS_PSI3323_SEM_ANEXO
-from usp_mcp.moodle import server
+from usp_mcp.moodle import politica, server
 
 
 def disciplinas_brutos():
@@ -24,29 +24,43 @@ def disciplinas_brutos():
 pytestmark = pytest.mark.contrato
 
 
+# As dez que existem sempre. Ordem de nascimento, e cada crescimento é decisão
+# registrada no §9: `material` em 31/08, `baixar_arquivo` em 01/09,
+# `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas`
+# e `atrasadas` em 14/09.
+SEMPRE = [
+    "o_que_vence",
+    "material",
+    "baixar_arquivo",
+    "diagnostico",
+    "ja_entreguei",
+    "notas",
+    "avisos",
+    "o_que_mudou",
+    "disciplinas",
+    "atrasadas",
+]
+
+# As duas de 15/09, e as únicas do projeto que dependem do ambiente: só existem
+# com `USP_MCP_ENTREGA=1`. Escritas aqui e não derivadas do módulo pelo mesmo
+# motivo da lista acima — derivar faria o teste concordar com o que achasse.
+SO_COM_A_FLAG = ["salvar_rascunho", "entregar"]
+
+
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — dez ferramentas. Cada crescimento é decisão registrada no §9:
-    `material` em 31/08, `baixar_arquivo` em 01/09, `diagnostico`,
-    `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas` e
-    `atrasadas` em 14/09.
+    """T42 — dez ferramentas, ou doze com a flag de entrega ligada.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma
     ferramenta" em decisão declarada em vez de efeito colateral.
+
+    As duas últimas entram condicionadas, e a condição é a asserção: uma
+    ferramenta de escrita aparecendo sem a flag reprova aqui, e é a mesma
+    propriedade que E14 verifica no fio. Este é o lado barato dela.
     """
     fs = server.listar_ferramentas()
-    assert [f["name"] for f in fs] == [
-        "o_que_vence",
-        "material",
-        "baixar_arquivo",
-        "diagnostico",
-        "ja_entreguei",
-        "notas",
-        "avisos",
-        "o_que_mudou",
-        "disciplinas",
-        "atrasadas",
-    ]
+    esperadas = SEMPRE + (SO_COM_A_FLAG if politica.entrega_habilitada() else [])
+    assert [f["name"] for f in fs] == esperadas
 
 
 def test_o_nome_vem_da_pergunta_nao_da_funcao_do_moodle():
