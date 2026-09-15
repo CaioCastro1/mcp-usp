@@ -773,7 +773,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_disciplinas = portas[_NOME_DISCIPLINAS]
     porta_atrasadas = portas[_NOME_ATRASADAS]
     descritor = portas[_NOME_FERRAMENTA]
-    servidor = MCPServer(name="usp-mcp-moodle", version="0.1.0")
+    servidor = MCPServer(name="usp-mcp-moodle", version="1.0.0")
 
     def _chamar(nome: str, argumentos: dict) -> str:
         """A tradução do erro do domínio para o canal que o modelo lê.
