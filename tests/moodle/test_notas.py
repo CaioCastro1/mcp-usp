@@ -202,7 +202,7 @@ def test_n9_nenhuma_nota_lancada_e_resposta_rotulada(disciplinas_brutas):
 # --------------------------------------------------------------------------
 
 
-def test_n10_item_a_item_com_nota_maximo_e_peso(disciplinas_brutas):
+def test_n10_item_a_item_com_nota_e_peso(disciplinas_brutas):
     """N10 — é a única visão que responde "como estou NESSA disciplina": nota de
     8,5 em algo que vale 25% e nota de 8,5 em algo que vale 5% não são a mesma
     resposta."""
@@ -214,14 +214,14 @@ def test_n10_item_a_item_com_nota_maximo_e_peso(disciplinas_brutas):
     assert "8,50" in r.texto
     assert "25,00 %" in r.texto, "não disse quanto o item pesa"
 
-    # O `grademax` NÃO chega deste site: a captura de 15/09 tem 20 itens e
-    # nenhum o traz (F2 trava isso). A ferramenta lê o campo e degrada sozinha,
-    # imprimindo só a nota — e o que este teste guarda é justamente que ela não
-    # INVENTA um máximo quando ele não vem.
+    # De quanto era a nota, esta ferramenta não diz: o e-Disciplinas não manda o
+    # máximo do item (captura de 15/09, 20 itens, nenhum com `grademax` — F8
+    # trava a leitura e F2 trava a montagem). O que este teste guarda é que a
+    # saída não INVENTA o máximo, seja lendo campo que não existe, seja
+    # derivando um de `percentageformatted`.
     assert " de " not in r.texto.split("peso")[0], (
         "apareceu um máximo que o e-Disciplinas não mandou:\n" + r.texto
     )
-    assert "25,00 %" in r.texto, "não disse o peso"
 
 
 def test_n11_o_total_do_curso_e_rotulado(disciplinas_brutas):
