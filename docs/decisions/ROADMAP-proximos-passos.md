@@ -234,7 +234,7 @@ Importa porque metade dos vencimentos reais é questionário: numa amostra de
 14 dias, 3 dos 4 itens de `o_que_vence` eram `questionário`. A ferramenta de
 notas do P2 (`gradereport_*`) cobre a nota final do curso; esta cobre o item.
 
-### D2. `mod_folder` — fecha um item aberto do backlog · ~2 h
+### D2. `mod_folder` — fecha um item aberto do backlog · **FEITO em 15/09/2026**
 
 `mod_folder_get_folders_by_courses` e `core_files_get_files` existem no site. O
 backlog registra desde 31/08 que **não se sabe** se `core_course_get_contents`
@@ -244,6 +244,13 @@ tinham pasta nenhuma — três amostras sem pasta não provam ausência.
 Uma disciplina que agrupe as listas numa Pasta é justamente o caso que `material`
 precisa acertar e pode estar errando em silêncio hoje. Medir isso fecha a questão
 com dado, que é como o §9 fecha as outras.
+
+> **Feito em 15/09/2026, e a resposta foi "nada a consertar".** `core_course_get_contents` expande sim: as dez pastas de
+> `PEA3301_2026_1sem` chegam com `contents` preenchido, e 54% dos arquivos daquela
+> disciplina moram dentro de pasta. `material` já as mostra, porque itera o
+> `contents` de todo módulo. **Nenhuma das duas funções entra na allowlist**: a de
+> pastas descreve sem listar arquivo, que é menos do que já temos, e a de arquivos
+> resolveria um problema inexistente. Medição em `notas/mod-folder.md`.
 
 ### D3. Anotações de ferramenta no protocolo · **FEITO em 15/09/2026**
 
