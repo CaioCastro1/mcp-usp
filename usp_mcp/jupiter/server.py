@@ -370,7 +370,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     """`python -m usp_mcp.jupiter.server --auto-verificar`: o que dá para checar
     sem tocar a rede da USP."""
     print("ferramentas expostas :", [f["name"] for f in listar_ferramentas()])
-    print("credencial exigida   : NENHUMA (bean público e stateless, §4.4 do recon)")
+    print("credencial exigida   : NENHUMA (bean público e stateless)")
 
     try:
         from mcp.server import MCPServer as _M

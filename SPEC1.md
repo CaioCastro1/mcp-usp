@@ -2729,3 +2729,29 @@ padrão). `_horario_comum` sobe o horário pro cabeçalho quando é o MESMO em t
 aberto da semana e o mantém na linha do dia quando varia — mesma regra estrita da
 fatoração de itens, aplicada ao horário. Medido: semana/almoço caiu para 4.560 B,
 semana/almoço+jantar para 8.018 B (~5% menor). Teste R48/R48b.
+
+### 14/09/2026 — o que o modelo lê deixa de citar o SPEC
+
+Revisão transversal: doze strings que chegam ao modelo ou ao usuário — negativas de
+allowlist, timeout, token inválido, avisos de `material` e `diagnostico` — citavam
+"§9 do SPEC1", "Invariante 2", "medido em 14/09". Para quem usa a ferramenta é referência
+sem referente, e custa token. Nenhum teste dependia delas (dois aceitavam `"§8"` OU
+`".env"`).
+
+**Decisão:** regra travada por teste (`tests/test_jargao.py`, J1): nenhuma string literal
+de `usp_mcp/` que não seja docstring contém `§`, `Invariante`, `SPEC1`, `Medido em`,
+`Fase 1/2` ou `Regra de Ouro`. Varredura por AST, como R40/T43; docstring e comentário
+seguem livres, porque são para quem mantém. Cada string foi reescrita mantendo o fato e a
+instrução — com uma exceção medida: o aviso de `diagnostico` mantém a frase "bloqueio
+permanente" (só tirou o "(§2.2)"), porque `test_d5_o_texto_conta_as_bloqueadas_mas_nao_as_nomeia`
+exige essa substring literal e o plano original não tinha essa dependência mapeada.
+Verificado por sabotagem (J1 reprova ao devolver "(Invariante 2)" a uma negativa de
+`usp_mcp/moodle/politica.py`).
+
+No mesmo PR: os comandos de ambiente do README e do CLAUDE.md passam a `uv` (mesmo
+`.venv/`, por hardlink, um cache único em vez de uma cópia por checkout) — a mensagem de
+SDK ausente segue com `pip` porque tem teste sobre a frase exata, e trocá-la é decisão à
+parte. A frase "cinco ferramentas" que o plano original mirava já não existia: o README
+tinha avançado para "sete ferramentas" (correto, e já batendo com a tabela) entre a
+escrita do plano e a execução — os pré-requisitos `rucard-semana-e-vocabulario` e
+`jupiter-disciplina-secoes` fecharam nesse intervalo.

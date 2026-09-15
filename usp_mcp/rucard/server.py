@@ -402,7 +402,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     from usp_mcp.env import carregar_env
 
     print("ferramentas expostas :", [f["name"] for f in listar_ferramentas()])
-    print("credencial pessoal   : NENHUMA (hash pública e compartilhada, §1.2)")
+    print("credencial pessoal   : NENHUMA (hash pública e compartilhada)")
 
     carregar_env()
     print("RUCARD_HASH          :",

@@ -64,8 +64,8 @@ def transporte_http(url: str, corpo: str, cabecalhos: dict[str, str]) -> tuple[i
         return e.code, e.read().decode("ISO-8859-1", errors="replace")
     except (urllib.error.URLError, TimeoutError) as e:
         raise JupiterIndisponivel(
-            f"o JupiterWeb não respondeu ({e}). Se você está num sandbox, a rede "
-            "da USP não é alcançável de lá — ver §1.1 do SPEC1."
+            f"o JupiterWeb não respondeu ({e}). Num ambiente sem acesso à rede da "
+            "USP (um sandbox em nuvem, por exemplo) a chamada não tem como sair."
         ) from e
 
 
@@ -85,8 +85,8 @@ def transporte_get_http(url: str, cabecalhos: dict[str, str]) -> tuple[int, byte
         return e.code, e.read()
     except (urllib.error.URLError, TimeoutError) as e:
         raise JupiterIndisponivel(
-            f"o JupiterWeb não respondeu ({e}). Se você está num sandbox, a rede "
-            "da USP não é alcançável de lá — ver §1.1 do SPEC1."
+            f"o JupiterWeb não respondeu ({e}). Num ambiente sem acesso à rede da "
+            "USP (um sandbox em nuvem, por exemplo) a chamada não tem como sair."
         ) from e
 
 

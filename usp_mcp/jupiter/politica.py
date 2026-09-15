@@ -110,9 +110,8 @@ def decidir(metodo: str, consulta: str, permitir_escrita: bool = False) -> Decis
         return Decisao(
             permitida=False,
             motivo=(
-                f"consulta {consulta} não está na allowlist (Invariante 2, "
-                "allowlist e não denylist). A fatia atual tem "
-                f"{len(CONSULTAS_PERMITIDAS)} consultas."
+                f"consulta {consulta} não é uma das que esta ferramenta faz ao "
+                f"JupiterWeb (a lista é fechada: {len(CONSULTAS_PERMITIDAS)} consultas)."
             ),
         )
 
@@ -137,7 +136,7 @@ def decidir_caminho(caminho: str) -> Decisao:
     return Decisao(
         permitida=False,
         motivo=(
-            f"caminho {caminho} não está na allowlist (Invariante 2, allowlist e "
-            f"não denylist). A fatia atual tem {len(CAMINHOS_PERMITIDOS)} caminho."
+            f"caminho {caminho} não é uma das páginas que esta ferramenta lê no "
+            f"JupiterWeb (a lista é fechada: {len(CAMINHOS_PERMITIDOS)} caminho)."
         ),
     )
