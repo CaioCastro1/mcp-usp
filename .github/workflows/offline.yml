@@ -1,0 +1,106 @@
+# Camada offline em cada push e em cada pull request.
+#
+# O `scripts/gate.sh` deste repositório checa mais coisa que o CI dos dois
+# projetos comparáveis, e mesmo assim só rodava quando alguém lembrava de
+# chamá-lo. Esse era o defeito — não o que ele checa —, e é o que este arquivo
+# fecha.
+#
+# A camada que fala com a USP de verdade NÃO entra aqui, pela mesma razão que
+# ela não entra no gate: precisa da USP estar de pé e do token pessoal do dono,
+# e cada chamada fica no log da conta dele. No CI, ela reprovaria uma PR por um
+# motivo que não é da PR, e gastaria credencial de uma pessoa para dizer isso.
+# Ela segue atrás da variável de ambiente que a libera, rodada à mão, na máquina
+# de quem tem a credencial. O `tests/test_ci.py` reprova qualquer workflow que
+# ligue essa variável — inclusive este, se um dia alguém tentar.
+#
+# E nenhum segredo entra aqui, nem pelo cofre do GitHub: a camada offline não
+# autentica em nada. O único valor de ambiente que a suíte exige é a chave do
+# RUCard, que é a chave pública embutida no aplicativo oficial e já vem
+# preenchida no `.env.example`, que é rastreado.
+
+name: offline
+
+on:
+  # Os dois, e não um só. Push cobre a branch principal e as branches de
+  # trabalho de quem tem acesso; pull request cobre a PR vinda de um fork, que
+  # não dispara push neste repositório. Com um só, metade das mudanças chegaria
+  # à revisão sem checagem nenhuma.
+  push:
+  pull_request:
+
+# Este trabalho clona, instala e roda teste. Não escreve nada de volta, então
+# recebe só leitura: permissão que não é usada é permissão que não precisa
+# existir.
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+
+    # A suíte inteira leva ~16 s na máquina do dono. Dez minutos é folga de
+    # sobra, e existe por um defeito já visto aqui: o `tests/test_gate.py` roda
+    # o gate dentro de um clone do próprio repositório, e uma recursão nesse
+    # caminho não falha — pendura. Sem teto, um trabalho pendurado fica rodando
+    # calado até o limite da conta.
+    timeout-minutes: 10
+
+    strategy:
+      # Sem cancelar a outra versão quando uma reprova: saber se a falha é das
+      # duas ou só de uma é metade do diagnóstico, e o cancelamento apaga
+      # justamente essa metade.
+      fail-fast: false
+      matrix:
+        # As duas pontas, e nada no meio. 3.11 é o piso que o `pyproject.toml`
+        # anuncia (é onde `tomllib` entra na biblioteca padrão, que o
+        # `tests/test_pacote.py` usa) — promessa que hoje nada exercita, e o CI
+        # é o lugar mais barato para exercitá-la, em vez de descobrir pelo
+        # relato de quem instalou. 3.14 é o que o dono roda: verde só no piso
+        # protegeria todo mundo menos ele. Versão do meio não acrescenta
+        # informação que essas duas já não deem.
+        python: ["3.11", "3.14"]
+
+    steps:
+      # Profundidade 1, que é o padrão. O `tests/test_gate.py` clona este
+      # checkout para exercitar o gate num clone limpo; medido em 15/09/2026,
+      # `git clone --local` a partir de um clone raso apenas avisa e copia do
+      # jeito normal, com código de saída 0. Buscar o histórico inteiro só para
+      # isso seria pagar por uma garantia que já existe.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      # Os mesmos comandos do README, na mesma ordem, de propósito: assim o CI
+      # também responde "o caminho de instalação que o README manda seguir
+      # ainda funciona?" — pergunta que já foi respondida errada aqui e que
+      # hoje só um clone novo, feito à mão, alcança. `python3 -m venv` e não
+      # `uv` porque é a alternativa que o próprio README oferece a quem não tem
+      # `uv`, e não precisa de mais nada instalado no runner.
+      #
+      # O venv em `.venv/` não é preferência: é onde o `scripts/gate.sh`
+      # procura o interpretador antes de cair no `python3` do sistema. Com ele,
+      # o CI roda pelo mesmo caminho que a máquina do dono roda.
+      - run: python3 -m venv .venv
+      - run: .venv/bin/python -m pip install -e ".[dev]"
+
+      # O runner clona limpo, e o `.env` é ignorado pelo git — ele não vem
+      # junto, exatamente como no clone de quem acabou de chegar ao projeto.
+      # Sem esta linha a suíte reprova falando da chave do RUCard, que é
+      # consequência e não causa. O exemplo já traz a chave pública preenchida
+      # e deixa o campo do token pessoal vazio, que é como a camada offline
+      # precisa dele.
+      - run: cp .env.example .env
+
+      # O gate, e não `pytest` direto. O motivo é medido, não estético: o
+      # desenho de 10/09/2026 sobre rodar o gate num clone limpo mostrou que a
+      # ÚNICA coisa que falta num clone é o `.env`, e que a cura cabe na linha
+      # acima, sem segredo nenhum. Com ela dada, o gate roda inteiro aqui — e o
+      # gate é três checagens a mais que o pytest: nenhum segredo do `.env` em
+      # arquivo rastreado, o cru com dado pessoal ainda ignorado, e a própria
+      # suíte com a camada live desligada na mão dele, não na minha. Chamar o
+      # pytest direto criaria uma segunda resposta para "o que precisa passar
+      # antes de commitar", e este repositório já pagou três vezes pelo preço
+      # de a mesma pergunta ter duas implementações.
+      - run: ./scripts/gate.sh
