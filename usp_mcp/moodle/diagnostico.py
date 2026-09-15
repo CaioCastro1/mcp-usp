@@ -48,6 +48,65 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "core_course_get_contents",
         "mod_assign_get_assignments",
     ),
+    # `ja_entreguei` (14/09) não pede `core_course_get_contents`: ela não lista
+    # arquivo nenhum. Precisa da resolução de sigla (as duas primeiras), da
+    # lista de entregas com prazo, e do status de cada uma.
+    "ja_entreguei": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
+    ),
+    # `disciplinas` (14/09) é a única linha desta tabela que não tem função
+    # própria: ela expõe a lista que a resolução de sigla já busca, e por isso
+    # exige exatamente as duas funções que TODAS as outras já exigem. Um site
+    # onde ela falha é um site onde nada com escopo de disciplina funciona.
+    "disciplinas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+    ),
+    # `atrasadas` (14/09) exige exatamente o mesmo que `ja_entreguei`, e é de
+    # propósito: ela é a outra pergunta sobre o mesmo par de funções — "o que
+    # venceu e não consta entregue" em vez de "o que já entreguei". Um site que
+    # responde uma responde a outra.
+    "atrasadas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
+    ),
+    # `notas` (14/09) exige as DUAS visões, e é o único caso da tabela em que a
+    # ferramenta não usa as duas na mesma invocação: ela escolhe uma conforme a
+    # pergunta tenha ou não disciplina. Declarar as duas é o certo mesmo assim —
+    # um site com só uma delas responde metade das perguntas, e "OK" aí seria
+    # promessa que quebra na segunda pergunta.
+    "notas": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "gradereport_overview_get_course_grades",
+        "gradereport_user_get_grade_items",
+    ),
+    # `avisos` (14/09) exige as duas de fórum juntas, e não uma ou outra como
+    # `notas`: `get_forum_discussions` pede um `forumid`, e o único lugar de
+    # onde ele sai é `get_forums_by_courses`. Um site com só a segunda não
+    # responde meia pergunta — não responde nenhuma.
+    "avisos": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_forum_get_forums_by_courses",
+        "mod_forum_get_forum_discussions",
+    ),
+    # `o_que_mudou` (14/09) pede `core_course_get_contents` junto, e não por
+    # acaso: sem ela o ponteiro devolve `cmid` e a resposta vira "o módulo
+    # 6372306 mudou", que não é português. Um site sem ela responderia a
+    # pergunta em números — o que é pior que não responder, porque parece
+    # resposta.
+    "o_que_mudou": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "core_course_get_updates_since",
+        "core_course_get_contents",
+    ),
 }
 
 

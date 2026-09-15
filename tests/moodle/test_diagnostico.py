@@ -62,8 +62,18 @@ def test_d2_funcao_ausente_reprova_so_a_ferramenta_que_depende_dela():
         + texto
     )
     assert "mod_assign_get_assignments" in texto, "não disse QUAL função falta"
-    assert texto.count("NÃO — faltam") == 2, (
-        "material e baixar_arquivo dependem dela; só elas deviam reprovar:\n" + texto
+    # Escrito à mão, e não derivado de `FUNCOES_POR_FERRAMENTA`: derivar da
+    # tabela que gera o texto faria o teste concordar consigo mesmo. `ja_entreguei`
+    # entrou nesta lista em 14/09 — ela pergunta o status de cada `assign` que
+    # `get_assignments` lista, então sem a função ela não tem por onde começar —,
+    # e `atrasadas` no mesmo dia, pelo mesmo motivo: sem a lista de entregas ela
+    # não sabe o que venceu. `disciplinas`, ao lado delas, continua OK: ela só
+    # precisa das duas funções da resolução de sigla.
+    reprovadas = sorted(
+        l.split()[0] for l in texto.splitlines() if "NÃO — faltam" in l
+    )
+    assert reprovadas == ["atrasadas", "baixar_arquivo", "ja_entreguei", "material"], (
+        "reprovou o conjunto errado de ferramentas:\n" + texto
     )
 
 

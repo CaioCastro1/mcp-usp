@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Cinco funções, todas de leitura. Crescer isso é decisão de §9, não
+# Onze funções, todas de leitura. Crescer isso é decisão de §9, não
 # conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
 # então novas existem porque `material` precisa traduzir sigla em `courseid`:
 # site_info dá o userid a partir do token, users_courses dá a lista, e
@@ -35,6 +35,52 @@ from dataclasses import dataclass
 # `mod_assign_remove_submission` seguem no bloqueio permanente do §2.2. É
 # igualdade exata de nome que libera, nunca prefixo — por isso a proximidade
 # não as arrasta junto.
+#
+# A sexta entrou em 14/09/2026, e a decisão está no §9: `ja_entreguei` responde
+# "eu já entreguei isso?", e nenhuma das cinco acima sabe responder.
+# `mod_assign_get_assignments` diz o que EXISTE e quando vence; o que foi feito
+# só existe em `mod_assign_get_submission_status`, no campo
+# `lastattempt.submission.status` — onde `draft` (rascunho salvo, não enviado) e
+# `submitted` (entregue) são uma palavra de distância. Ela é de leitura pura: a
+# função que ENTREGA é `mod_assign_submit_for_grading`, e continua bloqueada
+# duas vezes, pela omissão da allowlist e pelo §2.2.
+#
+# A sétima e a oitava entraram em 14/09/2026, com `notas`, e a decisão do §9 é
+# sobre serem DUAS: as duas visões de nota do e-Disciplinas não competem, se
+# complementam (catálogo §3.7). `gradereport_overview_get_course_grades` dá a
+# nota final de cada matrícula; `gradereport_user_get_grade_items` dá item a
+# item de UM curso, com peso e máximo. Nenhuma das duas responde o que a outra
+# responde, e a ferramenta escolhe UMA por invocação — nunca as duas.
+#
+# As duas são leitura. A família tem escrita (`gradereport_*_view_grade_report`,
+# que dispara evento de log) e tem leitura de nota DE TERCEIROS
+# (`gradereport_grader_get_users_in_report`): nenhuma das três entra, e os
+# prefixos declarados em P5 são estreitos o bastante para não as arrastar.
+#
+# A nona e a décima entraram em 14/09/2026, com `avisos`, e a decisão do §9 é
+# sobre a SEGUNDA delas ter o nome que tem. O comparável `loyaniu/moodle-mcp`
+# chama `mod_forum_get_discussions`, que **não existe** no Moodle 5.0 da USP —
+# medido em 14/09. A função é `mod_forum_get_forum_discussions`, e a diferença
+# entre as duas é a diferença entre a ferramenta responder e dar erro na
+# primeira pergunta real. A primeira, `mod_forum_get_forums_by_courses`, existe
+# porque a segunda exige um `forumid` que nem o `courseid` nem o `cmid` são.
+#
+# A família `mod_forum_` é a mais perigosa da allowlist até aqui: quatorze das
+# dezoito funções escrevem, e quatro delas estão no §2.2 (`add_discussion`,
+# `add_discussion_post`) ou deveriam estar pelo mesmo motivo
+# (`update_discussion_post` edita post público, `delete_post` apaga a discussão
+# inteira quando o post é o tópico). Nenhuma começa por `mod_forum_get_`, que é
+# o prefixo estreito declarado em P5 — o do plugin, `mod_forum_`, casaria com
+# todas as quatorze.
+#
+# A décima primeira entrou em 14/09/2026, com `o_que_mudou`, e é a primeira que
+# NÃO precisou de prefixo novo: `core_course_get_updates_since` casa com
+# `core_course_get_`, declarado desde 31/08 por causa de `get_contents`. A
+# decisão do §9 dela é outra — a janela é por DIAS e não por carimbo —, e o que
+# vale registrar aqui é que a família `core_course_` tem escrita
+# (`core_course_set_favourite_courses`, que o T5 usa justamente porque ela se
+# declara `read` e grava, e `core_course_view_course`), e nenhuma das duas casa
+# com o prefixo do verbo.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -42,6 +88,12 @@ ALLOWLIST: frozenset[str] = frozenset(
         "core_enrol_get_users_courses",
         "core_course_get_contents",
         "mod_assign_get_assignments",
+        "mod_assign_get_submission_status",
+        "gradereport_overview_get_course_grades",
+        "gradereport_user_get_grade_items",
+        "mod_forum_get_forums_by_courses",
+        "mod_forum_get_forum_discussions",
+        "core_course_get_updates_since",
     }
 )
 

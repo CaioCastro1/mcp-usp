@@ -28,11 +28,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from .projecao import FUSO_SAO_PAULO, Vencimento, projetar_eventos
-
-# Abreviação de dia da semana em português. datetime.weekday() é 0=segunda,
-# ..., 6=domingo — não usamos strftime("%a") porque isso depende do locale do
-# processo (em inglês por padrão) e não deve variar entre máquinas.
-_DIAS_SEMANA = ("seg", "ter", "qua", "qui", "sex", "sáb", "dom")
+from .texto import formatar_data
 
 # Nome da atividade do Moodle (`modulename`) traduzido pro que o dono lê. Só
 # tarefa e questionário aparecem no calendário do Moodle (ver COBERTURA em
@@ -59,19 +55,12 @@ class RespostaOQueVence:
     vazio_por: str | None
 
 
-def _formatar_data(quando: datetime) -> str:
-    """"dom 06/09 23:59" — curto de propósito (T39: poucos milhares de
-    caracteres para dezenas de eventos)."""
-    dia = _DIAS_SEMANA[quando.weekday()]
-    return f"{dia} {quando.day:02d}/{quando.month:02d} {quando.hour:02d}:{quando.minute:02d}"
-
-
 def _formatar_linha(v: Vencimento) -> str:
     # Sem URL de propósito: ~55 caracteres por evento estourariam o
     # orçamento de T39 (528 kB crus -> < 4.000 caracteres) sem responder à
     # pergunta "o que vence, quando, em que disciplina".
     tipo = _TIPOS_PT.get(v.tipo, v.tipo)
-    quando = _formatar_data(v.quando) if v.quando is not None else "sem data"
+    quando = formatar_data(v.quando) if v.quando is not None else "sem data"
     return f"{quando} {v.disciplina} ({tipo}): {v.nome}"
 
 
