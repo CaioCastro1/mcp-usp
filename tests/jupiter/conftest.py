@@ -10,12 +10,11 @@ import pytest
 RAIZ = pathlib.Path(__file__).resolve().parents[2]
 FIXTURES = RAIZ / "fixtures" / "jupiter"
 
-# As quatro fixtures da fatia vertical (§4.1 do spec). Uma quinta aqui é
+# As três fixtures da fatia vertical (§4.1 do spec). Uma quarta aqui é
 # alargar o escopo, e o teste da allowlist vai reclamar.
 FATIA = {
     "psi3323": "dwr-pubObterDisciplina-PSI3323.txt",
     "ptc3314": "dwr-pubObterDisciplina-PTC3314.txt",
-    "requisito": "dwr-pubListarRequisitoDisciplina-MAT2454.txt",
     "erro": "dwr-pubObterDisciplina-ERRO-sigla-inexistente.txt",
 }
 
@@ -76,11 +75,6 @@ def ptc3314():
 
 
 @pytest.fixture
-def requisito():
-    return texto("requisito")
-
-
-@pytest.fixture
 def erro():
     return texto("erro")
 
@@ -99,6 +93,10 @@ REQUISITOS = {
     "ptc3313_html": "html-listarCursosRequisitos-PTC3313.html",
     "ingresso_poli": "dwr-pubListarCursoEntrada-codclg3.txt",
     "colegiados": "dwr-pubListarColegiado.txt",
+    # `pubListarRequisitoDisciplina` saiu da FATIA (allowlist) em 14/09 (§9),
+    # mas o arquivo fica no disco: evidência pública do formato DWR de array
+    # de um elemento, citada em notas/jupiter-recon.md e usada só pelo T5.
+    "requisito_disciplina": "dwr-pubListarRequisitoDisciplina-MAT2454.txt",
 }
 
 
@@ -134,3 +132,8 @@ def colegiados():
     """As 47 unidades. Sem elas, decidir a unidade a partir do codcur seria
     chute: oito codclg são prefixo de outro (§9, 14/09)."""
     return (FIXTURES / REQUISITOS["colegiados"]).read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def requisito_disciplina():
+    return (FIXTURES / REQUISITOS["requisito_disciplina"]).read_text(encoding="utf-8")

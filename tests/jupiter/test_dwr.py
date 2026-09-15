@@ -19,10 +19,10 @@ def test_t4_objeto_unico_vira_mapa_de_26_campos(psi3323, ptc3314):
         assert o["coddis"] == sigla
 
 
-def test_t5_array_de_um_elemento_nao_colapsa(requisito):
+def test_t5_array_de_um_elemento_nao_colapsa(requisito_disciplina):
     # A armadilha: a fixture de pré-requisito tem EXATAMENTE 1 elemento. Um
     # decoder que "simplifique" lista de 1 quebra a ferramenta em silêncio.
-    r = dwr.decodificar(requisito)
+    r = dwr.decodificar(requisito_disciplina)
     assert isinstance(r, list), "array de 1 elemento virou objeto"
     assert len(r) == 1
     assert r[0]["coddisreq"] == "MAT2453"
