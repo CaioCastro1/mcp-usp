@@ -2665,6 +2665,70 @@ ponto/exclamação, é comunicado: sai dos itens e entra em `avisos` **uma vez p
 distinto**, nomeando os RUs. Campo novo `avisos_publicados` por refeição (trava R36
 atualizada). Regra de 2 pontos medidos, não lei: comunicado sem negrito e sem ponto
 final passa como prato, e isso está escrito no código. Testes R42–R42g.
+### 14/09/2026 — `requisitos` agrupa currículos com a mesma combinação
+
+Medido em `formatar_requisitos` sobre a fixture de MAT2455: 6.238 B, 23 blocos, 18 deles
+com exatamente as mesmas duas linhas. Agrupando pelo conjunto exato de (sigla, nome, tipo,
+rótulo): **4 combinações** — 13 currículos com MAT2454+MAT3458 fraco, 7 do piloto com
+2000101, 2 com MAT2454+MAT2458 fraco, e o 3250 sozinho com as mesmas siglas como requisito
+DURO. Texto agrupado: 2.458 B (2,5× menor). PSI3323 (1 currículo): 437 → 408 B.
+
+**Decisão:** só formatação. A projeção continua por currículo; o texto sai por combinação,
+com cada currículo numa linha (código, habilitação, período, período ideal, marca de
+ingresso). O agrupamento preserva por construção o que o desenho de 14/09 protege — o tipo
+é propriedade do currículo — porque o tipo está na chave. Teto: 3.500 B (T82). Testes
+T81–T82d; T70–T72 não precisaram mudar.
+### 14/09/2026 — `disciplina` responde por seção, e deixa o pré-requisito com `requisitos`
+
+Revisão de má prática nos servidores públicos. Medido em `server.formatar` sobre as
+fixtures: "quantos créditos tem PTC3314" é respondida pelo cabeçalho (139 B) e a
+ferramenta entregava 3.880 B — 28×; 38% disso era a lista de competências dos objetivos.
+O teste de custo (T34) media o dicionário, não o texto, e `ingles=True` (6.452 B) não era
+medido em lugar nenhum.
+
+**Decisão:** (a) parâmetro `secoes` (`ementa`, `objetivos`, `programa`, `bibliografia`,
+`avaliacao`, `todas`), padrão só `ementa`, cabeçalho sempre, e o que ficou de fora
+declarado na última linha (Invariante 7); (b) `codcur`/`codhab` **saem** de `disciplina`:
+o §9 de 14/09 já tinha medido que o único código descobrível devolve zero linha, e manter
+o parâmetro era oferecer ao modelo o caminho que não responde, com três avisos para
+explicar por quê; (c) `pubListarRequisitoDisciplina` sai da allowlist (4 → 3) e
+`ClienteJupiter.listar_requisito` some — a fixture DWR dela fica no disco como evidência,
+fora da `FATIA`; (d) parágrafo repetido na fonte (bibliografia de PTC3314) sai uma vez;
+(e) tetos novos sobre o **texto**: 1.200 B padrão, 5.000 B `todas`, 8.500 B `todas`+inglês.
+
+**Descartado:** um enum de "nível de detalhe" (`resumo`/`completo`). Perguntas reais pedem
+uma seção específica ("o que cai", "como é a avaliação"), e o array deixa o modelo pedir
+exatamente essa. Testes T80–T80g, T85–T87, T34b–T34d; T31, T33, T76, T78 e T79 removidos
+com o caminho que exercitavam.
+
+### 14/09/2026 — `bandejao` entende "sexta", "semana" e "Prefeitura"
+
+Revisão de má prática nos dois servidores públicos. Medido na saída real: "que dia tem
+lasanha essa semana?" custava 5 a 7 chamadas de ferramenta (~1.000 B cada) porque `dia`
+só aceitava `hoje`/`amanhã`/data; "o que tem na sexta?" obrigava o modelo a calcular a
+data; e "bandejão da Prefeitura" exigia saber que Prefeitura = PUSP-CB = id `7`, que a
+descrição não dizia.
+
+**Decisão:** (a) `dia` aceita nome de dia da semana (resolve para o dia DESSA semana,
+passado ou futuro — é a única com cardápio), `depois de amanhã`, artigo na frente, e
+`semana`; (b) `restaurantes` tem `enum` de **nomes** (`central`, `prefeitura`, `fisica`,
+`quimicas`), traduzidos para id antes da política, que segue por id (§1.2); (c)
+`bandejao_semana` responde os sete dias numa chamada — **5 requisições HTTP**, as mesmas
+de um dia, porque o `/menu` já devolve a semana e o cache é por RU (teste R45b trava);
+(d) item presente em todas as refeições abertas sai uma vez, num rodapé, só no texto.
+
+**Medido (fixtures da Fase 1, 4 RUs):** semana/almoço 4.818 B, semana/almoço+jantar
+8.381 B; tetos 6.500 B e 11.000 B (R46c). O único item comum à semana inteira é
+`Minipão / refresco` — o arroz varia (`feijão preto`), e por isso a fatoração é estrita
+(interseção), não "na maioria". Testes R43–R47.
+
+**Mesma sessão, achado adicional:** o horário também se repetia igual em toda a
+semana para 6 dos 7 pares RU+refeição — só o jantar do 9 varia (19:45 em dia útil,
+19:00 no sábado, o motivo já registrado acima para não fixá-lo no cabeçalho por
+padrão). `_horario_comum` sobe o horário pro cabeçalho quando é o MESMO em todo dia
+aberto da semana e o mantém na linha do dia quando varia — mesma regra estrita da
+fatoração de itens, aplicada ao horário. Medido: semana/almoço caiu para 4.560 B,
+semana/almoço+jantar para 8.018 B (~5% menor). Teste R48/R48b.
 
 ### 14/09/2026 — o que o modelo lê deixa de citar o SPEC
 

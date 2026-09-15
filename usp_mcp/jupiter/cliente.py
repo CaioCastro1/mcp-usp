@@ -149,15 +149,6 @@ class ClienteJupiter:
             params={"coddis": sigla, "verdis": 0},
         )
 
-    def listar_requisito(self, *, coddis: str, codcur: str, codhab: str) -> list:
-        """Pré-requisitos da disciplina **naquele curso**. Os três parâmetros são
-        obrigatórios porque a resposta é condicional ao curso (§5.2 do recon)."""
-        return self._chamar(
-            metodo="listar",
-            consulta="pubListarRequisitoDisciplina",
-            params={"codcur": codcur, "codhab": codhab, "coddis": coddis},
-        )
-
     # --- a segunda superfície: a página de requisitos por curso -------------
 
     def obter_requisitos(self, sigla: str) -> bytes:

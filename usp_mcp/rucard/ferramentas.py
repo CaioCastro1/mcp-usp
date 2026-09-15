@@ -15,6 +15,11 @@ Quatro coisas que a implementação óbvia erra e que aqui estão certas de prop
 vira: em 31/08/2026 às 19:22 o índice 0 já era 31/08, não 24/08. Índice funciona
 até segunda-feira.
 
+**A semana é a mesma pergunta.** "Que dia tem lasanha?" não é outra ferramenta: é
+`bandejao` sete vezes, uma por dia, com o `/menu` vindo do cache — 5 requisições, as
+mesmas de um dia. Nome de dia ("sexta") resolve para o dia DESSA semana, porque é a
+única que existe no RUCard.
+
 **`FECHADO` não é uma coisa só.** O RU 7 devolve os 7 jantares fechados porque
 **nunca** serve jantar; o RU 6 devolve sábado fechado porque não serve nesse dia;
 e um feriado seria fechado num dia em que ele serve. As três leem igual no
@@ -65,6 +70,47 @@ _REFEICOES_COM_CARDAPIO = ("almoco", "jantar")
 
 _ROTULO_REFEICAO = {"cafe": "café da manhã", "almoco": "almoço", "jantar": "jantar"}
 
+# O vocabulário de quem pergunta, e o id que a allowlist entende. `politica`
+# continua decidindo POR ID (§1.2: name/alias é exibição); aqui só se traduz a
+# entrada do usuário antes de qualquer política. Sem acento nos nomes canônicos
+# porque são valores de enum que trafegam em JSON digitado por modelo — com
+# acento também são aceitos.
+NOMES_RU_PARA_ID: dict[str, str] = {
+    "central": "6", "prefeitura": "7", "fisica": "8", "quimicas": "9",
+}
+NOMES_RU: tuple[str, ...] = tuple(NOMES_RU_PARA_ID)
+ALIASES_RU: dict[str, str] = {
+    **NOMES_RU_PARA_ID,
+    "pusp": "7", "pusp-cb": "7", "puspcb": "7", "pusp-c": "7",
+    "física": "8",
+    "químicas": "9", "quimica": "9", "química": "9",
+}
+
+
+def resolver_restaurantes(pedidos) -> list[str]:
+    """Nomes e/ou ids → ids, sem repetição, na ordem pedida. Vazio → os quatro.
+
+    Nome desconhecido é erro legível AQUI, antes da política: passar "each" adiante
+    como se fosse id devolveria a mensagem de id inexistente, que é a cura errada.
+    """
+    if not pedidos:
+        return list(politica.RUS_PERMITIDOS)
+    ids: list[str] = []
+    for pedido in pedidos:
+        chave = str(pedido).strip().lower()
+        if chave.isdigit():
+            id_ = chave
+        elif chave in ALIASES_RU:
+            id_ = ALIASES_RU[chave]
+        else:
+            raise ErroRucard(
+                f"não conheço o restaurante {pedido!r}. Use {', '.join(NOMES_RU)} "
+                "— ou omita para comparar os quatro."
+            )
+        if id_ not in ids:
+            ids.append(id_)
+    return ids
+
 _MARCA_VEGETARIANA = re.compile(r"\(\s*v\s*\)", re.IGNORECASE)
 _PREFIXO_OPCAO = re.compile(r"^op[çc][ãa]o\s*:?\s*", re.IGNORECASE)
 _TAG_HTML = re.compile(r"<[^>]+>")
@@ -95,20 +141,63 @@ def _comunicado(linha: str) -> str | None:
     return None
 
 
+# Nome de dia da semana → datetime.weekday(). Com e sem "-feira", com e sem
+# acento, e a abreviação de três letras — é assim que a pergunta chega ("na
+# sexta", "sábado", "qui"). Resolve para o dia DESSA semana, passado ou futuro,
+# porque é a única semana que tem cardápio.
+_NOMES_DIA: dict[str, int] = {
+    "segunda": 0, "segunda-feira": 0, "seg": 0,
+    "terça": 1, "terca": 1, "terça-feira": 1, "terca-feira": 1, "ter": 1,
+    "quarta": 2, "quarta-feira": 2, "qua": 2,
+    "quinta": 3, "quinta-feira": 3, "qui": 3,
+    "sexta": 4, "sexta-feira": 4, "sex": 4,
+    "sábado": 5, "sabado": 5, "sáb": 5, "sab": 5,
+    "domingo": 6, "dom": 6,
+}
+# "na sexta", "no sábado", "nesta quinta": o artigo não muda o dia.
+_ARTIGO_DE_DIA = re.compile(r"^(na|no|nesta|neste|nessa|nesse|esta|este|essa|esse|a|o)\s+")
+
+# O valor de `dia` que pede os sete dias. Quem o atende é `bandejao_semana`.
+SEMANA = "semana"
+
+
+def segunda_da_semana(dia: date) -> date:
+    """A segunda-feira da semana de `dia`. A semana do RUCard vai de seg a dom."""
+    return dia - timedelta(days=dia.weekday())
+
+
+def dias_da_semana(hoje: date) -> list[date]:
+    """Os sete dias, segunda a domingo, da semana de `hoje`."""
+    segunda = segunda_da_semana(hoje)
+    return [segunda + timedelta(days=i) for i in range(7)]
+
+
 def resolver_dia(bruto: str, hoje: date) -> date:
-    """"hoje", "amanhã", `DD/MM/AAAA` ou `AAAA-MM-DD` → data.
+    """"hoje", "amanhã", "sexta", `DD/MM/AAAA` ou `AAAA-MM-DD` → data.
 
     Aceita as duas formas de data porque as duas chegam: a brasileira é a que a
     pessoa digita e a que a API publica, e a ISO é a que um modelo tende a
-    normalizar sozinho. Aceitar só uma delas transforma pergunta boa em erro.
+    normalizar sozinho. Nome de dia resolve para o dia DESSA semana, mesmo que já
+    tenha passado — "o que teve na segunda" é pergunta válida na quarta, e a
+    semana corrente é a única com cardápio. Aceitar só uma forma transforma
+    pergunta boa em erro.
     """
-    texto = (bruto or "hoje").strip().lower()
+    texto = _ARTIGO_DE_DIA.sub("", (bruto or "hoje").strip().lower())
     if texto in ("hoje", "hj"):
         return hoje
     if texto in ("amanhã", "amanha"):
         return hoje + timedelta(days=1)
-    if texto in ("ontem",):
+    if texto in ("depois de amanhã", "depois de amanha"):
+        return hoje + timedelta(days=2)
+    if texto == "ontem":
         return hoje - timedelta(days=1)
+    if texto in _NOMES_DIA:
+        return segunda_da_semana(hoje) + timedelta(days=_NOMES_DIA[texto])
+    if texto == SEMANA:
+        raise ErroRucard(
+            "'semana' cobre os sete dias e é atendido por `bandejao_semana`, "
+            "não por `bandejao`. Pela ferramenta MCP, dia='semana' já faz isso."
+        )
     for formato in ("%d/%m/%Y", "%Y-%m-%d", "%d/%m"):
         try:
             lido = datetime.strptime(texto, formato).date()
@@ -116,9 +205,10 @@ def resolver_dia(bruto: str, hoje: date) -> date:
             continue
         return lido.replace(year=hoje.year) if formato == "%d/%m" else lido
     raise ErroRucard(
-        f"não entendi o dia {bruto!r}. Use 'hoje', 'amanhã' ou uma data como "
-        "26/08/2026. O RUCard publica só a semana corrente, então data de outra "
-        "semana não tem cardápio — nem no passado, nem no futuro."
+        f"não entendi o dia {bruto!r}. Use 'hoje', 'amanhã', um dia da semana "
+        "como 'sexta', 'semana' para os sete dias, ou uma data como 26/08/2026. "
+        "O RUCard publica só a semana corrente, então data de outra semana não "
+        "tem cardápio — nem no passado, nem no futuro."
     )
 
 
@@ -268,7 +358,7 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
             "'cafe' ou 'todas'."
         )
 
-    ids = [str(i) for i in (restaurantes or politica.RUS_PERMITIDOS)]
+    ids = resolver_restaurantes(restaurantes)
 
     fichas = catalogo.projetar(cliente.restaurantes())
 
@@ -392,6 +482,45 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
         "dia_semana": _DIAS_SEMANA[data.weekday()],
         "refeicoes": refeicoes,
         "restaurantes": saida,
+        "avisos": avisos,
+    }
+
+
+CAMPOS_SEMANA = ("inicio", "fim", "refeicoes", "dias", "avisos")
+
+
+def bandejao_semana(refeicao: str = "todas", restaurantes=None, *, cliente,
+                    hoje: date | None = None) -> dict:
+    """Os sete dias da semana corrente, segunda a domingo, numa resposta só.
+
+    É a mesma pergunta do §5 ("o que tem, e onde vale a pena") com outro recorte
+    de tempo — "que dia tem lasanha?" — e por isso não é outra ferramenta. Chama
+    `bandejao` uma vez por dia; o cliente cacheia o `/menu` por RU, então a semana
+    inteira custa as mesmas 5 requisições de um dia (há teste que trava isso).
+    Avisos iguais entre dias saem uma vez.
+    """
+    hoje = hoje if hoje is not None else datetime.now(FUSO_SAO_PAULO).date()
+    respostas = [
+        bandejao(
+            dia=d.strftime("%d/%m/%Y"), refeicao=refeicao, restaurantes=restaurantes,
+            cliente=cliente, hoje=hoje,
+        )
+        for d in dias_da_semana(hoje)
+    ]
+
+    avisos: list[str] = []
+    for resposta in respostas:
+        for aviso in resposta["avisos"]:
+            if aviso not in avisos:
+                avisos.append(aviso)
+
+    return {
+        "inicio": respostas[0]["data"],
+        "fim": respostas[-1]["data"],
+        "refeicoes": respostas[0]["refeicoes"],
+        "dias": [
+            {k: r[k] for k in ("data", "dia_semana", "restaurantes")} for r in respostas
+        ],
         "avisos": avisos,
     }
 
