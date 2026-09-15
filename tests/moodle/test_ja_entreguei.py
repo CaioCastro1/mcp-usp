@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tests.moodle.conftest import ClienteFalso, status_de_entrega
+from tests.moodle.conftest import ClienteFalso, entregas_falsas, status_de_entrega
 from usp_mcp.moodle import disciplinas as dis
 from usp_mcp.moodle.erros import ErroMoodle
 from usp_mcp.moodle.ja_entreguei import TETO_CONSULTAS, ja_entreguei
@@ -480,3 +480,120 @@ def test_j20_nenhuma_escrita_e_emitida_nem_com_a_flag(
         "mod_assign_get_assignments",
         "mod_assign_get_submission_status",
     }
+
+
+# --------------------------------------------------------------------------
+# Invariante 7 no `warnings` da API — e a razão de os dois avisos serem
+# CONTADOS SEPARADO, por origem.
+#
+# Esta ferramenta faz duas chamadas diferentes, e as duas devolvem `warnings`:
+# `mod_assign_get_assignments` (a captura real de PTC3314 traz dois, de "sem
+# direito de acesso") e `mod_assign_get_submission_status` (a captura de 15/09
+# traz a chave no topo, vazia nesta conta). Os dois avisos NÃO dizem a mesma
+# coisa, e é por isso que somá-los num número só seria perder informação:
+#
+#   - aviso da LISTA: pode existir entrega que nem apareceu. O que falta está
+#     fora da tela, e quem lê tem de ir ao site.
+#   - aviso do STATUS: a entrega apareceu, e o estado impresso na linha dela é
+#     que pode estar incompleto. Quem lê tem de conferir AQUELA entrega.
+#
+# Um "3 atividade(s) não puderam ser lidas" juntaria "sumiu da lista" com "está
+# na lista e o veredito é duvidoso" — que é exatamente o colapso que esta
+# ferramenta existe para não cometer.
+# --------------------------------------------------------------------------
+
+
+def test_j21_warning_da_lista_de_entregas_vira_aviso(
+    disciplinas_brutas, entregas_ptc3314
+):
+    """J21 — a fixture REAL traz dois `warnings` de "sem direito de acesso".
+
+    Engoli-los faz a resposta listar 4 entregas como se fossem todas, na
+    ferramenta em que quem lê decide ir dormir. "Não entreguei nada" e "não
+    consegui ver" não podem sair como a mesma frase.
+    """
+    c = _cliente(disciplinas_brutas, entregas_ptc3314, _todos_entregues())
+
+    r = ja_entreguei(c, "PTC3314", agora=AGORA)
+
+    assert "2 atividade" in r.texto, "os warnings da lista foram engolidos"
+    assert "fora desta lista" in r.texto, (
+        "disse que houve aviso mas não disse o que ele muda para quem lê"
+    )
+
+
+def test_j22_warning_do_status_de_uma_entrega_vira_aviso(disciplinas_brutas):
+    """J22 — o lado que só esta ferramenta e `atrasadas` têm: o aviso que vem
+    na resposta de UMA entrega, e que põe em dúvida a linha dela, não a lista."""
+    limpas = entregas_falsas(
+        [(142036, [(EC1, "EC-1", 1789354740, 0), (EC2, "EC-2", 1793500000, 0)])]
+    )
+    c = _cliente(
+        disciplinas_brutas,
+        limpas,
+        {EC1: status_de_entrega(com_warning=True), EC2: status_de_entrega()},
+    )
+
+    r = ja_entreguei(c, "PTC3314", agora=AGORA)
+
+    assert "1 entrega" in r.texto, "o warning do status foi engolido"
+    assert "não deu para ler" in r.texto, (
+        "não disse que um estado lido pela metade pode virar veredito errado"
+    )
+
+
+def test_j23_os_dois_warnings_sao_contados_separado_e_nao_somados(
+    disciplinas_brutas, entregas_ptc3314
+):
+    """J23 — o ponto da decisão. Dois avisos de origens diferentes, duas
+    contagens. Um "3 atividade(s)" somado esconderia que uma das três é de
+    outra natureza e tem outra cura."""
+    c = _cliente(
+        disciplinas_brutas,
+        entregas_ptc3314,
+        {EC1: status_de_entrega(com_warning=True), EC2: status_de_entrega()},
+    )
+
+    r = ja_entreguei(c, "PTC3314", agora=AGORA)
+
+    assert "2 atividade" in r.texto, "sumiu o aviso da lista"
+    assert "1 entrega" in r.texto, "sumiu o aviso do status"
+    assert "3 atividade" not in r.texto, (
+        "as duas contagens foram somadas: 'não apareceu na lista' e 'apareceu "
+        "e o estado é duvidoso' viraram o mesmo número"
+    )
+
+
+def test_j24_disciplina_sem_entrega_com_warning_nao_diz_que_nao_ha_nada(
+    disciplinas_brutas,
+):
+    """J24 — o vazio é o caso mais perigoso dos três.
+
+    `courses` vazio com `warnings` cheio é literalmente "o token não alcançou
+    esta disciplina", e a resposta de hoje é "esta disciplina não tem nenhuma
+    tarefa de entrega". Lista vazia que parece "não tem nada" é o que o
+    Invariante 7 proíbe pelo nome.
+    """
+    vazio_com_aviso = entregas_falsas([], com_warning=True)
+    c = _cliente(disciplinas_brutas, vazio_com_aviso)
+
+    r = ja_entreguei(c, "PTC3314", agora=AGORA)
+
+    assert r.vazio_por == "sem_entregas"
+    assert "1 atividade" in r.texto, (
+        "o vazio saiu mudo: quem lê entende 'não tem nada para entregar' onde "
+        "o Moodle disse 'não te deixei ver'"
+    )
+
+
+def test_j25_sem_warning_nenhum_aviso_de_credencial_e_inventado(disciplinas_brutas):
+    """J25 — o par dos quatro anteriores, pelo mesmo motivo de J14 existir: um
+    aviso que aparece sempre não avisa nada, e treina quem lê a ignorá-lo."""
+    limpas = entregas_falsas([(142036, [(EC1, "EC-1", 1789354740, 0)])])
+    c = _cliente(disciplinas_brutas, limpas, {EC1: status_de_entrega()})
+
+    r = ja_entreguei(c, "PTC3314", agora=AGORA)
+
+    assert "credencial" not in r.texto, (
+        "inventou aviso de credencial numa resposta em que a API não avisou nada"
+    )
