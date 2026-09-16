@@ -46,11 +46,11 @@ Ele instala, configura e te guia no único passo que precisa da sua mão.
 ```text
 Instale o usp-mcp neste computador e me conecte a ele.
 
-1. Clone https://github.com/CaioCastro1/mcp-usp em ~/usp-mcp, crie um venv lá dentro e
-   instale com `pip install -e ".[dev]"`. Copie o `.env.example` para `.env` e rode
-   `./scripts/gate.sh` para confirmar que ficou tudo certo.
+1. Clone https://github.com/CaioCastro1/mcp-usp em ~/usp-mcp, crie um venv em
+   ~/usp-mcp/.venv e instale com `pip install -e ".[dev]"`. Copie o `.env.example` para
+   `.env`, na mesma pasta, e rode `./scripts/gate.sh` para confirmar que ficou tudo certo.
 2. Registre os três servidores (moodle, jupiter, rucard) no meu Claude Code, no escopo
-   de usuário.
+   de usuário, apontando para os comandos em ~/usp-mcp/.venv/bin/.
 3. O e-Disciplinas precisa de uma chave pessoal minha. Rode `./scripts/token.sh` e me
    explique, passo a passo, o que eu preciso fazer no navegador. Não tente fazer esse
    passo sozinho: ele exige que eu clique.
@@ -59,24 +59,45 @@ Instale o usp-mcp neste computador e me conecte a ele.
 
 ### O caminho manual
 
-Abra o terminal e cole estes dois comandos, um de cada vez:
+Você vai precisar do Python 3.11 ou mais novo. Para saber qual você tem, abra o terminal e
+cole:
 
 ```bash
-python3 -m venv ~/usp-mcp
-~/usp-mcp/bin/pip install git+https://github.com/CaioCastro1/mcp-usp.git
+python3 --version
 ```
 
-O primeiro cria um ambiente isolado dentro da sua pasta pessoal, sem alterar o Python nem
-os programas já instalados no computador. O segundo instala o projeto nesse ambiente.
+Se o Terminal responder que não conhece o comando `python3`, ou se o número for menor que
+3.11, instale a versão atual pelo site python.org antes de seguir. Com uma versão mais
+antiga, o passo de instalação abaixo falha com uma mensagem do pip que não explica o
+motivo.
 
-Se o Terminal responder que não conhece o comando `python3`, é porque ele ainda não está
-instalado na sua máquina. Instale primeiro, pelo site python.org, e repita os dois
-comandos.
+Depois cole estes quatro comandos, um de cada vez:
+
+```bash
+git clone https://github.com/CaioCastro1/mcp-usp.git ~/usp-mcp
+python3 -m venv ~/usp-mcp/.venv
+~/usp-mcp/.venv/bin/pip install -e ~/usp-mcp
+cp ~/usp-mcp/.env.example ~/usp-mcp/.env
+```
+
+O primeiro baixa o projeto para uma pasta chamada `usp-mcp` dentro da sua pasta pessoal. O
+segundo cria, dentro dela, um ambiente isolado, sem alterar o Python nem os programas já
+instalados no computador. O terceiro instala o projeto nesse ambiente. O quarto cria o
+arquivo de configuração a partir do modelo que vem no projeto: ele já traz preenchida a
+única coisa que o bandejão precisa, e é nele que a sua chave do e-Disciplinas vai ficar
+guardada depois.
+
+Tudo fica junto em `~/usp-mcp`, de propósito. O programa lê o arquivo de configuração de
+dentro dessa pasta, então não instale o projeto em outro lugar separado dela. Para
+desinstalar, basta apagar a pasta.
+
+Se o Terminal disser que não conhece o comando `git`, no Mac ele mesmo oferece instalar na
+hora: aceite, espere terminar e repita o primeiro comando.
 
 Para conferir se deu certo:
 
 ```bash
-ls ~/usp-mcp/bin | grep usp
+ls ~/usp-mcp/.venv/bin | grep usp
 ```
 
 Tem que aparecer `usp-mcp-jupiter`, `usp-mcp-moodle` e `usp-mcp-rucard`.
@@ -88,12 +109,16 @@ não souber, o comando `whoami` no Terminal responde):
 ```json
 {
   "mcpServers": {
-    "usp-rucard": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-rucard" },
-    "usp-jupiter": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-jupiter" },
-    "usp-moodle": { "command": "/Users/SEU-USUARIO/usp-mcp/bin/usp-mcp-moodle" }
+    "usp-rucard": { "command": "/Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-rucard" },
+    "usp-jupiter": { "command": "/Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-jupiter" },
+    "usp-moodle": { "command": "/Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-moodle" }
   }
 }
 ```
+
+No Linux, o começo do caminho é `/home/` em vez de `/Users/`. Os comandos desta seção
+foram escritos para Mac e Linux; no Windows os caminhos são outros e este guia ainda não
+os cobre.
 
 Feche e abra o assistente. Pronto: bandejão e JupiterWeb já respondem. O e-Disciplinas
 ainda vai reclamar que falta a chave, e é a próxima seção.
@@ -108,13 +133,14 @@ Só o e-Disciplinas precisa disto. Bandejão e JupiterWeb funcionam sem nada.
 A chave é sua e pessoal, e cada pessoa obtém a dela. Ela nunca sai do seu computador, e é
 por isso que ninguém pode te dar uma pronta.
 
-Para obtê-la você precisa do projeto baixado inteiro, e não só do programa instalado
-acima, porque o script que faz isso não vem junto no pacote. Siga *Rodando a partir do
-código* até o fim do primeiro bloco de comandos, e depois rode:
+O script que a obtém já está no seu computador, na pasta do projeto que a instalação
+baixou. Cole no terminal:
 
 ```bash
-./scripts/token.sh
+~/usp-mcp/scripts/token.sh
 ```
+
+Se você instalou pelo caminho rápido, a pasta é a mesma.
 
 Ele abre uma página do e-Disciplinas no seu navegador. Você precisa já estar logado na
 Senha Única. A página mostra três coisas, e duas são distração: a caixa verde "O seu
@@ -128,11 +154,13 @@ aperte Enter.
 O script confere o que você copiou, testa a chave contra a USP e só então guarda. Se você
 copiou o endereço errado, ele avisa e não estraga nada. A chave nunca aparece na tela.
 
-Ela fica guardada num arquivo chamado `.env`, na linha `MOODLE_TOKEN`. Você não precisa
-abrir esse arquivo, mas se um dia abrir, é essa a linha.
+Ela fica guardada no arquivo `~/usp-mcp/.env`, na linha `MOODLE_TOKEN`. É o mesmo
+arquivo que o programa lê, então não há nada para copiar de um lugar para outro: feche e
+abra o assistente e o e-Disciplinas passa a responder. Você não precisa abrir esse
+arquivo, mas se um dia abrir, é essa a linha.
 
 Ela vence com o tempo e pode ser cancelada em `edisciplinas.usp.br`, em gerenciar tokens.
-Se um dia o e-Disciplinas parar de responder, rode `./scripts/token.sh` de novo.
+Se um dia o e-Disciplinas parar de responder, rode `~/usp-mcp/scripts/token.sh` de novo.
 
 ## Usando
 
@@ -259,8 +287,9 @@ endereço.
 
 ## Rodando a partir do código
 
-Você precisa desta seção em dois casos: se quiser usar o e-Disciplinas, porque o script
-que busca a chave só existe aqui, ou se for mexer no código.
+Esta seção é para quem vai mexer no código. Quem só quer usar, inclusive o e-Disciplinas,
+já tem tudo o que precisa pela seção *Instalando*: ela baixa o projeto inteiro, e o
+script da chave vem junto.
 
 O repositório é público para ler, baixar e usar, sob licença MIT: você pode usar, modificar
 e redistribuir, desde que mantenha o aviso de autoria. O texto completo está no arquivo
@@ -307,13 +336,14 @@ não entra em arquivo rastreado. O absoluto fica no arquivo de config da sua má
 
 ### Detalhes técnicos
 
-Três servidores MCP, treze ferramentas — quinze com a escrita de entrega ligada. Comunicação por
-stdio, JSON-RPC, um processo por servidor. Nove delas foram exercitadas contra a USP de
-verdade; `avisos`, `o_que_mudou`, `disciplinas` e `atrasadas` são de 14/09 e ainda não rodaram
-contra a USP. As duas primeiras nasceram contra resposta escrita à mão; `disciplinas`
-nasceu contra a resposta real capturada em agosto, e `atrasadas` contra metade real (a
-lista de entregas) e metade escrita à mão (o estado de cada entrega). Nenhuma das quatro
-é uso ao vivo ainda.
+Três servidores MCP, treze ferramentas, quinze com a escrita de entrega ligada.
+Comunicação por stdio, JSON-RPC, um processo por servidor. As treze têm medição contra a
+USP de verdade registrada no §9 do `SPEC1.md`. As quatro de 14/09 (`avisos`, `o_que_mudou`,
+`disciplinas` e `atrasadas`) nasceram numa cópia sem chave, contra resposta escrita à mão
+ou capturada em agosto, e foram medidas ao vivo no mesmo dia; a metade de `atrasadas` que
+era escrita à mão, o estado de cada entrega, virou captura real em 15/09
+(`fixtures/moodle/submission_status_ec1.json`). As duas de entrega não entram em teste ao
+vivo em fase nenhuma, de propósito.
 
 | Servidor | Ferramentas |
 |---|---|
@@ -328,7 +358,7 @@ com `USP_MCP_ALLOW_WRITES` ligada. A sua chave alcança 447 funções neste site
 número que faz as duas camadas existirem.
 
 **As duas ferramentas que escrevem não existem por padrão.** `salvar_rascunho` e `entregar`
-só aparecem no `tools/list` com `USP_MCP_ENTREGA=1` no ambiente — desligada, elas não
+só aparecem no `tools/list` com `USP_MCP_ENTREGA=1` no ambiente. Desligada, elas não
 existem, e não é o caso de uma ferramenta visível que recusa. Ligada, cada uma ainda exige
 duas chamadas: a primeira devolve um plano do que mudaria, com um código; a segunda,
 repetindo o código, é a que escreve. Se o estado mudar no e-Disciplinas entre as duas, o
@@ -344,8 +374,13 @@ arquivo cai em `~/.cache/usp-mcp/moodle/`.
 São três comandos e não um com argumento: o nome de cada um é o mesmo `serverInfo.name`
 que o servidor responde no `initialize`. O porquê está no `pyproject.toml`.
 
-Medido em 14/09/2026: instalação num venv limpo a partir da URL do repositório, e os três
-comandos subindo de `/tmp` com cliente MCP real. `pipx` e `uvx` não foram exercitados, e
+Medido em 14/09/2026: instalação editável num venv limpo, e os três comandos subindo de
+`/tmp` com cliente MCP real. Em 16/09/2026 o caminho manual da seção *Instalando* foi
+percorrido inteiro numa pasta limpa, com ambiente vazio: a hash do bandejão chega ao
+comando instalado a partir do `.env` do clone, e `scripts/token.sh` grava no mesmo
+arquivo. Instalar o pacote sozinho, fora do clone (`pip install git+...`), não funciona:
+o programa procura o `.env` na pasta do projeto, e em `site-packages` não há nenhum. Era o
+que este README ensinava até 16/09. `pipx` e `uvx` não foram exercitados, e
 `pip install --user` é barrado pelo PEP 668 no Python do Homebrew. Empacotar como MCP
 Bundle (`.mcpb`) segue sem teste, descrito no §6.1 por leitura de documentação.
 
@@ -353,8 +388,8 @@ Ferramenta não nasce por conveniência: o critério está no §5, e as questõe
 fecham com dado registrado no §9. O `SPEC1.md` é a autoridade do projeto.
 
 - `usp_mcp/`, os servidores, um pacote por sistema
-- `tests/`, três camadas: política e contrato offline, `live` atrás de env var
+- `tests/`, quatro camadas: política, contrato e handshake offline, `live` atrás de env var
 - `notas/`, análise por sistema, com custo medido em bytes e tokens
-- `fixtures/`, respostas cruas capturadas (as do Moodle ficam fora do git, porque têm dado pessoal)
+- `fixtures/`, respostas capturadas; as do Moodle só entram no git depois de higienizadas, e o cru delas (`fixtures/moodle/raw/`) fica fora
 - `scripts/`, chamadores da descoberta e o gate de pré-commit
 - `docs/decisions/BACKLOG-correcoes.md`, a dívida que está em aberto

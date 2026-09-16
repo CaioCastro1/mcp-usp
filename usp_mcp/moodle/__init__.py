@@ -1,6 +1,8 @@
 """Moodle (e-Disciplinas). Dado autenticado: só entrypoint local (§6, Invariante 4).
 
-ESQUELETO. Nada aqui está implementado — a Fase 2 é escrita contra a suíte em
-tests/moodle/, que é a especificação executável. Cada símbolo levanta
-NotImplementedError apontando para o teste que o define.
+Um módulo por ferramenta (`o_que_vence`, `material`, `arquivo`, `diagnostico`,
+`ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas`, `atrasadas`,
+`entrega`), sobre `politica` (allowlist e bloqueio permanente), `cliente` (o fio)
+e `projecao` (o que sai do payload cru). `server` é a casca stdio. A suíte em
+`tests/moodle/` é a especificação executável de cada um.
 """
