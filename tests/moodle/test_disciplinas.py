@@ -414,7 +414,9 @@ FORMATOS_REAIS = [
     ("PRO3200-2025.2", "PRO3200"),
     ("PCS3110-2024_2", "PCS3110"),
     ("PMT3100-2024-Primeiro Semestre", "PMT3100"),
-    ("PME3100-203-2023 - Prof. F. Trigo", "PME3100"),
+    # Como está na fixture de 31/08: o nome depois do "Prof." é sintético
+    # (§3.3, rede de honorífico do higienizador). O formato é o que importa.
+    ("PME3100-203-2023 - Prof. Su Me La", "PME3100"),
     ("PSI3322-2'2026", "PSI3322"),
     ("PCS3335", "PCS3335"),
     ("0303200-2025", "0303200"),
