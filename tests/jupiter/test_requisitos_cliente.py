@@ -168,3 +168,151 @@ def test_t81c_curriculo_sem_exigencia_forma_o_grupo_vazio_por_ultimo():
     vazio = {"codcur": "2", "exigencias": []}
     grupos = ferramentas.agrupar_curriculos([vazio, a])
     assert grupos[-1][0] == () and grupos[-1][1] == [vazio]
+
+
+# --- T94-T99: HTTP 200 não é prova de que a página é a certa ------------------
+#
+# O caminho do DWR já valida FORMA: sem o marcador de fim, o envelope não é
+# envelope e `decodificar` recusa. O caminho HTML não validava nada — só o
+# status. Qualquer corpo com 200 passava, `recortar` não achava `Curso:` e
+# devolvia `[]`, e a ferramenta emitia o aviso de "nenhum currículo", que diz ao
+# modelo que a disciplina pode não exigir nada. Com o TTL de um semestre, a
+# resposta errada ficava até o processo morrer.
+#
+# **O marcador escolhido, e por quê.** A conjunção de dois: `<title>Jupiterweb`
+# e a palavra `equisito` (que casa "Requisito", "requisitos" e "REQUISITOS"),
+# as duas sem diferenciar maiúscula. Medido nas nove páginas HTML capturadas:
+#
+#   - as TRÊS fixturas de `listarCursosRequisitos` trazem as duas, inclusive a
+#     de zero currículo, cujo único "equisito" está na frase que a própria
+#     página exibe ("Disciplina não tem requisitos");
+#   - a sigla NÃO serve: a fixtura de zero currículo não contém a própria;
+#   - `Curso:` NÃO serve: é exatamente o que separa "tem currículo" de "não
+#     tem", e usá-lo como marcador de forma transformaria a resposta legítima
+#     de PTC3313 em erro — o defeito de hoje virado do avesso;
+#   - o título sozinho NÃO serve: as seis outras páginas do JupiterWeb
+#     capturadas têm o mesmo `<title>Jupiterweb</title>`;
+#   - `equisito` sozinha é evidência fraca de que se chegou ao JupiterWeb: a
+#     palavra cabe na página de manutenção de qualquer aplicação.
+#
+# **O limite, declarado em vez de escondido:** das seis outras páginas do
+# JupiterWeb, a conjunção rejeita cinco. A sexta é a ficha da disciplina, que
+# passa só porque carrega um LINK para esta mesma página. Este caminho nunca
+# pede aquela URL, então a confusão não é alcançável — mas ela é real, e fica
+# escrita.
+
+PAGINAS_QUE_NAO_SAO_A_DE_REQUISITOS = {
+    "manutencao": (
+        b"<html><head><title>Sistema em manuten&ccedil;&atilde;o</title></head>"
+        b"<body><h1>Servi&ccedil;o temporariamente indispon&iacute;vel</h1></body></html>"
+    ),
+    "login": (
+        b"<html><head><title>USP Digital - Autentica&ccedil;&atilde;o</title></head>"
+        b"<body><form action='login'><input name='usuario'></form></body></html>"
+    ),
+    "corpo_vazio": b"",
+    "so_espaco": b"   \r\n\r\n   ",
+    # O caso que o marcador de titulo sozinho deixaria passar: pagina do
+    # JupiterWeb, mas nao esta.
+    "outra_pagina_do_jupiter": (
+        b"<html><head><title>Jupiterweb</title></head><body>"
+        b"<div id='my_web_cabecalho'>Busca de Disciplina</div></body></html>"
+    ),
+}
+
+
+@pytest.mark.parametrize("nome", sorted(PAGINAS_QUE_NAO_SAO_A_DE_REQUISITOS))
+def test_t94_pagina_com_200_que_nao_e_a_de_requisitos_vira_erro_legivel(nome):
+    bruto = PAGINAS_QUE_NAO_SAO_A_DE_REQUISITOS[nome]
+    transporte = GravadorGet(bruto)
+    c = cliente.ClienteJupiter(lambda *a: (200, ""), transporte_get=transporte)
+
+    with pytest.raises(erros.RespostaInvalida) as capturado:
+        c.obter_requisitos("PSI3323")
+
+    texto = str(capturado.value)
+    assert len(texto) > 60, f"{len(texto)} caracteres: {texto!r}"
+    assert "requisito" in texto.lower(), (
+        f"a mensagem não diz que a página esperada era a de requisitos: {texto!r}"
+    )
+    # O cru não sobe: a mensagem é a resposta, e a página pode ter 66 kB.
+    assert "<html" not in texto.lower() and "<title" not in texto.lower(), texto
+
+
+@pytest.mark.parametrize(
+    "fixtura", ["psi3323_html", "mat2455_html", "ptc3313_html"]
+)
+def test_t95_as_tres_paginas_reais_passam_pelo_marcador(fixtura, request):
+    """A guarda contra um marcador apertado demais.
+
+    `ptc3313_html` é a que importa: ela é a resposta LEGÍTIMA de zero currículo,
+    e um marcador que exigisse `Curso:` (ou a própria sigla) a transformaria em
+    erro. Trocaria um silêncio ruim por um vermelho mentiroso.
+    """
+    bruto = request.getfixturevalue(fixtura)
+    transporte = GravadorGet(bruto)
+    c = cliente.ClienteJupiter(lambda *a: (200, ""), transporte_get=transporte)
+
+    assert c.obter_requisitos("PSI3323") == bruto
+
+
+def test_t96_a_pagina_recusada_nao_entra_no_cache(psi3323_html):
+    """A outra metade do defeito: com o TTL de um semestre, uma página de
+    manutenção guardada responderia errado pela vida inteira do processo."""
+    transporte = GravadorGet(PAGINAS_QUE_NAO_SAO_A_DE_REQUISITOS["manutencao"])
+    c = cliente.ClienteJupiter(lambda *a: (200, ""), transporte_get=transporte)
+
+    with pytest.raises(erros.RespostaInvalida):
+        c.obter_requisitos("PSI3323")
+
+    # A USP voltou do ar: a segunda pergunta tem de sair de novo, e responder.
+    transporte.resposta = psi3323_html
+    assert c.obter_requisitos("PSI3323") == psi3323_html
+    assert len(transporte.urls) == 2, (
+        "a página inválida ficou no cache: a segunda pergunta não saiu"
+    )
+
+
+def test_t97_a_ferramenta_nao_chama_a_pagina_ruim_de_nenhum_curriculo(
+    ingresso_poli, colegiados, gravador
+):
+    """Ponta a ponta: o aviso de "nenhum currículo" não pode nascer de uma
+    página que nem era a de requisitos. Ele diz ao modelo que a disciplina
+    talvez não exija nada — a conclusão mais cara de errar aqui."""
+    c = cliente.ClienteJupiter(
+        gravador([colegiados, ingresso_poli]),
+        transporte_get=GravadorGet(PAGINAS_QUE_NAO_SAO_A_DE_REQUISITOS["manutencao"]),
+    )
+
+    with pytest.raises(erros.RespostaInvalida):
+        ferramentas.requisitos("PSI3323", cliente=c)
+
+
+def test_t98_a_sigla_vai_percent_encoded_na_url(psi3323_html):
+    """`dwr.serializar` já usa `quote`; este caminho montava a URL por f-string.
+
+    Uma sigla com `#` corta a URL no fragmento: o que sairia seria
+    `?coddis=PSI` e a resposta seria de outra disciplina, com cara de certa.
+    """
+    transporte = GravadorGet(psi3323_html)
+    c = cliente.ClienteJupiter(lambda *a: (200, ""), transporte_get=transporte)
+
+    c.obter_requisitos("PSI#3323")
+
+    (url,) = transporte.urls
+    assert url.endswith("?coddis=PSI%233323"), url
+    assert "#" not in url, (
+        "o `#` cru sobrevive na URL e tudo depois dele vira fragmento: a "
+        "requisição sai sem o resto da sigla"
+    )
+
+
+def test_t99_sigla_com_espaco_e_barra_tambem_e_escapada(psi3323_html):
+    """Duas outras que o f-string deixava passar cruas. `/` mudaria de rota."""
+    transporte = GravadorGet(psi3323_html)
+    c = cliente.ClienteJupiter(lambda *a: (200, ""), transporte_get=transporte)
+
+    c.obter_requisitos("A B/C")
+
+    (url,) = transporte.urls
+    assert url.endswith("?coddis=A%20B%2FC"), url
