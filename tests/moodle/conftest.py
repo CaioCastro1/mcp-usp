@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -41,26 +42,43 @@ FIXTURE_ENTREGAS_PTC3314 = RAIZ / "fixtures" / "moodle" / "assign_ptc3314.json"
 ARQUIVO_ENV = carregar_env(RAIZ)
 
 
-def _achar_cru() -> Path:
+def _achar_dir_cru() -> Path:
     """O cru é local à máquina do dono (gitignorado, §3.3) e num worktree ele
-    não existe. Procura no worktree, depois no checkout principal, depois onde
-    USP_MCP_MOODLE_RAW apontar. Só os testes DO HIGIENIZADOR dependem dele —
-    a fixture higienizada, essa, é obrigatória e faz falhar se sumir."""
+    não existe. Procura onde USP_MCP_MOODLE_RAW apontar, depois no worktree,
+    depois no checkout principal — o `.git` comum de um worktree mora lá, e
+    `git rev-parse --git-common-dir` diz onde, seja o worktree irmão da pasta
+    ou filho dela. Só o canário de reprodução do higienizador (T58) depende
+    disto — a fixture higienizada, essa, é obrigatória e faz falhar se sumir.
+
+    Até 16/09/2026 isto procurava UM arquivo, `raw/action_events.json`, que não
+    existe em máquina nenhuma há semanas: o raw do dono tem sete crus e nenhum
+    é ele. Os dois testes que dependiam dele pulavam sempre, dizendo "só existe
+    na máquina do dono" — e escondiam a cobertura das duas propriedades que o
+    higienizador promete. Agora é o diretório, e quem o usa diz o que faz sem ele.
+    """
     candidatos = [RAIZ / "fixtures" / "moodle" / "raw"]
     if (env := os.environ.get("USP_MCP_MOODLE_RAW")):
         candidatos.insert(0, Path(env))
+    try:
+        comum = subprocess.run(
+            ["git", "rev-parse", "--git-common-dir"],
+            cwd=RAIZ, capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        candidatos.append((RAIZ / comum).resolve().parent / "fixtures" / "moodle" / "raw")
+    except (OSError, subprocess.CalledProcessError):
+        pass
     # .claude/worktrees/<nome>/ → sobe até o checkout que tem o .git de verdade
     for pai in RAIZ.parents:
         if (pai / ".git").is_dir():
             candidatos.append(pai / "fixtures" / "moodle" / "raw")
             break
     for c in candidatos:
-        if (c / "action_events.json").exists():
-            return c / "action_events.json"
-    return candidatos[0] / "action_events.json"
+        if c.is_dir() and any(c.glob("*.json")):
+            return c
+    return candidatos[0]
 
 
-CRU_EVENTOS = _achar_cru()
+DIR_CRU = _achar_dir_cru()
 
 
 @pytest.fixture(scope="session")
