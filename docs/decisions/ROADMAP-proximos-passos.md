@@ -23,26 +23,19 @@ implementa por iniciativa de quem lê: ela volta para o dono do repositório.
 
 ### A1. Licença · **FEITO em 15/09/2026: MIT**
 
-O repositório **não tem licença nenhuma**, e por ora vai continuar assim: a
-pergunta foi feita e a resposta foi "nenhuma por enquanto" (14/09/2026).
+O repositório é MIT desde 15/09/2026 (PR #73): `LICENSE` na raiz, com os dois
+autores na linha de copyright, e `license = "MIT"` com `license-files` no
+`pyproject.toml`. A razão da MIT em vez de GPL ou Apache está no §9 do
+`SPEC1.md` (15/09) e ao lado do campo no `pyproject.toml`.
 
-Fica registrado o que essa escolha implica, para que a próxima pessoa a levantar
-o assunto não precise redescobrir: sem licença, o padrão legal é **todos os
-direitos reservados** — ninguém pode usar, modificar ou redistribuir, mesmo com o
-código público. Na prática isso alcança inclusive quem instalar seguindo o
-*"Para quem acabou de ganhar acesso"* do README.
+Como chegou aí, para a próxima pessoa não redescobrir: em 14/09 a pergunta foi
+feita e a resposta foi "nenhuma por enquanto". O que forçou a reabertura foi o
+lançamento. Sem arquivo de licença o padrão legal é **todos os direitos
+reservados**, e publicar assim entrega um repositório visível e legalmente
+inutilizável, inclusive para quem instalar seguindo o README. O comparável
+`loyaniu` continua sem licença; o `SaadRahman01/moodle-mcp` tem MIT.
 
-Vale reabrir junto com o B1, porque distribuir como pacote ou `.mcpb` torna a
-lacuna visível para quem não conhece o projeto. O comparável `loyaniu` também não
-tem licença; o `SaadRahman01/moodle-mcp` tem MIT.
-
-> **Decidido em 15/09/2026: MIT.** O que estava adiado era a escolha, não o
-> levantamento, e o que forçou a decisão foi o lançamento: publicar sem licença
-> entrega um projeto visível e legalmente inutilizável, inclusive para quem
-> seguir o README. A razão da MIT em vez de GPL está no `pyproject.toml`, ao
-> lado do campo. O arquivo `LICENSE` está na raiz.
-
-Com o A1 adiado, o P0 era **A2 + A3**, e os três estão fechados.
+Os três itens do P0 estão fechados.
 
 ### A2. O furo no bloqueio permanente · trabalho · ~1 h
 
@@ -162,8 +155,10 @@ comparável não tem nenhuma das duas.
 > código** — `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`
 > (PR #58) — e a decisão está no §9 do `SPEC1.md`, com a data. O texto abaixo
 > fica como estava porque é o levantamento que sustentou a pergunta; o que mudou
-> é que ela tem resposta. **A implementação não foi feita**: o
-> `BLOQUEIO_PERMANENTE` continua com 40 nomes até ela entrar.
+> é que ela tem resposta. **A implementação entrou no mesmo dia** (PR #68): o
+> `BLOQUEIO_PERMANENTE` tem 38 nomes, as duas de `mod_assign` moram em
+> `ESCRITA_CONFIRMADA`, e as ferramentas `salvar_rascunho` e `entregar` só
+> existem com `USP_MCP_ENTREGA=1`. O §2.2 e o §9 do `SPEC1.md` dizem o mesmo.
 
 Este item colide de frente com o desenho do projeto, e por isso volta para o dono
 antes de virar tarefa.
@@ -267,12 +262,12 @@ que sobrou de aprendizado: `baixar_arquivo` **não** é read-only no sentido do
 protocolo, porque ela grava no depósito em disco de quem chama, e o campo
 pergunta se a ferramenta modifica o ambiente e não se ela escreve no Moodle.
 
-`readOnlyHint` e `destructiveHint` são campos do MCP que o cliente lê para saber
-que uma ferramenta é segura. O `SaadRahman01` declara; nós não. O Invariante 1
-diz read-only, mas hoje isso é promessa em prosa — o protocolo tem campo para
-dizer a mesma coisa de um jeito que a máquina entende.
-
-Encaixe perfeito com a filosofia do projeto e uma das coisas mais baratas da lista.
+O levantamento que motivou o item, como estava em 14/09: `readOnlyHint` e
+`destructiveHint` são campos do MCP que o cliente lê para saber que uma
+ferramenta é segura. O `SaadRahman01` já declarava; nós não declarávamos, e o
+Invariante 1 era promessa em prosa, com o protocolo tendo campo para dizer a
+mesma coisa de um jeito que a máquina entende. Era uma das coisas mais baratas
+da lista, e foi.
 
 ### D4. CI · **FEITO em 15/09/2026**
 
@@ -284,10 +279,11 @@ Linux e reprovou por 735 de 736, num teste que depende do sistema de arquivos n�
 separar NFD de NFC. Fechar essa linha do `BACKLOG-correcoes.md` libera o runner
 Linux, que custa 10x menos minuto.
 
-O `gate.sh` é melhor que o CI dos dois comparáveis — e só roda quando alguém
-lembra. Uma action que rode a camada offline em cada push custa pouco. A camada
-`live` **não** entra, pelo mesmo motivo que ela não entra no gate: um CI que
-depende da USP estar de pé reprova PR por motivo errado.
+O levantamento que motivou o item, como estava em 14/09: o `gate.sh` era melhor
+que o CI dos dois comparáveis e só rodava quando alguém lembrava. Uma action que
+rodasse a camada offline em cada push custaria pouco, e a camada `live` **não**
+entraria, pelo mesmo motivo que ela não entra no gate: um CI que depende da USP
+estar de pé reprova PR por motivo errado.
 
 ### D5. Moodle genérico + pacote USP · **DECISÃO** · reorganização real
 

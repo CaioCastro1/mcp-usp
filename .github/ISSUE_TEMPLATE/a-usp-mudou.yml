@@ -1,0 +1,45 @@
+name: A USP mudou e a ferramenta parou
+description: Uma pergunta que funcionava parou de funcionar, ou a resposta veio errada.
+labels: ["usp mudou"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Este projeto vive sobre APIs da USP que não são documentadas e mudam sem
+        aviso. Quando uma delas muda, o sintoma costuma ser este. O que resolve o
+        caso rápido é a mensagem de erro inteira, sem recorte.
+
+        **Não cole nenhuma chave nem token.** Se o texto que você for colar tiver
+        uma sequência longa de letras e números, apague essa parte.
+
+  - type: input
+    id: pergunta
+    attributes:
+      label: Que pergunta você fez ao assistente?
+      placeholder: "O que tem no bandejão hoje?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: erro
+    attributes:
+      label: O que apareceu
+      description: A mensagem de erro inteira, ou a resposta errada que veio.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: esperado
+    attributes:
+      label: O que você esperava
+    validations:
+      required: true
+
+  - type: input
+    id: desde-quando
+    attributes:
+      label: Desde quando, se você souber
+      description: Funcionava na semana passada? Nunca funcionou? Só falha às vezes?
+    validations:
+      required: false
