@@ -21,9 +21,10 @@ As cinco camadas, e o que cada uma de fato entrega:
    duas a uma letra de distância na cabeça de quem gera a chamada.
 2. **Plano e execução em duas invocações.** A primeira chamada NUNCA escreve:
    devolve o plano e um código. A segunda só escreve se o código ainda casar
-   com o estado do site. Esta é a camada que resolve o problema real — estado
-   velho virando escrita errada — e é a única que funciona sem depender de
-   ninguém do outro lado.
+   com o estado do site E com o verbo: o código do rascunho não confirma a
+   entrega (ver `codigo_do_plano`). Esta é a camada que resolve o problema real
+   — estado velho virando escrita errada — e é a única que funciona sem
+   depender de ninguém do outro lado.
 3. **Elicitação como apresentação.** `Context.elicit` é onde um cliente com
    humano na frente mostra a pergunta. O próprio protocolo diz que um cliente
    agente pode responder sozinho, então ela é a forma certa de PERGUNTAR e a
@@ -232,14 +233,23 @@ def montar_plano(bruto, atividade: Atividade, sigla: str) -> Plano:
     )
 
 
-def codigo_do_plano(plano: Plano) -> str:
+def codigo_do_plano(plano: Plano, *, verbo: str) -> str:
     """O código de confirmação: o começo de um resumo do que mudaria.
 
-    Entram quatro coisas, e são as quatro que mudam o significado de entregar:
-    a atividade, o estado atual, o conjunto de arquivos COM tamanho, e o
-    carimbo da última alteração. Arquivo trocado por outro de mesmo nome e
+    Entram CINCO coisas, e são as cinco que mudam o significado de confirmar:
+    o verbo, a atividade, o estado atual, o conjunto de arquivos COM tamanho, e
+    o carimbo da última alteração. Arquivo trocado por outro de mesmo nome e
     tamanho diferente muda o código; arquivo novo muda o código; entrega que
     virou `submitted` entre a leitura e a escrita muda o código.
+
+    O verbo entrou em 16/09/2026, e o spec de 15/09 está ERRADO neste ponto: ele
+    lista quatro coisas. Sem o verbo, `salvar_rascunho` e `entregar` produziam o
+    MESMO código para o mesmo estado, e o caminho real era este: a pessoa pede
+    "salva aí", recebe o plano do rascunho com o código, diz "agora entrega", e
+    `mod_assign_submit_for_grading` saía sem o plano de entrega ter sido
+    mostrado. É o caso "uma palavra de distância" que a camada 1 separa,
+    reaberto pela camada 2. Um código é a confirmação de UM plano, e o plano
+    tem verbo.
 
     O que ele NÃO é: prova de que um humano leu. Tudo que este servidor diz ao
     modelo, o modelo pode repetir. O que ele prova é que o plano não mudou — e
@@ -247,6 +257,7 @@ def codigo_do_plano(plano: Plano) -> str:
     """
     material = json.dumps(
         [
+            verbo,
             plano.atividade.assignid,
             plano.status,
             sorted([a.nome, a.tamanho] for a in plano.arquivos),
@@ -348,7 +359,7 @@ def texto_do_plano(
         linhas.append("")
         linhas.append(
             f'Para confirmar, chame de novo com confirmacao="'
-            f'{codigo_do_plano(plano)}". Nada foi escrito no e-Disciplinas por '
+            f'{codigo_do_plano(plano, verbo=verbo)}". Nada foi escrito no e-Disciplinas por '
             "esta chamada."
         )
     return "\n".join(linhas)
@@ -577,7 +588,7 @@ async def _executar(
             recusa=motivo,
         )
 
-    codigo = codigo_do_plano(plano)
+    codigo = codigo_do_plano(plano, verbo=verbo)
     plano_escrito = texto_do_plano(plano, verbo=verbo, agora=agora)
 
     if not confirmacao:
@@ -612,7 +623,17 @@ async def _executar(
             recusa="recusada_na_pergunta",
         )
 
-    escrever(cliente, plano)
+    try:
+        escrever(cliente, plano)
+    except ErroMoodle as exc:
+        # O site disse não — com `errorcode` ou como lista de `warningcode`, que
+        # o cliente já traduziu. Reerguer com o verbo e a atividade no texto,
+        # porque quem lê isto acabou de confirmar um plano e precisa saber que
+        # ele NÃO aconteceu. "Feito" abaixo só existe depois desta linha.
+        raise ErroMoodle(
+            f"O e-Disciplinas recusou {acao} — {plano.sigla}, {atividade.nome}. "
+            f"{exc} Confira o estado pelo site antes de tentar de novo."
+        ) from exc
 
     # O plano SEM o pedido de confirmação: depois da escrita ele vira o recibo
     # do que foi feito, e as duas linhas do pedido passariam a mentir.

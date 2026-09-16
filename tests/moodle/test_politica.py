@@ -162,6 +162,40 @@ def test_o_bypass_e_negado_mesmo_que_tudo_mais_falhe():
     assert "tool_mobile_call_external_functions" not in politica.ALLOWLIST
 
 
+@pytest.mark.parametrize(
+    "funcao",
+    ["tool_mobile_call_external_functions", "mod_quiz_start_attempt"],
+)
+def test_t3b_o_bloqueio_permanente_vence_a_allowlist_quando_ela_erra(
+    funcao, monkeypatch
+):
+    """T3b — a segunda camada, exercitada de verdade.
+
+    O T3 nunca simula nada falhando: os nomes seguem negados pela omissão da
+    allowlist, e a lista de bloqueio existe justamente "para o dia em que
+    alguém acrescentar algo à allowlist por engano". Provado por mutação em
+    16/09/2026: `if funcao in BLOQUEIO_PERMANENTE:` trocado por `... and False:`
+    deixava 465 testes verdes. Este põe o nome bloqueado NA allowlist e exige
+    que ele siga negado, com o motivo citando o bloqueio, e não a omissão.
+    """
+    monkeypatch.setattr(
+        politica, "ALLOWLIST", politica.ALLOWLIST | frozenset({funcao})
+    )
+    assert funcao in politica.ALLOWLIST, "o monkeypatch não pegou"
+
+    for kwargs in (
+        {},
+        {"permitir_escrita": True},
+        {"confirmada": True},
+        {"permitir_escrita": True, "confirmada": True},
+    ):
+        d = politica.decidir(funcao, **kwargs)
+        assert not d.permitida, f"{funcao} passou pela allowlist com {kwargs}"
+        assert "bloqueio permanente" in d.motivo, (
+            f"a recusa de {funcao} não cita o bloqueio permanente: {d.motivo!r}"
+        )
+
+
 def test_funcao_desconhecida_e_negada_por_omissao():
     """T4 — allowlist, não denylist: o default é negar."""
     assert not politica.decidir("core_course_get_courses").permitida

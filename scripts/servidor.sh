@@ -61,8 +61,16 @@ fi
 if [ ! -x .venv/bin/python ]; then
   echo "não há .venv/bin/python em $raiz" >&2
   echo "o venv é por diretório e não vem no git. Crie o deste checkout:" >&2
+  # Os dois `-r` que estavam aqui curavam a mesma falta que o README, o
+  # `CLAUDE.md` e o CI curam com `pip install -e ".[dev]"`, e curavam pior: sem
+  # o `-e` não existem os três entry points em `.venv/bin/`, e o
+  # `tests/test_pacote.py` (P6) passa a PULAR em vez de exercitar o que o pacote
+  # promete. Duas curas para a mesma falta é a divergência que este repositório
+  # já pagou três vezes (§9, 12/09/2026), então aqui ficou a do CI. Os
+  # `requirements*.txt` continuam existindo e continuam sendo citados pelo nome
+  # na mensagem de SDK ausente dos três `main()`, que tem teste próprio.
   echo "  python3 -m venv .venv" >&2
-  echo "  .venv/bin/python -m pip install -r requirements-dev.txt -r requirements.txt" >&2
+  echo "  .venv/bin/python -m pip install -e \".[dev]\"" >&2
   exit 1
 fi
 

@@ -415,3 +415,181 @@ def test_T99b_o_token_nao_aparece_em_nenhuma_mensagem_de_erro():
         cliente.baixar(URL_ARQUIVO)
 
     assert TOKEN_DE_TESTE not in str(erro.value)
+
+
+# ---------------------------------------------------------------------------
+# Sete defeitos medidos em 16/09/2026, todos deste arquivo. Cada teste abaixo
+# nasceu VERMELHO contra o código de então, e os que provam ausência de caminho
+# (T60, T62) foram conferidos por mutação: quebrar o código de propósito faz o
+# teste reprovar, senão ele não prova nada.
+# ---------------------------------------------------------------------------
+
+import http.client
+
+from usp_mcp.moodle import politica
+
+FUNCAO_LEITURA = "core_calendar_get_action_events_by_timesort"
+FUNCAO_ESCRITA = "mod_assign_submit_for_grading"
+
+
+@pytest.fixture
+def com_a_flag(monkeypatch):
+    monkeypatch.setenv(politica.NOME_DA_FLAG, "1")
+
+
+def test_t59_recusa_do_moodle_em_forma_de_lista_nao_passa_por_sucesso(com_a_flag):
+    """T59 — `external_warnings` é lista com HTTP 200, e recusa não é `[]`.
+
+    `mod_assign_submit_for_grading` e `mod_assign_save_submission` são
+    declaradas no core com retorno `external_warnings`: sucesso é `[]`, e recusa
+    é uma lista com `warningcode` (`couldnotsubmitforgrading`,
+    `submissionsclosed`, `couldnotsavesubmission`). Um tradutor de erro que só
+    olha `dict` com `errorcode` deixa a recusa passar como sucesso, e o aluno é
+    informado de que entregou — no verbo que não tem desfazer.
+    """
+    recusa = [
+        {
+            "item": "assignment",
+            "itemid": 577509,
+            "warningcode": "couldnotsubmitforgrading",
+            "message": "Could not submit assignment for grading",
+        }
+    ]
+    c = _cliente(lambda **kw: recusa)
+    with pytest.raises(ErroMoodle) as e:
+        c.escrever(FUNCAO_ESCRITA, assignid=577509, acceptsubmissionstatement=1)
+    assert "couldnotsubmitforgrading" in str(e.value)
+    assert FUNCAO_ESCRITA in str(e.value)
+    assert not isinstance(e.value, TokenInvalido)
+
+    # A lista vazia é o sucesso documentado, e tem de continuar passando.
+    assert _cliente(lambda **kw: []).escrever(
+        FUNCAO_ESCRITA, assignid=577509, acceptsubmissionstatement=1
+    ) == []
+
+    # E uma lista de LEITURA — cursos, seções — não tem `warningcode` e não
+    # pode virar erro: o critério é a forma do item, não o tipo do topo.
+    cursos = [{"id": 1, "shortname": "PTC3314"}, {"id": 2, "shortname": "PSI3323"}]
+    assert _cliente(lambda **kw: cursos).chamar("core_enrol_get_users_courses") == cursos
+
+
+def test_t60_chamar_nunca_declara_confirmacao_mesmo_com_a_flag_ligada(com_a_flag):
+    """T60 — a separação `chamar`/`escrever` é o coração do desenho de 15/09.
+
+    O T21 acima usava `mod_assign_submit_for_grading` desde antes de ela sair
+    do bloqueio permanente, então hoje ele prova outra coisa. Este é o teste que
+    faltava: com a flag ligada, o caminho de LEITURA continua sem conseguir
+    escrever, e a diferença entre os dois verbos é a única coisa que separa uma
+    recusa de uma requisição. Provado por mutação: `confirmada=True` dentro de
+    `chamar` faz este teste reprovar.
+    """
+    chamou = []
+    c = _cliente(lambda **kw: chamou.append(kw) or [])
+
+    with pytest.raises(FuncaoBloqueada) as e:
+        c.chamar(FUNCAO_ESCRITA, assignid=1)
+    assert chamou == [], "chamar() tocou o transporte com função de escrita"
+    assert "confirma" in str(e.value).lower()
+
+    # O contrário, senão o teste passaria com um cliente que não escreve nunca:
+    # o MESMO nome, pela porta certa, sai no fio.
+    c.escrever(FUNCAO_ESCRITA, assignid=1)
+    assert len(chamou) == 1
+    assert chamou[0]["dados"]["wsfunction"] == FUNCAO_ESCRITA
+
+
+def test_t61_params_nao_sobrescrevem_a_decisao_da_politica():
+    """T61 — a política decide sobre um nome que o fio é OBRIGADO a honrar.
+
+    `dados = {"wsfunction": funcao, ..., **params}` com `**params` por último
+    deixava `chamar("permitida", wsfunction="bloqueada")` passar pela política
+    com um nome e mandar outro. Não é alcançável pelos inputs MCP de hoje, mas
+    a docstring do módulo promete o contrário. Asserção sobre o que SAIU no
+    fio (item 11 do CLAUDE.md), e não sobre a saída.
+    """
+    chamou = []
+    c = _cliente(lambda **kw: chamou.append(kw) or {"events": []})
+
+    for chave, valor in (
+        ("wsfunction", FUNCAO_ESCRITA),
+        ("wstoken", "outro-token"),
+        ("moodlewsrestformat", "xml"),
+    ):
+        with pytest.raises(FuncaoBloqueada) as e:
+            c.chamar(FUNCAO_LEITURA, **{chave: valor})
+        assert chave in str(e.value), f"a recusa não nomeia {chave!r}"
+    assert chamou == [], f"algo saiu no fio apesar da chave reservada: {chamou}"
+
+    # E o caminho normal manda EXATAMENTE o nome que a política aprovou.
+    c.chamar(FUNCAO_LEITURA, timesortfrom=0)
+    assert chamou[0]["dados"]["wsfunction"] == FUNCAO_LEITURA
+    assert chamou[0]["dados"]["moodlewsrestformat"] == "json"
+    assert chamou[0]["dados"]["timesortfrom"] == 0
+
+
+@pytest.mark.parametrize(
+    "excecao",
+    [
+        http.client.IncompleteRead(b"{\"events\": ["),
+        http.client.BadStatusLine("HTTP/1.1 garbage"),
+        http.client.RemoteDisconnected("Remote end closed connection"),
+    ],
+    ids=["IncompleteRead", "BadStatusLine", "RemoteDisconnected"],
+)
+def test_t62_falha_de_transporte_http_vira_erro_legivel(excecao):
+    """T62 — `IncompleteRead` e `BadStatusLine` são `HTTPException`, não `OSError`.
+
+    Resposta truncada ou status line inválida escapava crua e chegava ao
+    modelo como "Error executing tool X", de 32 bytes. Nos dois caminhos: as
+    funções e o download.
+    """
+    def transporte(**kw):
+        raise excecao
+
+    with pytest.raises(MoodleIndisponivel) as e:
+        _cliente(transporte).chamar(FUNCAO_LEITURA)
+    assert "e-disciplinas" in str(e.value).lower() or "moodle" in str(e.value).lower()
+
+    c = ClienteMoodle(
+        token=TOKEN_FALSO,
+        url="https://exemplo.invalid",
+        transporte=lambda **kw: {},
+        transporte_download=transporte,
+    )
+    with pytest.raises(MoodleIndisponivel):
+        c.baixar("https://exemplo.invalid/webservice/pluginfile.php/1/a.pdf")
+
+
+def test_t63_barra_final_na_url_nao_quebra_funcao_nem_download():
+    """T63 — `MOODLE_URL=https://edisciplinas.usp.br/` é a forma que se copia
+    do navegador, e ela fazia o prefixo esperado virar `//webservice/...`, que
+    nenhuma `fileurl` real tem: TODO download era recusado, e no singular a
+    recusa subia crua. A cura é normalizar na construção, uma vez.
+    """
+    visto = {}
+    baixou = []
+
+    def transporte(*, url, dados):
+        visto["url"] = url
+        return {"events": []}
+
+    def transporte_download(*, url, dados, teto_bytes):
+        baixou.append(url)
+        return "application/pdf", b"%PDF-1.4 x"
+
+    c = ClienteMoodle(
+        token=TOKEN_FALSO,
+        url="https://edisciplinas.usp.br/",
+        transporte=transporte,
+        transporte_download=transporte_download,
+    )
+    c.chamar(FUNCAO_LEITURA)
+    assert visto["url"] == "https://edisciplinas.usp.br/webservice/rest/server.php"
+
+    fileurl = "https://edisciplinas.usp.br/webservice/pluginfile.php/9599833/mod_resource/content/1/a.pdf"
+    assert c.baixar(fileurl) == b"%PDF-1.4 x"
+    assert baixou == [fileurl]
+
+    # A allowlist do download continua valendo: outro host segue recusado.
+    with pytest.raises(FuncaoBloqueada):
+        c.baixar("https://evil.example.com/webservice/pluginfile.php/1/a.pdf")

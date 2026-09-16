@@ -1,7 +1,6 @@
 # Saída sem jargão de projeto — Plano de Implementação
 
-> **Para quem executa:** SUB-SKILL OBRIGATÓRIA — use `superpowers:subagent-driven-development`
-> (recomendado) ou `superpowers:executing-plans` para implementar tarefa por tarefa.
+> **Para quem executa:** implemente tarefa por tarefa, na ordem em que estão escritas.
 > Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Objetivo:** nenhuma string que o modelo ou o usuário leem cita `§`, `Invariante`, `SPEC1`,
