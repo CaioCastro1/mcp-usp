@@ -356,12 +356,14 @@ def test_o_base64_nu_continua_passando_depois_da_checagem_de_ida():
 # ------------------------------------------- o token.sh, pelo caminho do stdin
 
 # `pbpaste | ./scripts/token.sh` e um caminho de uso documentado no cabecalho do
-# script, e e o unico alcancavel pela suite: sem tty o script NAO abre navegador
-# (o `open` mora dentro de `[ -t 0 ]`) e NAO tenta a captura automatica. Continua
-# valendo o que o BACKLOG registra desde 10/09 — os passos de abrir o navegador e
-# ler o clipboard de verdade nao sao alcancaveis daqui, e nada abaixo finge que
-# sao. O que estes testes alcancam e o texto que o script imprime e a conferencia
-# que ele faz sobre o valor que chega.
+# script. Ate 16/09 era o unico alcancavel pela suite, porque sem tty o script nao
+# abria navegador (o `open` morava dentro de `[ -t 0 ]`). Desde 16/09 ele abre
+# tambem sem terminal — quando o stdin vem vazio, que e a invocacao de abertura do
+# fluxo em duas etapas —, entao TODO teste que passa pelo passo 3 precisa do `open`
+# dublado de `navegador_dublado`, senao abre o navegador de quem roda a suite. O
+# que abre, quando abre e o passaporte guardado entre as duas invocacoes estao em
+# tests/moodle/test_token_navegador.py. Continua fora de alcance ler um clipboard
+# de verdade, e a captura automatica (`--auto`) segue exigindo tty.
 
 
 @pytest.fixture
@@ -405,13 +407,41 @@ def curl_dublado(raiz, corpo):
     return f"{binario}:{os.environ['PATH']}"
 
 
-def token_sh(raiz, colado, path=None):
-    """Roda o `token.sh` com o valor vindo do stdin. Nada aqui toca a rede."""
-    ambiente = dict(os.environ)
+def navegador_dublado(raiz):
+    """Um `open` de mentira em `raiz/bin`, que grava o argv e nunca abre nada.
+
+    O dube registra cada chamada em `raiz/open.log`, uma linha por argv, e e por
+    esse arquivo que test_token_navegador.py afirma O QUE foi aberto e QUANTAS
+    vezes. Idempotente: a mesma pasta `bin/` que `curl_dublado` usa.
+    """
+    binario = raiz / "bin"
+    binario.mkdir(exist_ok=True)
+    falso = binario / "open"
+    if not falso.exists():
+        falso.write_text(f"#!/bin/sh\nprintf '%s\\n' \"$*\" >> '{raiz / 'open.log'}'\n")
+        falso.chmod(0o755)
+    return binario
+
+
+def token_sh(raiz, colado, path=None, env=None, navegador=True, args=()):
+    """Roda o `token.sh` com o valor vindo do stdin. Nada aqui toca a rede, e
+    nada abre navegador: com `navegador=True` (o padrao) o `open` do PATH e o
+    dube de `navegador_dublado`. So o teste da maquina sem `open` desliga isso,
+    e ele passa um PATH minimo que nao tem `open` nenhum.
+
+    `SSH_CONNECTION`/`SSH_TTY` saem do ambiente porque o script, ao ve-las, se
+    recusa a abrir navegador — certo numa sessao SSH de verdade, e ruido numa
+    suite rodada por SSH que quer ver o dube ser chamado.
+    """
+    ambiente = {k: v for k, v in os.environ.items() if k not in ("SSH_CONNECTION", "SSH_TTY")}
     if path is not None:
         ambiente["PATH"] = path
+    if navegador:
+        ambiente["PATH"] = f"{navegador_dublado(raiz)}:{ambiente.get('PATH', '')}"
+    if env:
+        ambiente.update(env)
     return subprocess.run(
-        ["bash", str(raiz / "scripts" / "token.sh")],
+        ["bash", str(raiz / "scripts" / "token.sh"), *args],
         input=colado,
         capture_output=True,
         text=True,
