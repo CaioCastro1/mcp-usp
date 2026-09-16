@@ -299,9 +299,19 @@ mais sobre o desenho do que qualquer preferência estética.
 
 ### 3.3 Higienização
 
-Antes de commitar fixtures: substituir nome, e-mail, `userid`, `fullname` de turma e notas
-por valores sintéticos estáveis (mesmo id → mesmo valor falso), preservando a **forma**. A
-forma é o que interessa para teste.
+Antes de commitar fixtures: `scripts/higienizar.py` troca dado pessoal por valor sintético
+estável (mesmo valor → mesmo valor falso), preservando a **forma**: tipo, chaves, contagem,
+bytes de string, dígitos de número. A forma é o que interessa para teste.
+
+A decisão do que é pessoal é por **família** da chave, em rede de prefixo/sufixo
+(`*fullname`, `*email`, `*pictureurl`, `*filename`/`*fileurl`, `grade*`/`percentage*`/`rank*`,
+`*token`/`*accesskey`, `lastaccess`/`gradedate*`, `time*` debaixo de `submission`), e por
+**conteúdo** independente da chave (e-mail, `pluginfile.php/<n>/user/`, 32 hex, `sesskey=`,
+nome depois de honorífico) — nunca por lista de nomes exatos, que foi como três vazamentos
+chegaram à `main` (§9, 16/09/2026). O que a regra não troca e a varredura por conteúdo
+(`alertas()`, `--verificar`) ainda acusa não entra: a CLI recusa gravar. Fica de fora de
+propósito o que é forma do curso e não do dono: `id`/`cmid`/contexto de curso nas `fileurl`,
+`name` e `shortname` fora do honorífico, `timemodified` de material, `grademax`.
 
 ---
 
@@ -3818,5 +3828,65 @@ descrição do pacote e no README.
 
 O copyright nomeia os dois autores. O histórico tem 180 commits de `CaioCastro1` e 86 de
 `JoaoPedroBPG`, então a obra é conjunta e a linha de copyright precisa dizer isso.
+
+---
+
+### 16/09/2026 — a higienização decide por família e por conteúdo, não por nome exato de campo
+
+Três vazamentos confirmados na `main`, todos por campo que a lista exata de `higienizar.py`
+não conhecia. Em `grade_items_ptc3314.json`, `graderaw` e `gradeformatted` saíam sintéticos e
+`percentageformatted` ficava real ao lado deles — três itens com o percentual verdadeiro do
+dono. Em `submission_status_ec1.json`, `filename` e `fileurl` da entrega em grupo traziam um
+nome de arquivo com forma de Número USP, provavelmente de um colega. Em
+`forum_discussions_avisos.json`, `userpictureurl` trazia `pluginfile.php/<n>/user/icon` de um
+professor: o contexto de usuário é estável e único por pessoa, e `avisos.py` já o descartava
+como dado pessoal na projeção. Um quarto apareceu pela varredura nova: os 35 `editurl` de
+`action_events.json`, versionada em 31/08, carregavam `sesskey=` do dono.
+
+O buraco não era nenhum dos campos. Era **decidir por igualdade de nome**: dado pessoal
+chega com nome novo a cada função do Moodle, e a lista envelhece a cada captura
+(`usermodifiedfullname` e `useridnumber` já tinham escapado assim em 15/09). O script passou
+a três camadas, nesta ordem: **família pela chave** em rede de prefixo/sufixo (`*fullname`,
+`*email`, `*pictureurl`, `*filename`, `grade*`/`percentage*` menos os sufixos que descrevem
+a forma do item, `*token`, `lastaccess`/`gradedate*`, `time*` debaixo de `submission`);
+**conteúdo independente da chave** (e-mail, contexto de usuário, 32 hex, `sesskey=`, nome
+depois de honorífico — é o que alcança `name` de módulo e `shortname` de turma, que são
+produto e por isso não são trocados por inteiro); e **tipo**: `int` continua `int` com os
+mesmos dígitos, `float` continua `float`, epoch vira epoch deslocado. A versão anterior
+fazia `graderaw` inteiro virar `6.19`; a captura tem `5`.
+
+Marca reconhecível: run de dígitos trocado em texto começa com `0`, credencial sintética com
+`0000`. Id real do Moodle nunca tem zero à esquerda, então `alertas()` — varredura por
+conteúdo, cega para a chave — acusa o real sem acusar a própria saída. Ela roda sobre toda
+fixture publicada (T56), é sabotada de propósito (T57, molde do F7) e a CLI recusa gravar o
+que ela ainda vê (T57b). Exceção declarada da varredura: string inteira múltipla de 1024
+(`maxsubmissionsizebytes`) não é Número USP.
+
+Re-higienização das 12 publicadas. Sete têm cru em `fixtures/moodle/raw/` do checkout
+principal e foram regeneradas; o conftest passa a achá-lo por `git rev-parse
+--git-common-dir`, então worktree irmão também acha. Cinco **não têm cru** —
+`action_events`, `assign_ptc3314`, `course_contents_psi3323`, `course_contents_ptc3314` e
+`users_courses`, de 31/08 e 12/09 — e o publicado foi a entrada, só as regras novas tocando
+(fusão: onde a regra antiga já mexia, o publicado fica). O que mudou: 35 `sesskey`; em
+`course_contents_ptc3314`, 18 `name` com honorífico, 2 `availabilityinfo` que nomeavam a
+turma do dono e 1 `fileurl`; 32 `customdata` esvaziados em `psi3323` (regra de 15/09 que ela
+nunca tinha visto); `lastaccess` em 118 matrículas; o `shortname` de PME3100 com nome de
+professor; e nas de 15/09, percentual, Número USP no arquivo, contexto de usuário,
+`useridnumber` agora marcado, datas de entrega e correção deslocadas, `gradeformatted`
+`"Gu G"` virou `"5,15"` (a forma da nota sobrevive) e `"-"` de "sem nota" voltou a ser
+`"-"`, porque marcador é forma.
+
+T48 e T49 **pulavam sempre**: dependiam de `raw/action_events.json`, que não existe em
+máquina nenhuma — o raw do dono tem sete crus e nenhum é ele. O skip dizia "só existe na
+máquina do dono" e escondia justamente a cobertura das duas propriedades que o higienizador
+promete. Agora são provadas sobre toda publicada e sobre um cru sintético (T48-T55); o cru
+real é canário de reprodução (T58), o único que pula, dizendo o que não conferiu.
+
+O que esta mudança **não** faz: histórico. Os valores reais continuam nos commits de 31/08
+(`sesskey`) e 15/09 (percentual, Número USP, contexto de usuário). Reescrever é decisão do
+dono e exige coordenação (`main` não recebe force-push, §5); está no BACKLOG. E o que ainda
+sobrevive em fixture por decisão, não por descuido: `id`/`cmid`/contexto de curso,
+`shortname`, `name` sem honorífico, `timemodified` de material, `enrolledusercount`, ids de
+grupo (`usergroups`, `submissiongroup`).
 
 ---
