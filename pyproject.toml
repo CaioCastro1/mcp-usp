@@ -33,6 +33,16 @@ version = "1.0.0"
 description = "Ferramentas MCP para a vida acadêmica na USP — bandejão do RUCard, prazos e material do e-Disciplinas, catálogo do JupiterWeb. Projeto não-oficial, sem vínculo com a Universidade de São Paulo."
 readme = "README.md"
 
+# Os dois nomes do `LICENSE` e do cabeçalho do README, e não um só: a licença é
+# MIT e o aviso de autoria que ela obriga a manter cita os dois. Sem `email` de
+# propósito: endereço pessoal em metadado de pacote é dado que o projeto
+# publica para sempre em troca de nada, e quem quiser falar com o projeto tem o
+# endereço de issues logo abaixo (§2 do CONVENTIONS.md).
+authors = [
+  { name = "Caio Castro" },
+  { name = "João Pedro Barreto do Prado Gunthen" },
+]
+
 # MIT, decidida em 15/09/2026 (A1 do ROADMAP, que estava adiado desde 14/09).
 # A escolha é sobre o que se exige de quem pega o código, e aqui a resposta é
 # "nada além do crédito": este projeto não é biblioteca que outros embutem, é
@@ -69,6 +79,22 @@ requires-python = ">=3.11"
 # lista divergir do `requirements.txt`, que segue sendo citado pelo nome na
 # mensagem de SDK ausente dos três servidores (e tem teste sobre essa mensagem).
 dependencies = ["mcp>=2,<3"]
+
+# Sem isto, `pip show usp-mcp` devolve nome, versão e descrição, e nenhum
+# caminho de volta para o repositório. Quem instalou por `pipx`/`uvx` não tem
+# checkout nenhum para consultar: o pacote é o único artefato na mão dessa
+# pessoa, e é ele que tem de dizer onde o código mora e onde se relata um
+# defeito. É o mesmo desenho do Invariante 6 aplicado a metadado: resposta que
+# não leva a lugar nenhum é resposta que manda o leitor adivinhar.
+#
+# Os rótulos estão em inglês, como todas as chaves do TOML à volta: quem lê
+# `Homepage` e `Issues` aqui não é uma pessoa, é o PyPI e o `pip`, que os
+# reconhecem por esse nome. O `tests/test_urls_do_repo.py` (U1) passou a varrer
+# este arquivo junto com o README e o CLAUDE.md, para o dono do repositório não
+# poder divergir em silêncio. Foi o estrago medido em 14/09/2026.
+[project.urls]
+Homepage = "https://github.com/CaioCastro1/mcp-usp"
+Issues = "https://github.com/CaioCastro1/mcp-usp/issues"
 
 [project.optional-dependencies]
 # Espelha `requirements-dev.txt`. `pip install -e ".[dev]"` num checkout faz o que
