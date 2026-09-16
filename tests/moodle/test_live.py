@@ -174,8 +174,8 @@ def test_e13_o_plano_de_uma_entrega_real_bate_com_o_site_sem_escrever(cliente_re
     # O código é estável sobre a MESMA leitura: se ele variasse, a segunda
     # chamada seria impossível contra o site de verdade, e isso é coisa que só
     # o dado vivo mostra.
-    assert ent.codigo_do_plano(plano) == ent.codigo_do_plano(
-        ent.montar_plano(status_cru, alvo, "PTC3314")
+    assert ent.codigo_do_plano(plano, verbo="entrega") == ent.codigo_do_plano(
+        ent.montar_plano(status_cru, alvo, "PTC3314"), verbo="entrega"
     )
 
     # E a saída não vaza endereço de arquivo com credencial colada atrás.
