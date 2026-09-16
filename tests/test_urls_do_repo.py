@@ -34,12 +34,22 @@ DONO = "CaioCastro1"
 REPO = "mcp-usp"
 
 # Casa `github.com/dono/repo` e `github.com:dono/repo` (a forma SSH do clone),
-# com ou sem `.git` no fim.
-ENDERECO = re.compile(r"github\.com[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?=[\s)\"'`]|$)")
+# com ou sem `.git` no fim, e com ou sem caminho depois, como `/issues` e `/blob/...`.
+# A barra entrou no olhar-adiante quando o `pyproject.toml` passou a declarar
+# `[project.urls]`: sem ela o endereço de issues não casava com nada, e a única
+# URL do arquivo que a varredura enxergava era a `Homepage`. Uma regra que não
+# alcança metade do que existe para alcançar fica verde sem ter olhado.
+ENDERECO = re.compile(r"github\.com[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?(?=[\s)\"'`/]|$)")
 
 # Onde a instrução de instalação pode morar. Arquivo novo que mande baixar o
 # projeto e não esteja aqui é buraco: U3 existe para essa lista não envelhecer.
-DOCUMENTOS = ("README.md", "CLAUDE.md")
+#
+# `pyproject.toml` entrou depois: o `[project.urls]` é a única forma de quem
+# instalou por `pipx`/`uvx` achar o repositório (`pip show usp-mcp`), e um dono
+# errado ali é ainda mais calado que no README: não quebra comando nenhum, só
+# leva a pessoa para uma página que não existe. `CONTRIBUTING.md` entrou pelo
+# mesmo motivo: ele manda abrir PR e issue neste repositório.
+DOCUMENTOS = ("README.md", "CLAUDE.md", "pyproject.toml", "CONTRIBUTING.md")
 
 pytestmark = pytest.mark.politica
 
@@ -103,7 +113,8 @@ def test_u3_a_varredura_enxerga_as_duas_formas_e_o_dono_errado(tmp_path):
     falso.write_text(
         "clone https://github.com/CaioCastro1/mcp-usp.git aqui\n"
         "e git@github.com:Castro1/mcp-usp.git ali\n"
-        "e https://github.com/loyaniu/moodle-mcp que é de outro projeto\n",
+        "e https://github.com/loyaniu/moodle-mcp que é de outro projeto\n"
+        'e Issues = "https://github.com/Castro1/mcp-usp/issues" no metadado\n',
         encoding="utf-8",
     )
 
@@ -111,9 +122,14 @@ def test_u3_a_varredura_enxerga_as_duas_formas_e_o_dono_errado(tmp_path):
     assert (1, "CaioCastro1", "mcp-usp") in achados, "não pegou a forma https com .git"
     assert (2, "Castro1", "mcp-usp") in achados, "não pegou a forma ssh"
     assert (3, "loyaniu", "moodle-mcp") in achados, "não pegou repositório de terceiro"
+    assert (4, "Castro1", "mcp-usp") in achados, (
+        "não pegou o endereço com caminho depois do nome do repositório. É a "
+        "forma do `Issues` do `[project.urls]`, e sem ela o dono errado ali "
+        "passaria batido"
+    )
 
     erradas = [(l, d) for l, d, r in achados if r == REPO and d != DONO]
-    assert erradas == [(2, "Castro1")], (
+    assert erradas == [(2, "Castro1"), (4, "Castro1")], (
         "a regra ou deixou passar o dono errado, ou reclamou de repositório de "
         f"terceiro: {erradas}"
     )

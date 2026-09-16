@@ -1,4 +1,4 @@
-"""D3-D5: a checagem 0 do gate — `.env` existe e tem `RUCARD_HASH` com valor.
+"""D3-D6: a checagem 0 do gate, e o código de saída de quando a suíte não roda.
 
 Arquivo separado do `test_documentacao.py` de propósito, e não por gosto: D1-D2
 leem um `.md` e custam um `read_text`; D3-D5 leem e **executam** o
@@ -12,8 +12,15 @@ do próprio script já diz que a checagem mais barata que pode reprovar vem ante
 — **e tem que dizer o comando que resolve**, em vez de falar de `RUCARD_HASH`,
 que é consequência e não causa.
 
-D4/D5 clonam com `git clone --local`: nada de rede, nada de credencial. Sem
+D4/D5/D6 clonam com `git clone --local`: nada de rede, nada de credencial. Sem
 `git` no PATH eles pulam declarando o motivo, em vez de passar sem ter rodado.
+
+D6 é de outra família, e está aqui por herdar o mesmo clone caro: ele guarda o
+**código de saída** do gate quando a checagem 3 é pulada. Por dois dias o
+comentário do `gate.sh` afirmava que o código "NAO vira 0 por causa disto" e o
+script saía 0: comentário certo, código errado. `./scripts/gate.sh && git push`
+via verde sem a suíte ter rodado, que é exatamente o falso-verde que o §6 do
+`CONVENTIONS.md` proíbe.
 """
 from __future__ import annotations
 
@@ -191,4 +198,36 @@ def test_d5_o_gate_nao_exige_token_do_moodle(tmp_path):
     assert "PULADA" in r.stdout and "SUITE NAO RODOU" in r.stdout, (
         "o gate pulou a suíte sem dizer. Invariante 7: sem limite silencioso — "
         f"quem lê a saída tem de saber que a checagem 3 não rodou. Saída:\n{r.stdout}"
+    )
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason=MOTIVO_SEM_GIT)
+def test_d6_a_suite_pulada_nao_sai_com_zero(tmp_path):
+    """D6: pular a checagem 3 não pode devolver sucesso a quem chamou.
+
+    Dizer PULADA na tela e sair 0 protege só quem LÊ a saída. Quem encadeia
+    (`./scripts/gate.sh && git push`), quem roda no CI ou quem põe isto num hook
+    só enxerga o código de saída, e para esses o gate estava dizendo "passou"
+    sobre uma suíte que não rodou.
+
+    O que se assere é `!= 0`, e não um número: o valor exato é detalhe do
+    script, e um teste que o fixasse reprovaria por uma renumeração que não
+    muda nada. O que não pode mudar é a resposta à pergunta "posso commitar?".
+    """
+    clone = _clone_limpo(tmp_path / "clone-sem-suite")
+    shutil.copy2(clone / ".env.example", clone / ".env")
+
+    r = _rodar_gate(clone)
+
+    # A premissa: este run de fato pulou a suíte. Sem isto, um gate que
+    # reprovasse na checagem 0 passaria aqui por acidente, provando outra coisa.
+    assert "PULADA" in r.stdout, (
+        "este run não chegou a pular a checagem 3, e D6 não está medindo o que "
+        f"promete. Saída:\n{r.stdout}{r.stderr}"
+    )
+    assert r.returncode != 0, (
+        "o gate saiu 0 com a suíte PULADA. Quem encadeia `./scripts/gate.sh && "
+        "git push` recebe sinal verde sobre código que ninguém testou, e o "
+        "comentário do próprio script promete o contrário. Faça o caminho do "
+        f"pulo sair com código próprio. Saída:\n{r.stdout}{r.stderr}"
     )

@@ -6,13 +6,21 @@ motivo que a mensagem de erro não nomeava — o `./scripts/gate.sh` estava na
 seção de instalação e o `cp .env.example .env` só aparecia na *Configuração*,
 depois. Essa seção mudou de nome duas vezes em 14/09/2026: *Rodando* virou
 *Instalando*, e depois o README foi reordenado para quem NÃO é técnico. Hoje
-`## Instalando` é o caminho de quem só quer usar (dois comandos, sem clone e sem
-gate), e o fluxo que estes testes descrevem mora em
-`## Rodando a partir do código`, que é onde o clone e o gate vivem. Ela não se
-chama "contribuir" de propósito: quem só quer usar o e-Disciplinas também passa
-por lá, porque o `token.sh` não vem no pacote.
+`## Instalando` é o caminho de quem só quer usar, e o fluxo que D1 e D2
+descrevem mora em `## Rodando a partir do código`, que é a seção de quem mexe
+no código e onde o gate vive.
 Quem lê de cima para baixo levava um `FAILED` sobre `RUCARD_HASH` e nenhuma
 pista de que faltava um passo que ainda nem tinha lido.
+
+D3 é de 16/09/2026 e guarda o outro caminho, o de quem só usa. Até essa data o
+caminho manual de `## Instalando` mandava `pip install git+...` num venv solto,
+e isso põe o pacote em `site-packages`, onde `usp_mcp.env.achar_env` não acha
+`.env` nenhum: o bandejão caía em `HashAusente` mandando copiar um
+`.env.example` que a pessoa não tinha, e o token gravado pelo `token.sh` ficava
+num clone que o servidor instalado nunca lia. D1 e D2 passavam verdes porque só
+olham a outra seção. A cura foi o caminho manual clonar, criar o venv DENTRO do
+clone e instalar editável, que é o layout que `env.py`, o `.mcp.json` e o
+`servidor.sh` já suportam; D3 afirma os três passos pela string que se digita.
 
 Documento também envelhece calado (é a lição do §9 de 31/08 sobre estado em
 `CLAUDE.md`/`README.md`): a diferença aqui é que a ordem errada volta a doer em
@@ -93,4 +101,40 @@ def test_d2_o_readme_nao_manda_preencher_o_token_para_o_gate():
     assert "MOODLE_TOKEN" in bloco("Configuração"), (
         "o README parou de nomear a variável `MOODLE_TOKEN` na Configuração. "
         "Quem for de fato usar o Moodle precisa saber o nome dela."
+    )
+
+
+# Os comandos exatos do caminho manual, como se digitam. A ordem importa tanto
+# quanto em D1: o `cp` tem de vir antes de o README dizer "Pronto".
+CLONE = "git clone https://github.com/CaioCastro1/mcp-usp.git ~/usp-mcp"
+INSTALACAO_EDITAVEL = "pip install -e ~/usp-mcp"
+CURA_MANUAL = "cp ~/usp-mcp/.env.example ~/usp-mcp/.env"
+
+
+def test_d3_o_caminho_manual_instala_dentro_do_clone_e_cria_o_env():
+    instalando = bloco("Instalando")
+
+    for passo in (CLONE, INSTALACAO_EDITAVEL, CURA_MANUAL):
+        assert passo in instalando, (
+            f"a seção Instalando não traz {passo!r}. O comando instalado só acha o "
+            "`.env` se o pacote for instalado de dentro do clone (editável) e o "
+            "`.env` for criado nesse clone; sem um dos três passos o bandejão cai "
+            "em HashAusente e o token do `token.sh` nunca chega ao servidor."
+        )
+
+    # O layout que não funciona não pode voltar por engano: pacote em
+    # `site-packages` não tem `.env` ao lado, e `achar_env` não procura em
+    # mais lugar nenhum (decisão registrada no docstring de `usp_mcp/env.py`).
+    assert "install git+" not in instalando, (
+        "a seção Instalando voltou a instalar o pacote direto da URL do "
+        "repositório, fora de um clone. Medido em 16/09/2026: nesse layout "
+        "`achar_env()` devolve None e o bandejão não responde."
+    )
+
+    i_cura = instalando.find(CURA_MANUAL)
+    i_pronto = instalando.find("Pronto:")
+    assert i_pronto != -1, "a seção Instalando não diz mais 'Pronto:'; o teste mediria o vazio"
+    assert i_cura < i_pronto, (
+        "o README diz 'Pronto' antes de mandar criar o `.env`. Quem lê de cima "
+        "para baixo abre o assistente sem a hash do bandejão."
     )

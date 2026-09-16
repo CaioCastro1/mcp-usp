@@ -19,7 +19,7 @@ import datetime
 import pytest
 
 from tests.rucard.conftest import HASH_DE_TESTE, texto
-from usp_mcp.rucard import ferramentas
+from usp_mcp.rucard import cliente as mod_cliente, ferramentas
 from usp_mcp.rucard.cliente import ClienteRucard
 from usp_mcp.rucard.erros import ErroRucard, RucardIndisponivel
 
@@ -559,3 +559,173 @@ def test_r45b_a_semana_inteira_custa_cinco_requisicoes(gravador, respostas_da_fa
     ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=SEGUNDA)
     # Invariante 5: o /menu já devolve a semana, e o cliente cacheia por RU.
     assert sorted(transporte.rotas()) == ["menu/6", "menu/7", "menu/8", "menu/9", "restaurants"]
+
+
+# --- R54-R57: o catálogo que não trouxe o RU ---------------------------------
+#
+# `/restaurants` com HTTP 200 e corpo `[]` ou `{}` produzia um erro cujo texto
+# inteiro era "RU 6 (CENTRAL)." — a frase de PERMISSÃO da política, pega para o
+# mesmo id porque a ferramenta perguntava "por que este RU não está aqui?" a
+# quem só sabe responder "ele pode?". O id é permitido, então a resposta é a
+# permissão, e o modelo recebe uma sentença que não diz o que houve nem o que
+# fazer. É o Invariante 6 falhando no lugar mais difícil de notar: existe
+# mensagem, ela só não é sobre o problema.
+
+
+def _catalogo(corpo, respostas_da_fatia):
+    respostas = dict(respostas_da_fatia)
+    respostas["restaurants"] = corpo
+    return respostas
+
+
+@pytest.mark.parametrize("corpo", ["[]", "{}"], ids=["lista_vazia", "objeto_vazio"])
+def test_r54_catalogo_vazio_com_200_nao_vira_a_frase_de_permissao(
+    corpo, gravador, respostas_da_fatia
+):
+    transporte = gravador(_catalogo(corpo, respostas_da_fatia))
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+
+    with pytest.raises(ErroRucard) as capturado:
+        ferramentas.bandejao(cliente=cliente, hoje=SEGUNDA)
+
+    texto = str(capturado.value)
+    assert texto.strip() != "RU 6 (CENTRAL).", (
+        "o erro ficou com o texto da permissão: ele afirma que o RU 6 PODE ser "
+        "consultado, que é verdade e não é o problema"
+    )
+    assert len(texto) > 60, f"{len(texto)} caracteres: {texto!r}"
+    assert "catálogo" in texto.lower() or "restaurante" in texto.lower(), texto
+
+
+def test_r55_catalogo_que_perdeu_um_ru_diz_qual_e_por_que(gravador, respostas_da_fatia):
+    """O catálogo veio, com 200 e conteúdo, e sem o RU pedido.
+
+    Diferente do vazio: aqui a resposta da USP é íntegra e não traz aquele
+    restaurante. A mensagem tem de nomear o RU — "não veio no catálogo" sem
+    dizer qual manda o modelo adivinhar.
+    """
+    import json
+
+    from tests.rucard.conftest import carregar
+
+    cru = carregar("restaurantes")
+    for campus in cru:
+        campus["restaurants"] = [
+            r for r in campus.get("restaurants") or [] if str(r.get("id")) != "6"
+        ]
+    transporte = gravador(_catalogo(json.dumps(cru), respostas_da_fatia))
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+
+    with pytest.raises(ErroRucard) as capturado:
+        ferramentas.bandejao(restaurantes=["central"], cliente=cliente, hoje=SEGUNDA)
+
+    texto = str(capturado.value)
+    assert texto.strip() != "RU 6 (CENTRAL)."
+    assert "6" in texto, "a mensagem não nomeia o RU que faltou"
+    assert "catálogo" in texto.lower()
+
+
+def test_r56_id_fora_da_allowlist_continua_recebendo_a_mensagem_da_politica(chamar):
+    """O outro lado da cura: quando a política de fato NEGA, é a fala dela que
+    vale. Trocar as duas mensagens uma pela outra seria mudar de defeito."""
+    with pytest.raises(ErroRucard) as capturado:
+        chamar(restaurantes=["13"], hoje=SEGUNDA)
+
+    texto = str(capturado.value)
+    assert "EACH" in texto and "fora do escopo" in texto
+
+
+# --- R57: RU fora do ar não é martelado sete vezes na semana ------------------
+
+
+def test_r57_ru_fora_do_ar_e_pedido_uma_vez_por_semana_e_nao_sete(
+    gravador, respostas_da_fatia
+):
+    """A promessa de `bandejao_semana` é "as mesmas 5 requisições de um dia".
+
+    Ela valia só no caminho feliz: sucesso entra no cache, falha não entrava, e
+    o RU fora do ar era pedido uma vez POR DIA. Medido antes da cura:
+    `{'6': 7, '7': 1, '8': 1, '9': 1}`. Com o tempo limite de 20 s, são 140 s
+    gastos num RU só — martelar a USP justamente quando ela está mal.
+    """
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/6"] = (500, "<html>Tomcat</html>")
+    transporte = gravador(respostas)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+
+    ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=SEGUNDA)
+
+    quantas = {}
+    for rota in transporte.rotas():
+        quantas[rota] = quantas.get(rota, 0) + 1
+    assert quantas == {
+        "restaurants": 1, "menu/6": 1, "menu/7": 1, "menu/8": 1, "menu/9": 1,
+    }, f"medido: {quantas}"
+
+
+def test_r57b_a_falha_lembrada_continua_dizendo_o_que_houve(
+    gravador, respostas_da_fatia
+):
+    """Cachear a falha não pode virar cachear o silêncio.
+
+    O aviso de cada dia tem de continuar nomeando o RU e o motivo — e dizer que
+    a chamada não foi repetida, porque "tentei uma vez e parei" e "tentei sete"
+    são fatos diferentes para quem lê.
+    """
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/6"] = (500, "<html>Tomcat</html>")
+    cliente = ClienteRucard(gravador(respostas), hash_rucard=HASH_DE_TESTE)
+
+    semana = ferramentas.bandejao_semana(refeicao="todas", cliente=cliente, hoje=SEGUNDA)
+
+    junto = " ".join(semana["avisos"])
+    assert "500" in junto, "o motivo original sumiu junto com a segunda tentativa"
+    assert "RU 6" in junto or "CENTRAL" in junto.upper()
+    # Todos os sete dias trazem o RU 6 na lista, com a situação declarada.
+    for dia in semana["dias"]:
+        (ru6,) = [r for r in dia["restaurantes"] if r["id"] == "6"]
+        assert ru6["refeicoes"]["almoco"]["situacao"] == "indisponivel"
+
+
+def test_r57c_a_falha_lembrada_expira_e_nao_congela_o_ru(gravador, respostas_da_fatia):
+    """A falha lembrada é curta de propósito: ela existe para um varrimento de
+    semana, não para tirar o RU do ar até o processo morrer."""
+    from tests.rucard.test_cliente import Relogio
+
+    relogio = Relogio()
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/6"] = [(500, "<html>Tomcat</html>"), texto("menu_6")]
+    transporte = gravador(respostas)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE, relogio=relogio)
+
+    # Com um RU só pedido e ele fora do ar, NENHUM respondeu: a ferramenta
+    # levanta em vez de devolver cardápio vazio, e é o comportamento certo.
+    for _ in range(2):
+        with pytest.raises(RucardIndisponivel):
+            ferramentas.bandejao(restaurantes=["6"], cliente=cliente, hoje=SEGUNDA)
+    assert transporte.rotas().count("menu/6") == 1, "a falha não foi lembrada"
+
+    relogio.avancar(mod_cliente.TTL_FALHA + 1)
+    resposta = ferramentas.bandejao(restaurantes=["6"], cliente=cliente, hoje=SEGUNDA)
+
+    assert transporte.rotas().count("menu/6") == 2, "a falha lembrada nunca expirou"
+    (ru6,) = resposta["restaurantes"]
+    assert ru6["refeicoes"]["almoco"]["situacao"] == "aberto"
+
+
+def test_r57d_a_falha_lembrada_e_por_rota_e_nao_do_cliente_inteiro(
+    gravador, respostas_da_fatia
+):
+    """Um RU fora do ar não pode calar os outros três."""
+    respostas = dict(respostas_da_fatia)
+    respostas["menu/6"] = (500, "<html>Tomcat</html>")
+    transporte = gravador(respostas)
+    cliente = ClienteRucard(transporte, hash_rucard=HASH_DE_TESTE)
+
+    resposta = ferramentas.bandejao(cliente=cliente, hoje=SEGUNDA)
+
+    abertos = [
+        r["id"] for r in resposta["restaurantes"]
+        if r["refeicoes"]["almoco"]["situacao"] == "aberto"
+    ]
+    assert abertos == ["7", "8", "9"]

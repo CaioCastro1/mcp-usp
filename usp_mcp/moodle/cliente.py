@@ -16,6 +16,7 @@ em tempo de execução que alguém pode esquecer de manter.
 """
 from __future__ import annotations
 
+import http.client
 import json
 import urllib.parse
 import urllib.request
@@ -30,6 +31,24 @@ from .erros import (
 )
 
 _URL_SUFIXO_WEBSERVICE = "/webservice/rest/server.php"
+
+# As três chaves do envelope REST que `_requisitar` preenche sozinho. Nenhuma
+# pode vir em `params`: a política decide sobre `funcao`, e um `wsfunction`
+# vindo de fora venceria essa decisão no fio (`**params` era o último a
+# escrever no dicionário). Medido em 14/09/2026 com transporte falso: a política
+# aprovou `core_course_get_contents` e o fio recebeu
+# `mod_assign_submit_for_grading`. Não é alcançável pelos inputs MCP de hoje —
+# os call sites usam chaves literais —, e é exatamente por isso que a recusa
+# fica aqui e não em cada ferramenta: o dia em que uma repassar `**kwargs` do
+# modelo não pode ser o dia em que isto passa a valer.
+_CHAVES_RESERVADAS = frozenset({"wstoken", "wsfunction", "moodlewsrestformat"})
+
+# O que o transporte pode levantar sem que seja culpa do JSON: `OSError` cobre
+# timeout, recusa de conexão e `urllib.error.URLError`; `http.client.HTTPException`
+# cobre `IncompleteRead` (resposta truncada) e `BadStatusLine` (status line
+# inválida), que NÃO são `OSError` e escapavam cruas até 16/09/2026 — chegavam
+# ao modelo como "Error executing tool X", de 32 bytes.
+_FALHAS_DE_TRANSPORTE = (OSError, http.client.HTTPException)
 
 # Caminho que caracteriza arquivo servido pelo webservice — a allowlist do
 # download. Não é o mesmo endpoint das funções (`/webservice/rest/server.php`).
@@ -95,6 +114,21 @@ def _transporte_padrao(*, url: str, dados: dict) -> dict:
     return json.loads(bruto)
 
 
+def _e_lista_de_warnings(resposta) -> bool:
+    """A forma `external_warnings` do core: lista de itens com `warningcode`.
+
+    O critério é a forma do ITEM, não o tipo do topo: `core_enrol_get_users_courses`
+    e `core_course_get_contents` também devolvem lista no topo, de cursos e de
+    seções, e nenhum item deles tem `warningcode`. Lista vazia não é warning —
+    é o sucesso documentado das funções que devolvem `external_warnings`.
+    """
+    return (
+        isinstance(resposta, list)
+        and len(resposta) > 0
+        and all(isinstance(item, dict) and "warningcode" in item for item in resposta)
+    )
+
+
 def _levantar_se_erro(rotulo: str, resposta) -> None:
     """Traduz o erro do Moodle, e é chamada pelos DOIS caminhos.
 
@@ -102,7 +136,27 @@ def _levantar_se_erro(rotulo: str, resposta) -> None:
     (`baixar`) recebe o mesmo formato de erro por outro transporte. Duplicar a
     tradução criaria duas mensagens diferentes para `invalidtoken`, e a
     divergência só apareceria no dia em que o token expirasse.
+
+    Dois formatos de recusa, e os dois chegam com HTTP 200:
+
+    - `dict` com `errorcode` — a exceção do Moodle, em qualquer função;
+    - `list` de itens com `warningcode` — o retorno `external_warnings` que
+      `mod_assign_submit_for_grading` e `mod_assign_save_submission` declaram
+      no core. Sucesso é `[]`; recusa é `[{"warningcode":
+      "couldnotsubmitforgrading", ...}]`, e há `submissionsclosed` e
+      `couldnotsavesubmission`. Até 16/09/2026 este formato passava por
+      sucesso, e `entregar` dizia "Feito" sobre uma recusa — no verbo que não
+      tem desfazer.
     """
+    if _e_lista_de_warnings(resposta):
+        detalhes = "; ".join(
+            f"{item.get('warningcode')} — {item.get('message', '') or ''}".rstrip(" —")
+            for item in resposta
+        )
+        raise ErroMoodle(
+            f"Moodle recusou {rotulo}: {detalhes}. A resposta veio como lista de "
+            "avisos (HTTP 200), que é como o Moodle diz não para esta função."
+        )
     if not (isinstance(resposta, dict) and "errorcode" in resposta):
         return
     errorcode = resposta["errorcode"]
@@ -152,7 +206,13 @@ class ClienteMoodle:
                 "(ver .env.example) antes de usar o cliente."
             )
         self._token = _TokenOculto(token)
-        self.url = url
+        # Sem barra final, sempre. `https://edisciplinas.usp.br/` é a forma que
+        # se copia do navegador, e com ela o prefixo esperado do download virava
+        # `...usp.br//webservice/pluginfile.php/`, que nenhuma `fileurl` real
+        # tem: TODO `baixar` era recusado, e no modo singular a recusa subia
+        # crua. Normalizar aqui, uma vez, é o que faz os dois sufixos abaixo
+        # valerem para as duas grafias.
+        self.url = url.rstrip("/")
         self.transporte = transporte if transporte is not None else _transporte_padrao
         self.transporte_download = (
             transporte_download
@@ -172,7 +232,9 @@ class ClienteMoodle:
         `ESCRITA_CONFIRMADA` chamada por aqui é recusada pela política como
         qualquer outra — a porta da escrita é `escrever`, e ela tem nome
         próprio justamente para não ser aberta por engano por código que só
-        queria ler.
+        queria ler. Quem trava esta frase é o T60, com a flag ligada: até
+        16/09/2026 nenhum teste a alcançava, e `confirmada=True` aqui dentro
+        passava por 460 testes verdes.
         """
         return self._requisitar(funcao, params, confirmada=False)
 
@@ -205,12 +267,26 @@ class ClienteMoodle:
         if not decisao.permitida:
             raise FuncaoBloqueada(decisao.motivo)
 
+        if reservadas := _CHAVES_RESERVADAS & set(params):
+            # Antes do transporte, e como recusa de política e não como erro de
+            # parâmetro: a política acabou de decidir sobre `funcao`, e uma
+            # destas chaves em `params` é uma tentativa de mandar outra coisa no
+            # fio com a decisão dela na mão.
+            raise FuncaoBloqueada(
+                f"{funcao}: os parâmetros trazem {sorted(reservadas)}, que são "
+                "do envelope da requisição e não da função. A política decidiu "
+                f"sobre {funcao!r}, e é esse nome que vai no fio — nenhum outro."
+            )
+
         url = f"{self.url}{_URL_SUFIXO_WEBSERVICE}"
+        # O envelope entra DEPOIS de `params`, de propósito: mesmo que a recusa
+        # acima um dia deixe passar uma grafia nova, o último a escrever
+        # `wsfunction` é o nome que a política aprovou.
         dados = {
+            **params,
             "wstoken": self._token.get(),
             "wsfunction": funcao,
             "moodlewsrestformat": "json",
-            **params,
         }
 
         try:
@@ -223,13 +299,15 @@ class ClienteMoodle:
                 f"{funcao}: a resposta do e-Disciplinas não é um JSON válido "
                 "(provável página de manutenção ou erro HTML com HTTP 200)."
             ) from exc
-        except OSError as exc:
+        except _FALHAS_DE_TRANSPORTE as exc:
             # TimeoutError é subclasse de OSError, assim como ConnectionError e
-            # urllib.error.URLError — cobre timeout e recusa de conexão com um
-            # único except.
+            # urllib.error.URLError — cobre timeout e recusa de conexão. A
+            # segunda família é a que não é OSError: resposta truncada e status
+            # line inválida (ver `_FALHAS_DE_TRANSPORTE`).
             raise MoodleIndisponivel(
-                f"{funcao}: o Moodle/e-Disciplinas não respondeu (timeout ou "
-                "conexão recusada). Tente de novo mais tarde."
+                f"{funcao}: o Moodle/e-Disciplinas não respondeu ou a resposta "
+                "veio truncada (timeout, conexão recusada ou interrompida). "
+                "Tente de novo mais tarde."
             ) from exc
 
         _levantar_se_erro(funcao, resposta)
@@ -268,10 +346,11 @@ class ClienteMoodle:
                 dados={"token": self._token.get()},
                 teto_bytes=teto_bytes,
             )
-        except OSError as exc:
+        except _FALHAS_DE_TRANSPORTE as exc:
             raise MoodleIndisponivel(
-                "O e-Disciplinas não respondeu ao download (timeout ou conexão "
-                "recusada). Tente de novo mais tarde."
+                "O e-Disciplinas não respondeu ao download ou ele veio "
+                "interrompido (timeout, conexão recusada ou truncada). Tente de "
+                "novo mais tarde."
             ) from exc
 
         if "json" in (content_type or "").lower():

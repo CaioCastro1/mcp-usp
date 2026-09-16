@@ -1,4 +1,4 @@
-"""ESQUELETO-FASE2 — erros legíveis do RUCard (Invariante 6)."""
+"""Erros legíveis do RUCard (Invariante 6)."""
 from __future__ import annotations
 
 

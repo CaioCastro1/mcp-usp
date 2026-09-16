@@ -184,11 +184,18 @@ Não negociáveis, independentemente do que a descoberta sugerir.
      `tiny_premium_get_api_key`, `mod_lti_get_tool_launch_data` — mintam ou vazam
      credencial; um MCP não tem motivo para escalar acesso. A `tiny_premium` devolve
      `get_config('tiny_premium','apikey')` sem exigir capability nenhuma.
-   - `mod_assign_save_submission`, `mod_assign_submit_for_grading`,
-     `mod_assign_start_submission`, `mod_assign_remove_submission` — entrega em nome do
+   - `mod_assign_start_submission`, `mod_assign_remove_submission` — entrega em nome do
      usuário. `start_submission` liga o cronômetro de entrega cronometrada: é o análogo
-     exato de `start_attempt` e estava de fora. Se algum dia entrarem, entram como comando
-     dedicado com confirmação humana, nunca como efeito colateral.
+     exato de `start_attempt` e estava de fora. Até 15/09/2026 esta linha trazia também
+     `mod_assign_save_submission` e `mod_assign_submit_for_grading`, com a ressalva de que
+     *"se algum dia entrarem, entram como comando dedicado com confirmação humana, nunca
+     como efeito colateral"*. Entraram assim, em 15/09/2026 (§9, duas entradas dessa
+     data): as duas **saíram desta lista** para um terceiro conjunto,
+     `ESCRITA_CONFIRMADA` em `usp_mcp/moodle/politica.py`, que só é alcançável com
+     `USP_MCP_ENTREGA=1` no ambiente **e** confirmação declarada por chamada; sem a flag,
+     as duas ferramentas que as usam nem aparecem no `tools/list`. `USP_MCP_ALLOW_WRITES`
+     continua não abrindo nenhuma das duas. As outras duas de `mod_assign` seguem aqui,
+     sem flag que libere. O `BLOQUEIO_PERMANENTE` tem 38 nomes desde então.
    - `mod_lesson_launch_attempt`, `mod_lesson_process_page`, `mod_lesson_finish_attempt` e
      as entregas de `mod_workshop` — mesmo raciocínio das tentativas de quiz.
    - `core_message_send_instant_messages`, `core_message_send_messages_to_conversation`,
@@ -3382,7 +3389,9 @@ abriram".
 `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`, 225 linhas, zero de
 produção. O `BLOQUEIO_PERMANENTE` de `usp_mcp/moodle/politica.py` **continua com 40 nomes
 hoje**, as duas de assign entre eles, e só cai para 38 quando a implementação entrar. Quem
-ler o §2.2 agora lê o estado verdadeiro do código. O próprio §2.2 já antecipava a forma
+ler o §2.2 agora lê o estado verdadeiro do código. (A implementação entrou **no mesmo dia**,
+pela PR #68; a entrada seguinte registra o que ela fez, e o §2.2 foi atualizado em 16/09
+para dizer 38.) O próprio §2.2 já antecipava a forma
 desta decisão, na frase sobre as quatro de `mod_assign`: *"Se algum dia entrarem, entram
 como comando dedicado com confirmação humana, nunca como efeito colateral."* O spec é essa
 frase detalhada, não uma virada contra ela.
@@ -3446,6 +3455,47 @@ evitar.
 `mod_quiz_get_quizzes_by_courses` devolve `attempts`, com `0` significando tentativas
 ilimitadas. Um portão de questionário que comece exigindo `attempts == 0` é a versão
 defensável, e é por onde essa fase deve começar se ela existir.
+
+---
+
+### 15/09/2026 — a entrega com confirmação saiu do spec e virou código: 40 nomes viraram 38
+
+Registro escrito em 16/09/2026, sobre a PR #68 (commit `343d13a`), mergeada em 15/09 e sem
+entrada aqui até agora. A falta custou uma divergência na lista de segurança: o §2.2
+continuou por um dia dizendo que `mod_assign_save_submission` e
+`mod_assign_submit_for_grading` eram "bloqueio permanente, sem flag que libere", e a
+entrada anterior deste §9 dizia "continua com 40 nomes hoje", enquanto o interpretador
+respondia `len(BLOQUEIO_PERMANENTE) == 38` e as duas em `ESCRITA_CONFIRMADA`. O
+`CLAUDE.md` diz que quando os dois divergem o `SPEC1.md` está certo; aqui era o inverso, e
+por isso o §2.2 foi corrigido junto com esta entrada.
+
+**O que entrou, medido no código de hoje:**
+
+- `usp_mcp/moodle/politica.py` ganhou um terceiro conjunto, `ESCRITA_CONFIRMADA`, com as
+  duas funções, e o `BLOQUEIO_PERMANENTE` caiu de 40 para **38**. `decidir` só aprova um
+  nome desse conjunto com `USP_MCP_ENTREGA=1` no ambiente **e** `confirmada=True` vindo do
+  call site; qualquer uma das duas sozinha recusa, com o motivo dizendo qual faltou. As
+  três de questionário e as outras duas de `mod_assign` (`start_submission`,
+  `remove_submission`) continuam no bloqueio permanente, e `USP_MCP_ALLOW_WRITES` continua
+  sem abrir nada.
+- `usp_mcp/moodle/cliente.py` ganhou um verbo separado, `escrever`, que é o único caminho
+  que declara confirmação; `chamar` nunca declara, então nenhuma ferramenta de leitura
+  consegue escrever por acidente.
+- `usp_mcp/moodle/entrega.py` traz as duas ferramentas, `salvar_rascunho` e `entregar`,
+  nos dois passos do spec: a primeira chamada devolve o plano com um código que é hash do
+  plano; a segunda, repetindo o código, escreve, e se `status`, `timemodified` ou o
+  conjunto de arquivos mudaram no meio, recusa e devolve o plano novo. As cinco recusas do
+  spec (grupo, `locked`, `cansubmit` falso, já entregue, zero arquivos) estão lá.
+- Com a flag desligada, `listar_ferramentas()` devolve dez nomes; ligada, doze. As duas
+  novas são as primeiras do projeto com `destructiveHint` verdadeiro.
+- Suíte: 14 testes de política (`tests/moodle/test_politica_entrega.py`), 9 da ferramenta
+  (`tests/moodle/test_entrega.py`) e 2 no fio (`tests/handshake/test_entrega_no_fio.py`),
+  o último deles o E14 do spec: sem a flag, as duas **não aparecem** no `tools/list`.
+  Escrita ao vivo não entra em fase nenhuma.
+
+**O que não mudou, para não parecer que mudou:** o modelo de ameaça do spec. O portão
+protege contra acidente e frase ambígua, e não contra um modelo com shell. O README diz isso
+na seção *Entregando trabalho*, e o `.env.example` repete ao lado da flag.
 
 ---
 
@@ -3831,6 +3881,79 @@ O copyright nomeia os dois autores. O histórico tem 180 commits de `CaioCastro1
 
 ---
 
+### 16/09/2026 — o caminho de instalação do README não produzia um projeto funcionando
+
+**O defeito, medido simulando a instalação por `pip`.** O caminho manual do README mandava
+`python3 -m venv ~/usp-mcp && ~/usp-mcp/bin/pip install git+https://...`. Isso põe o pacote
+em `site-packages`, sem `.env` e sem `.git` em lugar nenhum, e `usp_mcp/env.py` procura o
+`.env` a partir da posição do próprio arquivo, subindo até um diretório com `.git`. Com o
+pacote copiado para um diretório assim e o ambiente limpo: `achar_env()` devolve `None`,
+`RUCARD_HASH` fica `None` e `MOODLE_TOKEN` ausente. Duas consequências, as duas confirmadas:
+
+1. **O bandejão não respondia**, apesar de o README prometer três vezes que ele funciona
+   para qualquer pessoa sem configuração. A hash não está no código (o R8 e a checagem 1 do
+   gate proíbem), e a mensagem de `HashAusente` manda copiar um `.env.example` que quem
+   instalou por `pip` não tem no disco.
+2. **O token do `token.sh` nunca chegava ao servidor instalado.** O README mandava clonar à
+   parte para rodar o script; o `.env` ficava na raiz desse clone e o servidor registrado era
+   o do venv solto, que não olha para lá. A pessoa preenchia certo e recebia "MOODLE_TOKEN
+   ausente — configure-o no .env", apontando o arquivo que acabara de preencher.
+
+O caminho rápido (o prompt para o Claude Code) não tinha o defeito: ele já clonava em
+`~/usp-mcp`, criava o venv dentro e instalava editável. O manual divergia dele.
+
+**A cura: o caminho manual passa a instalar do jeito que o código já suporta.** Um clone em
+`~/usp-mcp`, o venv em `~/usp-mcp/.venv`, `pip install -e ~/usp-mcp` e
+`cp ~/usp-mcp/.env.example ~/usp-mcp/.env`. Na instalação editável `__file__` continua
+apontando para a árvore clonada, então o `.env` que o `cp` cria (com a hash) e que o
+`token.sh` preenche (com o token) é o mesmo arquivo que os três comandos instalados leem. É
+também o layout que o `.mcp.json`, o `scripts/servidor.sh`, o gate e o P6 já exercitam. O
+`env.py` não ganhou linha de código: ganhou o registro, no docstring, de onde ele não procura
+e por quê. O D3 (`tests/test_documentacao.py`) afirma os três comandos pela string que se
+digita e reprova se `install git+` voltar à seção.
+
+**A prova, repetindo a simulação com o layout novo (16/09):** clone numa pasta limpa, venv
+dentro, instalação editável, `cp` do exemplo; depois, com `cwd=/` e `env -i` (nenhuma
+variável do projeto no ambiente): `achar_env()` devolve `<clone>/.env`; `RUCARD_HASH`
+presente, 32 chars; o comando instalado `usp-mcp-rucard` responde `initialize`
+(`usp-mcp-rucard 1.0.0`) e `tools/list` (`[bandejao]`); e `chamar_ferramenta("bandejao")`,
+com transporte servindo as fixtures versionadas para não tocar a USP, faz 2 requisições com
+`hash=<valor do .env>` no corpo das duas e devolve o cardápio. Para o token: o `token.sh`
+resolve o `.env` pelo mesmo `achar_env` a partir do clone, e um `MOODLE_TOKEN` de forma
+válida gravado nessa linha aparece como "presente, 32 chars" no `--auto-verificar` do
+servidor do Moodle rodado de `/` com ambiente vazio. O controle (pacote solto, sem `.env` e
+sem `.git`) continua devolvendo `None` e `HashAusente`, de propósito.
+
+**O que foi considerado e descartado, com o custo de cada um:**
+
+- **Embutir a `RUCARD_HASH` no código, com o ambiente sobrepondo.** Resolveria o bandejão sem
+  `.env` nenhum, e o valor é público. Mas `scripts/_gate_segredos.py` reprova o valor em
+  qualquer arquivo rastreado fora do par `.env.example`/`SPEC1.md`, por decisão escrita
+  ("a mesma hash aparecendo em QUALQUER outro arquivo é surpresa"), e o R8 reprova em
+  `usp_mcp/rucard/`. Passar pelo gate exigiria afrouxar a guarda que existe para isso, e não
+  resolveria o token, que é pessoal e não pode ter valor embutido.
+- **Um caminho fixo do usuário (`~/.config/usp-mcp/.env`) ou o pai do venv.** Seria uma
+  segunda resposta para "onde está o `.env`", e o §9 de 12/09 registra três vezes o que
+  custa haver duas. O `token.sh` também teria de aprender o lugar novo.
+- **O `MOODLE_TOKEN` no bloco `env` da configuração do cliente MCP.** Já descartado em 31/08
+  (duplica o segredo num arquivo fácil de commitar) e obrigaria a pessoa a abrir o `.env`,
+  copiar o token e colar num JSON, quando o README promete que a chave nunca aparece na tela.
+- **Registrar `<clone>/scripts/servidor.sh` em vez dos entry points.** Funciona, mas devolve
+  ao caminho de quem só usa o lançador de desenvolvimento, e some com o pacote que 14/09
+  construiu. Os entry points continuam sendo o comando registrado; só o lugar deles mudou
+  para `~/usp-mcp/.venv/bin/`.
+
+**Junto, no mesmo commit, porque a revisão mediu:** o §2.2 dizia que
+`mod_assign_save_submission` e `mod_assign_submit_for_grading` eram bloqueio permanente
+quando o código as tinha em `ESCRITA_CONFIRMADA` desde 15/09 (corrigido, e a entrada que
+faltava sobre a implementação entrou acima); `usp_mcp/moodle/__init__.py` e
+`usp_mcp/rucard/erros.py` ainda se declaravam esqueleto, nos dois únicos arquivos que o
+`fonte_de` das suítes não lê (corrigidos, e `tests/test_sem_esqueleto.py` varre o pacote
+inteiro); o README dizia que nove ferramentas tinham rodado contra a USP quando eram treze,
+não dizia o piso de Python 3.11, falava em três camadas de teste quando são quatro e dizia
+que as fixtures do Moodle ficam fora do git quando 15 estão nele e só `raw/` fica fora; e o
+A1 do roadmap afirmava no título que a licença é MIT e no corpo que não há licença nenhuma
+(reescrito, junto com o B3, o D3 e o D4, que tinham o mesmo padrão em menor grau).
 ### 16/09/2026 — a higienização decide por família e por conteúdo, não por nome exato de campo
 
 Três vazamentos confirmados na `main`, todos por campo que a lista exata de `higienizar.py`

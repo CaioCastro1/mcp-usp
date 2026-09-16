@@ -49,7 +49,11 @@ LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchService
 DIR="$HOME/Library/Caches/usp-mcp-token"   # NAO mude para /tmp: ver medicao 2
 APP="$DIR/UspMcpToken.app"
 FIFO="$DIR/redirect.fifo"
-BUNDLE_ID="co.lastro.uspmcp.tokenhandler"
+# Identificador do handler efemero que este script cria, registra e desregistra a
+# cada rodada. Prefixo neutro de proposito: nao e dominio de empresa nenhuma (o
+# projeto nao tem vinculo com a USP nem com o empregador de quem o escreve), e o
+# .app nunca e distribuido: vive em ~/Library/Caches e sai no trap de saida.
+BUNDLE_ID="local.usp-mcp.tokenhandler"
 
 diag() { printf '   %s\n' "$1" >&2; }
 

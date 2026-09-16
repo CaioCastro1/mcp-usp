@@ -21,3 +21,12 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+
+# Configuração local do Claude Code. Foi rastreada até 16/09/2026 e carregava o
+# ferramental de OUTRA empresa (skills e conectores que nada têm a ver com a USP),
+# desligado NOMEANDO cada item, ou seja, publicando a lista. Pior: era a
+# configuração pessoal de um dos donos, então todo mundo que clonasse herdava os
+# overrides dele. Desligar item por item nunca ia terminar; o arquivo é que não
+# pertence ao repositório. Nenhum teste nem script depende dele existir.
+.claude/settings.json
+.claude/settings.local.json
