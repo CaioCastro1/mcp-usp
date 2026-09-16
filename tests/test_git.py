@@ -83,6 +83,26 @@ def test_g3_caminho_com_acento_nao_vira_falso_positivo(tmp_path):
             "reproduz o BUG-2 e passaria por engano"
         )
 
+        # O BUG-2 exige um sistema de arquivos INSENSÍVEL a normalização: é ele
+        # que faz a mesma pasta atender pelas duas grafias, e é daí que vem o
+        # `rc=128` que o helper tinha de aprender a não ler como "ignorado". No
+        # ext4 as duas grafias são duas pastas, a de NFC não existe, e o que se
+        # mediria aqui seria outra coisa — um caminho ausente, não o bug.
+        #
+        # A checagem é empírica e não por nome de sistema operacional, porque o
+        # que decide é o sistema de ARQUIVOS: um volume ext4 montado num Mac
+        # separaria as duas grafias, e um APFS não separa em máquina nenhuma.
+        if not raiz_nfc.exists():
+            pytest.skip(
+                "este sistema de arquivos separa NFD de NFC, então as duas "
+                "grafias são dois diretórios e o BUG-2 não tem como acontecer "
+                "aqui. Não é cobertura perdida por descuido: o defeito é de "
+                "sistema insensível a normalização (APFS, e o NTFS por outro "
+                "caminho), e é lá que este teste precisa rodar. O G4 e o G5, "
+                "que guardam o tratamento de rc inesperado e a rota única para "
+                "o subcomando, rodam em qualquer sistema e continuam valendo."
+            )
+
         assert esta_ignorado(raiz_nfc / "fixture.txt", raiz_nfc) is False
         assert esta_ignorado(raiz_nfc / "cru" / "bruto.json", raiz_nfc) is True
     finally:

@@ -290,17 +290,15 @@ def test_c8_o_ci_roda_onde_o_projeto_roda(arquivo):
     virar um vermelho misterioso numa PR que não tem nada com isso.
     """
     texto = sem_comentarios((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
-    assert re.search(r"runs-on:\s*macos", texto), (
-        f"{arquivo} não roda em macOS. Medido em 15/09/2026, num runner Linux: "
-        "735 de 736. O `test_g3` cria uma pasta acentuada em NFD e pergunta ao "
-        "git sobre a mesma pasta em NFC, que é a forma que o Python entrega — "
-        "duas grafias que só são a mesma pasta num sistema de arquivos "
-        "insensível a normalização, como o do Mac onde o projeto é "
-        "desenvolvido e usado. Em ext4 a segunda simplesmente não existe e o "
-        "teste morre antes de medir o que veio medir. Levar o CI para Linux "
-        "é mais barato e fica possível no dia em que esse teste souber pular "
-        "declarando o motivo; até lá, um vermelho ali reprova a PR por um "
-        "motivo que não é da PR."
+    assert re.search(r"runs-on:\s*ubuntu", texto), (
+        f"{arquivo} não roda em Linux. A escolha mudou em 16/09/2026 e tem "
+        "razão medida: o runner era macOS porque o `test_g3` quebrava em ext4, "
+        "e custava 10x o minuto num repositório privado. Hoje o `test_g3` "
+        "detecta o sistema de arquivos e pula declarando o motivo, então o "
+        "flanco que sobra é conhecido e não silencioso: o BUG-2 só é "
+        "exercitado em sistema insensível a normalização, isto é, na máquina "
+        "de quem desenvolve, pelo gate local. Se um dia voltar para macOS, que "
+        "volte declarado aqui e não por acidente numa PR de outro assunto."
     )
 
 
