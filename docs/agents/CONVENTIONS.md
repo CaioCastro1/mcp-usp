@@ -69,6 +69,72 @@ classe interna do servidor — é descartado antes de qualquer log: no Jupiter i
 Nome de ferramenta vem da pergunta do dono, não da função do Moodle: `o_que_vence`
 é bom nome, `get_action_events_by_timesort` não é (§5 do `SPEC1.md`).
 
+### Notação dos testes: que letra mora em que arquivo
+
+O código inteiro cita teste por sigla: `T78-T81`, `H6`, `P5`, `L2`, `A6`, `M17`,
+`E1-E4`, `D1-D2`. Para quem escreveu, é taquigrafia útil. Para uma terceira
+pessoa, "H6 pegou material em 31/08" não tem referente, e até 16/09/2026 não
+havia arquivo nenhum dizendo o que cada letra significa. A tabela abaixo foi
+derivada lendo os arquivos, e não de memória; a docstring de cada arquivo é a
+fonte de verdade sobre o que aquela família cobre.
+
+| Sigla | Arquivo | Do que trata |
+|---|---|---|
+| `A1-A8` | `tests/test_anotacoes.py` | a promessa de read-only chega ao cliente como campo |
+| `A1-A20` | `tests/moodle/test_avisos.py` | a ferramenta `avisos` |
+| `AT1-AT20` | `tests/moodle/test_atrasadas.py` | a ferramenta `atrasadas` |
+| `C1-C9` | `tests/test_ci.py` | o workflow do CI |
+| `D1-D2` | `tests/test_documentacao.py` | o README leva um clone limpo até o gate |
+| `D3-D6` | `tests/test_gate.py` | a checagem 0 do gate, e o código de saída dele |
+| `D1-D6` | `tests/moodle/test_diagnostico.py` | a ferramenta `diagnostico` |
+| `DI1-DI23` | `tests/moodle/test_disciplinas.py` | a ferramenta `disciplinas` |
+| `E1-E4` | `tests/{jupiter,moodle,rucard}/test_erro_no_fio.py` | o erro chega ao modelo, nos três sistemas |
+| `E1-E6` | `tests/moodle/test_politica_entrega.py` | as duas condições que governam a escrita |
+| `E7-E12` | `tests/moodle/test_entrega.py` | o plano de entrega e as recusas |
+| `E13` | `tests/moodle/test_live.py` | o plano contra uma entrega real, sem escrever |
+| `E14` | `tests/handshake/test_entrega_no_fio.py` | sem a flag, as ferramentas de escrita não existem no fio |
+| `F1-F9` | `tests/moodle/test_forma_real.py` | nem o dublê monta campo que o e-Disciplinas não tem |
+| `G1-G5` | `tests/test_git.py` | o helper que pergunta ao git se um caminho está ignorado |
+| `H1-H10` | `tests/handshake/test_stdio.py` | o handshake stdio de cada servidor, como processo |
+| `J1` | `tests/test_jargao.py` | o que sai do processo não cita o `SPEC1.md` |
+| `J1-J25` | `tests/moodle/test_ja_entreguei.py` | a ferramenta `ja_entreguei` |
+| `L1-L6` | `tests/test_lancador.py` | o `scripts/servidor.sh` |
+| `M1-M18` | `tests/moodle/test_o_que_mudou.py` | a ferramenta `o_que_mudou` |
+| `N1-N18` | `tests/moodle/test_notas.py` | a ferramenta `notas` |
+| `P1-P6` | `tests/test_pacote.py` | o `pyproject.toml` e os entry points |
+| `P1-P5` | `tests/moodle/test_politica.py` | a allowlist do Moodle (Invariante 2) |
+| `R1-R48` | `tests/rucard/*.py` | o RUCard inteiro, uma faixa por arquivo |
+| `T1-T5` | `tests/test_token_fora_do_argv.py` | o token não passa pela linha de comando do `curl` |
+| `T1-T87` | `tests/jupiter/*.py` | o Jupiter inteiro, uma faixa por arquivo |
+| `T68-T114` | `tests/moodle/*.py` | material, arquivo, depósito, cliente e fronteira do Moodle |
+| `U1-U3` | `tests/test_urls_do_repo.py` | a URL que manda baixar o projeto aponta para ele |
+| `W1-W2` | `tests/test_ws.py` | o `scripts/ws.sh` acha o `.env` |
+
+Três coisas que a tabela revela e que valem ser ditas em voz alta, porque quem
+cita uma sigla numa PR precisa saber:
+
+1. **A letra sozinha não identifica o teste.** `A`, `D`, `E`, `J`, `P` e `T` são
+   usadas por duas ou mais famílias, e `T` é usada por três: Jupiter, Moodle e o
+   teste do token. Pior, as faixas de `T` do Jupiter e do Moodle se sobrepõem
+   (`T68` e `T80-T82` existem nos dois). Ao citar, diga o arquivo ou o sistema
+   junto: "T80 do Jupiter", não "T80".
+2. **Número repetido dentro da mesma família existe.** `R42-R44` estão em
+   `test_bandejao.py` e em `test_live.py`. O `pytest` não se importa, porque o
+   identificador dele é o caminho mais o nome inteiro da função; quem se importa
+   é a pessoa que leu a sigla numa PR.
+3. **Nem todo teste tem sigla.** `tests/moodle/test_o_que_vence.py`,
+   `test_projecao.py`, `test_higienizacao.py`, `test_token_decode.py` e
+   `test_anexos_de_entrega.py` nomeiam a propriedade sem prefixo. Isso é
+   escolha, não esquecimento: eles são citados pelo nome do arquivo.
+
+**`BUG-N` não é família de teste.** É defeito medido, citado em `tests/git.py` e
+`tests/test_git.py`. O número não está definido em lugar nenhum do repositório,
+e `BUG-2` é o único que aparece: o defeito que as duas citações descrevem é o dos
+12 testes que reprovavam pela causa errada, desenhado em
+`docs/superpowers/specs/2026-09-10-check-ignore-em-caminho-nfd-design.md` e
+fechado na PR #24. Defeito novo vai para `docs/decisions/BACKLOG-correcoes.md`,
+que numera por data e não por sigla; não invente um `BUG-3`.
+
 ## 4. Antes de cada commit
 
 ```bash

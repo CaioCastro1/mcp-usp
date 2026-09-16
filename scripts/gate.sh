@@ -3,8 +3,17 @@
 #
 # Uso:  ./scripts/gate.sh
 #
-# Quatro checagens, nesta ordem, porque a mais barata que pode reprovar vem antes:
+# Um pré-requisito e quatro checagens, nesta ordem, porque a mais barata que
+# pode reprovar vem antes:
 #
+#   pré. Isto é um clone git. Sem numeração porque não é uma propriedade do
+#      código, e sim do chão em que ele está: as checagens 1 e 2 PERGUNTAM ao
+#      git (`git ls-files`, `git check-ignore`), e fora de um repositório as
+#      duas mentem. Medido: quem baixa o ZIP do GitHub em vez de clonar recebe
+#      um traceback de `CalledProcessError` na 1 e, na 2, "o cru com dado
+#      pessoal deixou de ser ignorado", que é falso, e é o pior diagnóstico
+#      possível porque manda a pessoa procurar um vazamento que não existe.
+#      Aborta, como a 0, em vez de somar ao placar.
 #   0. O .env existe e tem RUCARD_HASH com valor. Custa um `test -f` e um grep,
 #      e é a única falha do gate com cura de uma linha — por isso ela é dita com
 #      o COMANDO, e não com o nome da variável que faltou. Vem antes da 1 porque
@@ -38,7 +47,33 @@ passo() { printf '  %-46s' "$1"; }
 ok()    { echo "OK"; }
 erro()  { echo "FALHOU"; falhou=1; }
 
+# Código de saída de "as checagens que rodaram passaram, mas a suíte não rodou".
+# Não é 0 e não é 1 de propósito: 0 seria mentira (§6 do CONVENTIONS.md: uma
+# verificação que não pode falhar não verifica nada) e 1 diria "reprovou", que
+# também não é verdade. Um número próprio deixa quem chama distinguir os três.
+SAIDA_SEM_SUITE=3
+
 echo "gate: $(pwd)"
+
+# ------------------------------------------------------- pré. isto é um clone
+passo "pre. isto e um clone git"
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then ok; else
+  echo "FALHOU"
+  cat <<'FIM' | sed 's/^/       /'
+isto não é um repositório git. Provavelmente é o ZIP do GitHub, descompactado.
+As checagens 1 e 2 perguntam ao git quais arquivos estão rastreados e quais
+estão ignorados; sem repositório elas não têm a quem perguntar, e o que sai é
+diagnóstico falso (traceback na 1, "o cru deixou de ser ignorado" na 2).
+
+Cura: clone em vez de baixar o ZIP. O comando exato está no README, na seção
+"Rodando a partir do código". O ZIP serve para ler o código, não para trabalhar
+nele: sem `.git` não há histórico, não há branch e não há commit para este gate
+proteger.
+FIM
+  echo
+  echo "gate: REPROVOU. Nao commite."
+  exit 1
+fi
 
 # ------------------------------------------------------------------- 0. o env
 # `CHAVE=` seguido de pelo menos um caractere que não seja espaço nem aspa: um
@@ -96,7 +131,10 @@ fi
 #
 # O pulo e BARULHENTO de proposito (Invariante 7: sem limite silencioso). Quem
 # pula a suite nao pode achar que passou por ela: a linha diz PULADA, o rodape diz
-# que a suite nao rodou, e o codigo de saida NAO vira 0 por causa disto.
+# que a suite nao rodou, e o codigo de saida NAO vira 0 por causa disto: sai
+# $SAIDA_SEM_SUITE. Por dois dias o comentario dizia isso e o codigo saia 0: quem
+# lesse `./scripts/gate.sh && git push` via verde sem a suite ter rodado, e o
+# `tests/test_gate.py` (D6) existe para essa divergencia nao voltar calada.
 if [ "${USP_MCP_GATE_SEM_SUITE:-0}" = "1" ]; then
   passo "3. suite offline"
   echo "PULADA"
@@ -107,10 +145,11 @@ if [ "${USP_MCP_GATE_SEM_SUITE:-0}" = "1" ]; then
   echo
   if [ "$falhou" -eq 0 ]; then
     echo "gate: checagens 0-2 passaram. A SUITE NAO RODOU — isto nao e um gate verde."
-  else
-    echo "gate: REPROVOU. Nao commite."
+    echo "      Saida $SAIDA_SEM_SUITE, e nao 0: sem a checagem 3 nao ha o que aprovar."
+    exit "$SAIDA_SEM_SUITE"
   fi
-  exit "$falhou"
+  echo "gate: REPROVOU. Nao commite."
+  exit 1
 fi
 
 passo "3. suite offline"
