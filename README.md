@@ -5,9 +5,11 @@ Feito por Caio Castro & João Pedro Gunthen
 Consulta em português a sistemas acadêmicos da USP: o cardápio dos bandejões, os prazos e
 o material do e-Disciplinas, e o catálogo de disciplinas do JupiterWeb.
 
-Ele não tem interface própria. Você o conecta a um assistente, como o Claude, e passa a
-poder perguntar em linguagem comum. A resposta vem dos sistemas da USP, no momento da
-pergunta.
+Ele não tem interface própria. Você o conecta a um assistente e passa a poder perguntar em
+linguagem comum. A resposta vem dos sistemas da USP, no momento da pergunta.
+
+Qualquer assistente que fale MCP serve. Este guia mostra os passos com o Claude, porque é
+o que os autores usam, e a seção *Onde ele funciona* conta o resto.
 
 Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 
@@ -32,11 +34,35 @@ Bandejão e JupiterWeb funcionam para qualquer pessoa. O e-Disciplinas mostra as
 disciplinas, então ele precisa de uma chave sua, e obter essa chave dá um pouco mais de
 trabalho. A seção *Configuração* explica.
 
+## Onde ele funciona
+
+O programa roda no seu computador, e o assistente fala com ele ali mesmo. Três lugares
+costumam ser confundidos por terem o mesmo nome, e a diferença entre eles decide se a
+instalação vai dar certo:
+
+| Onde você pergunta | Funciona? |
+|---|---|
+| Claude Desktop, que é o **chat** no aplicativo de computador | sim, e é onde entra o bloco de configuração da próxima seção |
+| Claude Code, no terminal ou na aba Code do aplicativo | sim, e o registro é por linha de comando |
+| claude.ai aberto no **navegador** | não |
+
+O navegador fica de fora porque, do lado do site, não existe nada capaz de conversar com um
+programa que está na sua máquina. Não é um defeito à espera de conserto: é a outra face de
+uma decisão registrada do projeto, que é a sua chave do e-Disciplinas nunca sair do seu
+computador. Pelo navegador nem o bandejão responde, e ele nem chave usa.
+
+O Claude aparece nesse quadro porque é o assistente que os autores usam, e não porque o
+projeto precise dele. Por dentro, isto aqui é um servidor MCP comum, o padrão aberto que os
+assistentes usam para falar com ferramentas, e não há uma linha de código escrita para um
+assistente em particular. A seção *Detalhes técnicos*, no fim do arquivo, diz o que foi
+medido a esse respeito.
+
 ## Instalando
 
-Este é um MCP: um conjunto de ferramentas que um assistente passa a saber usar. Ele
-funciona tanto no terminal quanto no aplicativo do Claude, na função Code, que é onde a
-maioria das pessoas vai usar.
+Este é um MCP: um conjunto de ferramentas que um assistente passa a saber usar. A
+instalação tem duas partes. Primeiro você baixa o projeto para o seu computador, e isso é
+igual para todo mundo. Depois você avisa o assistente que ele existe, e esse segundo passo
+muda conforme o lugar do quadro acima.
 
 ### O caminho rápido
 
@@ -102,9 +128,20 @@ ls ~/usp-mcp/.venv/bin | grep usp
 
 Tem que aparecer `usp-mcp-jupiter`, `usp-mcp-moodle` e `usp-mcp-rucard`.
 
-Agora avise o assistente que eles existem. No Claude Desktop, abra as configurações de
-conectores e cole isto, trocando `SEU-USUARIO` pelo nome da sua conta no computador (se
-não souber, o comando `whoami` no Terminal responde):
+Agora avise o assistente que eles existem. Em qualquer um dos caminhos abaixo você troca
+`SEU-USUARIO` pelo nome da sua conta no computador; se não souber qual é, o comando
+`whoami` no Terminal responde.
+
+**No Claude Desktop**, a configuração mora num arquivo. Pelo menu, o caminho até ele é
+Configurações, depois Desenvolvedor, depois o botão que edita a configuração (em inglês,
+Settings e Developer). Se preferir abrir o arquivo direto, no Mac ele é
+
+```text
+~/Library/Application Support/Claude/claude_desktop_config.json
+```
+
+e no Linux, `~/.config/Claude/claude_desktop_config.json`. Se ele estiver vazio, cole isto
+inteiro:
 
 ```json
 {
@@ -116,9 +153,29 @@ não souber, o comando `whoami` no Terminal responde):
 }
 ```
 
-No Linux, o começo do caminho é `/home/` em vez de `/Users/`. Os comandos desta seção
-foram escritos para Mac e Linux; no Windows os caminhos são outros e este guia ainda não
-os cobre.
+Se já tiver alguma coisa escrita, não troque o conteúdo pelo de cima: as três linhas `usp-`
+entram dentro do `mcpServers` que já está lá, depois do que já existe, com uma vírgula
+separando uma da outra.
+
+**No Claude Code**, não há arquivo para editar à mão. Cole estes três comandos no Terminal,
+um de cada vez:
+
+```bash
+claude mcp add usp-rucard --scope user -- /Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-rucard
+claude mcp add usp-jupiter --scope user -- /Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-jupiter
+claude mcp add usp-moodle --scope user -- /Users/SEU-USUARIO/usp-mcp/.venv/bin/usp-mcp-moodle
+```
+
+O `--scope user` é o que faz o registro valer em qualquer pasta, e não só na que você
+estiver quando rodar o comando.
+
+**Em outro assistente que fale MCP**, a ideia é a mesma: apontar o programa para os três
+comandos que apareceram no passo anterior. Onde essa configuração se escreve muda de
+assistente para assistente, e quem diz é a documentação de cada um.
+
+No Linux, o começo do caminho é `/home/` em vez de `/Users/` nos dois blocos. Os comandos
+desta seção foram escritos para Mac e Linux; no Windows os caminhos são outros e este guia
+ainda não os cobre.
 
 Feche e abra o assistente. Pronto: bandejão e JupiterWeb já respondem. O e-Disciplinas
 ainda vai reclamar que falta a chave, e é a próxima seção.
@@ -344,6 +401,16 @@ ou capturada em agosto, e foram medidas ao vivo no mesmo dia; a metade de `atras
 era escrita à mão, o estado de cada entrega, virou captura real em 15/09
 (`fixtures/moodle/submission_status_ec1.json`). As duas de entrega não entram em teste ao
 vivo em fase nenhuma, de propósito.
+
+Nada aqui é escrito para um assistente específico. A dependência de execução é uma só, o
+`mcp`, que é o SDK oficial do protocolo, e a única vez em que a palavra Claude aparece
+dentro de `usp_mcp/` é numa docstring citando o `CLAUDE.md`. A versão do protocolo é
+negociada com quem chega, e não fixada numa só. Medido em 16/09/2026, nos três servidores:
+cliente pedindo `2024-11-05` recebe `2024-11-05`, pedindo `2025-03-26` recebe `2025-03-26`
+e pedindo `2025-06-18` recebe `2025-06-18`. Outros clientes MCP, como Cursor, Windsurf,
+Zed, Continue e a extensão do VS Code, falam esse mesmo protocolo. Isso é o que se sabe
+pelo protocolo em comum, e não o relato de alguém que tenha rodado este projeto dentro
+deles: ninguém rodou ainda.
 
 | Servidor | Ferramentas |
 |---|---|
