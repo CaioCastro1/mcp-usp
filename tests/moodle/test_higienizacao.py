@@ -421,7 +421,7 @@ def test_t57_a_varredura_pega_cada_forma_que_promete_pegar():
     """
     plantados = {
         "email": ("dono@usp.br", "e-mail"),
-        "icone": ("https://edisciplinas.usp.br/pluginfile.php/6919955/user/icon/edis/f2", "contexto de usuário"),
+        "icone": ("https://edisciplinas.usp.br/pluginfile.php/2468135/user/icon/edis/f2", "contexto de usuário"),
         "chave": ("9f8e7d6c5b4a39281706f5e4d3c2b1a0", "32 hex"),
         "sessao": ("https://x/course/mod.php?update=1&sesskey=AbCdEf1234", "credencial em parâmetro"),
         "filename": ("EP1_PTC3314_12345678.pdf", "Número USP"),
