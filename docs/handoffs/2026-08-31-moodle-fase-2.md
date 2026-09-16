@@ -85,7 +85,7 @@ o carregamento do `.env`. **Nenhuma asserção existente foi afrouxada.**
 ## Como retomar
 
 ```bash
-cd /Users/caiocastro/Padrao/GitHub/mcp-usp
+cd /caminho/para/o/checkout/mcp-usp
 
 # se o venv não existir NESTE diretório (cada worktree precisa do seu):
 python3 -m venv .venv
