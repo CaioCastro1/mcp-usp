@@ -330,6 +330,34 @@ def _projetar_refeicao(ficha, dia: date, qual: str, bruto_do_dia: dict) -> dict:
     }
 
 
+def _sem_ficha(id_ru: str, fichas: dict) -> ErroRucard:
+    """O catálogo não trouxe o RU pedido. São DUAS causas, e só uma é política.
+
+    A pergunta que a ferramenta faz aqui é "por que este RU não está no
+    catálogo?", e a política só sabe responder "ele pode ser consultado?". Para
+    um id permitido a resposta dela é a frase de PERMISSÃO — e o erro saía com o
+    texto `RU 6 (CENTRAL).`, que afirma que o RU 6 pode, o que é verdade e não é
+    o problema. Existe mensagem, ela só não é sobre o que houve.
+
+    Quando a política de fato nega (id fora da allowlist, id que ninguém
+    capturou), a fala dela continua sendo a certa: ela diz o que fazer.
+    """
+    decisao = politica.decidir("menu", id_ru)
+    if not decisao.permitida:
+        return ErroRucard(decisao.motivo)
+
+    trouxe = ", ".join(sorted(fichas)) if fichas else "nenhum"
+    return ErroRucard(
+        f"o RUCard respondeu o catálogo de restaurantes, e o RU {id_ru} não "
+        f"está nele (vieram: {trouxe}). O id é válido e consultável — o que "
+        "falta é a ficha, de onde saem nome, endereço, horário e preço, e sem "
+        "ela não há como dizer se um cardápio fechado é feriado ou dia em que "
+        "esse restaurante não serve. Isto é falha de leitura do catálogo, não "
+        "restaurante inexistente: tente de novo, e peça outro restaurante se "
+        "persistir."
+    )
+
+
 def _dia_do_payload(payload: dict, dia: date) -> dict | None:
     alvo = dia.strftime("%d/%m/%Y")
     for bruto in payload.get("meals") or []:
@@ -376,9 +404,7 @@ def bandejao(dia: str = "hoje", refeicao: str = "todas", restaurantes=None, *,
     for id_ru in ids:
         ficha = fichas.get(id_ru)
         if ficha is None:
-            # A política do cliente é quem nega de verdade; aqui é só não
-            # inventar ficha para um id que o catálogo não trouxe.
-            raise ErroRucard(politica.decidir("menu", id_ru).motivo)
+            raise _sem_ficha(id_ru, fichas)
 
         if refeicoes == ["cafe"]:
             # Café não tem cardápio: não vale gastar uma chamada de /menu por RU
