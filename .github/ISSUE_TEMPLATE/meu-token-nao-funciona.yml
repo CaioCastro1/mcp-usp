@@ -1,0 +1,56 @@
+name: Meu token não funciona
+description: O script que busca a chave do e-Disciplinas travou, ou a chave obtida não é aceita.
+labels: ["token"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Antes de escrever: não cole a sua chave aqui
+
+        A chave do e-Disciplinas é credencial pessoal sua. Quem a tiver responde
+        ao e-Disciplinas como se fosse você, e toda chamada feita com ela fica no
+        log da sua conta. Ela não é necessária para diagnosticar nada disto.
+
+        Se você colar por engano, feche a issue e obtenha uma chave nova pelo
+        site do e-Disciplinas: a antiga deixa de valer.
+
+        Antes de abrir, vale rodar isto, que normaliza o que está no seu `.env`
+        e resolve boa parte dos casos. Ele é idempotente e nunca imprime o valor
+        da chave:
+
+        ```bash
+        ./scripts/fix-token.sh
+        ```
+
+  - type: dropdown
+    id: passo
+    attributes:
+      label: Em que passo você travou?
+      options:
+        - Rodei ./scripts/token.sh e ele falhou
+        - O navegador abriu mas eu não achei o endereço para copiar
+        - Colei o endereço e o script recusou
+        - O .env foi gravado, mas as perguntas do e-Disciplinas falham
+        - Outro
+    validations:
+      required: true
+
+  - type: textarea
+    id: tela
+    attributes:
+      label: O que apareceu na tela
+      description: >
+        Cole a saída, sem a parte que for uma sequência longa de letras e
+        números. Os scripts deste projeto nunca imprimem o valor da chave, então
+        o que eles escrevem pode ser colado inteiro.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema e versão do Python
+      placeholder: "macOS 15, Python 3.13"
+    validations:
+      required: false
