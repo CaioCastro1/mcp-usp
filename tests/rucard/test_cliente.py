@@ -174,6 +174,68 @@ def test_r16_ttl_expirado_refaz(cliente_de_fixture):
     assert transporte.rotas() == ["menu/6", "menu/6"], "não expirou depois do TTL"
 
 
+def test_r16b_a_revalidacao_por_data_continua_viva_depois_do_ttl_expirar(gravador):
+    """A proteção do R15, mas na SEGUNDA janela de TTL — e nas seguintes.
+
+    O R15 sozinho só exercita a primeira janela de vida do processo, e é por
+    isso que ele ficava verde com a proteção desligada. O flag "já revalidei
+    nesta janela" era ligado sempre que existia entrada anterior, inclusive
+    quando a refeita fora por TTL vencido: depois da primeira expiração, toda
+    entrada nova nascia marcada como já revalidada e a virada de semana deixava
+    de ser percebida para sempre.
+
+    A ironia é o ponto: às 3 h de processo vivo, que é quando a virada da
+    segunda-feira de fato acontece, a proteção já estava desligada.
+    """
+    relogio = Relogio()
+    transporte = gravador(
+        {"menu/6": [texto("menu_6"), texto("menu_6"), texto("menu_6_semana_seguinte")]}
+    )
+    c = ClienteRucard(
+        transporte, hash_rucard=HASH_DE_TESTE, relogio=relogio, ttl_menu=100
+    )
+
+    c.menu("6", SEG_FASE1)          # 1ª requisição: nasce a primeira janela
+    relogio.avancar(101)            # o TTL vence
+    c.menu("6", SEG_FASE1)          # 2ª requisição: janela NOVA, não revalidação
+    assert transporte.rotas() == ["menu/6", "menu/6"]
+
+    # Agora a virada de semana, dentro da segunda janela.
+    segundo = c.menu("6", SEG_SEGUINTE)
+
+    assert transporte.rotas() == ["menu/6", "menu/6", "menu/6"], (
+        "o cliente devolveu o cache da semana anterior. O flag de revalidação "
+        "foi ligado por uma refeita de TTL, que não é revalidação por data: a "
+        "partir da primeira expiração a virada de semana passa despercebida."
+    )
+    assert segundo["meals"][0]["date"] == "31/08/2026"
+
+
+def test_r16c_revalidar_por_data_continua_valendo_uma_vez_por_janela(gravador):
+    """O outro lado, para a cura do R16b não virar uma requisição por pergunta.
+
+    Uma pergunta sobre uma data que a API nunca vai cobrir (Natal) não pode
+    custar uma chamada cada vez. Depois de revalidar uma vez, a janela está
+    gasta — e é isso que o flag deve significar.
+    """
+    relogio = Relogio()
+    transporte = gravador({"menu/6": [texto("menu_6"), texto("menu_6")]})
+    c = ClienteRucard(
+        transporte, hash_rucard=HASH_DE_TESTE, relogio=relogio, ttl_menu=10**6
+    )
+
+    c.menu("6", SEG_FASE1)
+    c.menu("6", datetime.date(2026, 12, 25))  # revalida: 1 chamada a mais
+    assert transporte.rotas() == ["menu/6", "menu/6"]
+
+    c.menu("6", datetime.date(2026, 12, 25))
+    c.menu("6", datetime.date(2026, 12, 26))
+    assert transporte.rotas() == ["menu/6", "menu/6"], (
+        "a janela já tinha sido revalidada: perguntar de novo por uma data que "
+        "a API não serve não pode virar uma requisição por pergunta"
+    )
+
+
 def test_r17_o_catalogo_tem_ttl_maior_que_o_menu():
     # Medido: `/restaurants` veio byte-idêntico em 27/08 e 31/08 — é o dado
     # mais estático do projeto. O cardápio muda toda semana. Um TTL só para os
