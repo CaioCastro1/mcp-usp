@@ -1,8 +1,8 @@
-"""C1-C8: o CI roda a camada offline, e só ela, sem credencial nenhuma.
+"""C1-C9: o CI roda a camada offline, e só ela, sem credencial nenhuma.
 
 O `scripts/gate.sh` já checa tudo o que precisa ser checado antes de um commit.
 O defeito nunca foi o que ele checa — é que ele só roda quando alguém lembra.
-Uma action fecha essa porta, e abre duas outras que estes testes trancam:
+Uma action fecha essa porta, e abre três outras que estes testes trancam:
 
 1. **Ligar a camada `live` no CI.** Ela fala com a USP de verdade, com o token
    pessoal do dono, e cada chamada fica no log da conta. Um CI que depende de a
@@ -15,8 +15,16 @@ Uma action fecha essa porta, e abre duas outras que estes testes trancam:
    qualquer valor com forma de chave — e reprova no arquivo inteiro, comentário
    incluído: um segredo citado "só para explicar" continua sendo um segredo
    escrito num arquivo rastreado.
+3. **Desligar a suíte de dentro do CI.** O `gate.sh` tem uma variável que pula a
+   checagem 3, e ela existe por um motivo estreito e só ele: o
+   `tests/test_gate.py` roda o gate dentro de um clone deste repositório, e sem
+   o pulo a suíte do clone rodaria o teste que clona de novo. Num workflow ela
+   não tem uso legítimo nenhum: o CI passaria a rodar um gate que checa `.env` e
+   `.gitignore` e chama isso de verde, que é o falso-verde mais caro possível,
+   porque é o único que ninguém precisa lembrar de rodar. C9 reprova qualquer
+   workflow que a ligue.
 
-C3 e C4 seriam verdes num diretório `.github/` vazio, que é o falso-verde que
+C3, C4 e C9 seriam verdes num diretório `.github/` vazio, que é o falso-verde que
 este repositório persegue desde o primeiro gate. C1, C2, C5 e C6 são o
 contrapeso: existe workflow, ele dispara em push e em pull request, ele de fato
 instala o pacote e roda a camada offline, e ele cria o `.env` antes disso. C8
@@ -49,6 +57,10 @@ WORKFLOWS = RAIZ / ".github" / "workflows"
 # no YAML: derivar do código faria o teste concordar com uma renomeação em vez de
 # reprovar por ela.
 VARIAVEL_LIVE = "USP_MCP_LIVE"
+
+# A variável que faz o `gate.sh` PULAR a suíte. Mesma razão de estar escrita à
+# mão: é o nome que não pode aparecer ligado num workflow.
+VARIAVEL_SEM_SUITE = "USP_MCP_GATE_SEM_SUITE"
 
 # Valores que NÃO ligam a camada: vazio (a forma que o próprio gate usa para
 # limpar a variável antes do pytest) e zero.
@@ -95,15 +107,31 @@ def sem_comentarios(texto: str) -> str:
     return "\n".join(_COMENTARIO.sub("", linha) for linha in texto.splitlines())
 
 
-def liga_a_camada_live(texto: str) -> list[tuple[int, str]]:
-    """(linha, trecho) de cada atribuição que LIGA a camada live."""
+def liga_a_variavel(texto: str, variavel: str) -> list[tuple[int, str]]:
+    """(linha, trecho) de cada atribuição que LIGA `variavel` no YAML.
+
+    Uma varredura só para as duas variáveis proibidas, e não duas cópias: as
+    formas que ela precisa pegar são as mesmas (`VAR: 1` no bloco `env:` e
+    `VAR=1` na linha de comando), e duas implementações da mesma pergunta é o
+    preço que este repositório já pagou três vezes (§9, 12/09/2026).
+    """
     achados = []
-    padrao = re.compile(rf"{VARIAVEL_LIVE}\s*[:=]\s*(\S*)")
+    padrao = re.compile(rf"{variavel}\s*[:=]\s*(\S*)")
     for numero, linha in enumerate(sem_comentarios(texto).splitlines(), 1):
         for valor in padrao.findall(linha):
             if valor not in _DESLIGADO:
                 achados.append((numero, linha.strip()))
     return achados
+
+
+def liga_a_camada_live(texto: str) -> list[tuple[int, str]]:
+    """(linha, trecho) de cada atribuição que LIGA a camada live."""
+    return liga_a_variavel(texto, VARIAVEL_LIVE)
+
+
+def desliga_a_suite(texto: str) -> list[tuple[int, str]]:
+    """(linha, trecho) de cada atribuição que faz o gate PULAR a suíte."""
+    return liga_a_variavel(texto, VARIAVEL_SEM_SUITE)
 
 
 def segredos_em(texto: str) -> list[tuple[int, str]]:
@@ -171,6 +199,28 @@ def test_c4_nenhum_workflow_menciona_segredo(arquivo):
         "colada. Credencial pessoal não sai da máquina do dono, e o que o "
         "workflow precisa do ambiente sai do `.env.example`, que é público e "
         "já está no repositório."
+    )
+
+
+@pytest.mark.parametrize("arquivo", [p.name for p in workflows()])
+def test_c9_nenhum_workflow_desliga_a_suite_do_gate(arquivo):
+    """C9: a porta de escape do `gate.sh` não pode ser aberta pelo CI.
+
+    C5 garante que o workflow CHAMA o gate. Sem C9, chamar o gate com esta
+    variável ligada satisfaria C5 e devolveria verde tendo checado o `.env` e o
+    `.gitignore`, e nada do código que a PR mudou. O gate imprime PULADA e sai
+    com código próprio, mas a linha some no meio do log de um runner, e o único
+    leitor que sobra é o `&&` implícito entre os passos.
+    """
+    achados = desliga_a_suite((WORKFLOWS / arquivo).read_text(encoding="utf-8"))
+    assert not achados, (
+        f"{arquivo} desliga a suíte do gate:\n  "
+        + "\n  ".join(f"linha {l}: {t}" for l, t in achados)
+        + f"\nTire a atribuição de {VARIAVEL_SEM_SUITE} do workflow. Ela existe "
+        "por um motivo só: o `tests/test_gate.py` roda o gate dentro de um "
+        "clone deste repositório, e sem ela a suíte do clone recorreria sobre "
+        "si mesma. Num runner não há recursão nenhuma a evitar: o que ela faz "
+        "é transformar o CI num carimbo que não leu o código."
     )
 
 
@@ -255,11 +305,11 @@ def test_c8_o_ci_roda_onde_o_projeto_roda(arquivo):
 
 
 def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
-    """C7 — sabotagem controlada das duas varreduras.
+    """C7: sabotagem controlada das três varreduras.
 
-    Sem isto, um regex quebrado deixaria C3 e C4 verdes em cima de um workflow
-    que liga a camada live e carrega o cofre de segredos junto — os dois casos
-    exatos para os quais estes testes foram escritos.
+    Sem isto, um regex quebrado deixaria C3, C4 e C9 verdes em cima de um
+    workflow que liga a camada live, carrega o cofre de segredos e desliga a
+    suíte junto. São os casos exatos para os quais estes testes foram escritos.
     """
     sujo = (
         "env:\n"
@@ -272,6 +322,10 @@ def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
         f"# comentário explicando por que {VARIAVEL_LIVE}=1 não entra aqui\n"
         "run: |\n"
         f"  {VARIAVEL_LIVE}=1 pytest -m live\n"
+        # Depois das linhas acima, e não no meio delas: as asserções de C7
+        # citam número de linha, e inserir no meio faria este teste reprovar
+        # por uma edição que não mudou varredura nenhuma.
+        f"  {VARIAVEL_SEM_SUITE}=1 ./scripts/gate.sh\n"
     )
     arquivo = tmp_path / "sujo.yml"
     arquivo.write_text(sujo, encoding="utf-8")
@@ -281,6 +335,12 @@ def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
     assert ligadas == [2, 7], (
         "a varredura da camada live não pegou as duas formas (`VAR: 1` no bloco "
         f"`env:` e `VAR=1` na linha de comando), ou contou o comentário: {ligadas}"
+    )
+
+    desligadas = [linha for linha, _ in desliga_a_suite(texto)]
+    assert desligadas == [8], (
+        "a varredura do pulo da suíte não pegou a linha que desliga a checagem "
+        f"3 do gate: {desligadas}"
     )
 
     achados = segredos_em(texto)
@@ -303,3 +363,4 @@ def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
     )
     assert liga_a_camada_live(limpo) == [], "acusou um comentário que só explica"
     assert segredos_em(limpo) == [], "acusou um workflow que não tem segredo nenhum"
+    assert desliga_a_suite(limpo) == [], "acusou um workflow que roda o gate inteiro"

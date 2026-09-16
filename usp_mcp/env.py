@@ -15,6 +15,29 @@ acidente (Invariante 3).
 
 Parser de stdlib de propósito: `python-dotenv` seria a primeira dependência de
 runtime do projeto, e o formato aqui é `CHAVE=valor` com comentário.
+
+**Onde este módulo NÃO procura, e por quê (16/09/2026).** O `.env` é achado a
+partir da posição deste arquivo: a raiz do checkout, e dali para cima até o
+`.git` de verdade. Isso cobre o checkout, o worktree e a instalação editável
+(`pip install -e`), em que `__file__` continua apontando para a árvore. Não
+cobre o pacote copiado para `site-packages` por um `pip install git+...`, e
+medido em 16/09 era esse o caminho que o README ensinava: `achar_env()` devolvia
+None, o bandejão caía em `HashAusente` e o token gravado pelo `token.sh` ficava
+num clone que o servidor instalado nunca lia. A cura escolhida foi o README
+instalar do jeito que este arquivo já suporta (um clone, o `.venv/` dentro dele,
+instalação editável), e não ensinar este módulo a procurar em mais um lugar:
+
+- embutir a `RUCARD_HASH` aqui, com o ambiente sobrepondo, resolveria o bandejão
+  sem `.env` nenhum, mas a checagem 1 do gate (`scripts/_gate_segredos.py`)
+  reprova o valor em qualquer arquivo rastreado fora do par
+  `.env.example`/`SPEC1.md`, e o R8 do RUCard reprova em `usp_mcp/rucard/`. É
+  decisão registrada, não esquecimento: o valor é público, e mesmo assim tem
+  UMA casa;
+- um caminho fixo do usuário (`~/.config/usp-mcp/.env`) ou o pai do venv
+  seriam uma segunda resposta para "onde está o `.env`", e três entradas do §9
+  (12/09) registram o que custa ter duas respostas para essa pergunta;
+- o `MOODLE_TOKEN` no bloco `env` do cliente MCP já foi descartado acima, e
+  obrigaria a pessoa a abrir o arquivo e copiar o segredo à mão.
 """
 from __future__ import annotations
 
@@ -22,6 +45,8 @@ import os
 from pathlib import Path
 
 # usp_mcp/env.py → sobe dois níveis até a raiz do checkout (ou do worktree).
+# Numa instalação editável isto continua sendo a árvore clonada; numa cópia em
+# site-packages é o próprio site-packages, onde não há `.env` (ver o docstring).
 _RAIZ = Path(__file__).resolve().parents[1]
 
 

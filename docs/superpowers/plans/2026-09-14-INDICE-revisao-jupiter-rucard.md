@@ -48,7 +48,7 @@ neste repositório.
 ### 1 — comunicado no cardápio (RUCard)
 
 ```
-Execute o plano docs/superpowers/plans/2026-09-14-rucard-aviso-no-cardapio.md usando a skill superpowers:executing-plans.
+Execute o plano docs/superpowers/plans/2026-09-14-rucard-aviso-no-cardapio.md, tarefa por tarefa, na ordem.
 
 Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-rucard-aviso-no-cardapio-design.md, depois o plano. Crie a branch fix/rucard-comunicado-no-cardapio a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"` antes de rodar qualquer teste.
 
@@ -60,7 +60,7 @@ Ao final me diga: PR aberto (link), o que divergiu do plano, e o texto real que 
 ### 2 — semana e vocabulário (RUCard) — depois do 1
 
 ```
-Execute o plano docs/superpowers/plans/2026-09-14-rucard-semana-e-vocabulario.md usando a skill superpowers:executing-plans.
+Execute o plano docs/superpowers/plans/2026-09-14-rucard-semana-e-vocabulario.md, tarefa por tarefa, na ordem.
 
 Pré-requisito: o PR "comunicado no cardápio vira aviso" já mergeado na main. Confira com `git log origin/main --oneline | grep -i comunicado`; se não estiver, pare e me avise.
 
@@ -74,7 +74,7 @@ Ao final me diga: PR aberto (link), o que divergiu do plano, e cole a saída de 
 ### 3 — disciplina por seção (Jupiter)
 
 ```
-Execute o plano docs/superpowers/plans/2026-09-14-jupiter-disciplina-secoes.md usando a skill superpowers:executing-plans.
+Execute o plano docs/superpowers/plans/2026-09-14-jupiter-disciplina-secoes.md, tarefa por tarefa, na ordem.
 
 Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-jupiter-disciplina-secoes-design.md, depois o plano. Crie a branch feat/jupiter-disciplina-secoes a partir da main atualizada. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
 
@@ -86,7 +86,7 @@ Ao final me diga: PR aberto (link), o que divergiu do plano, quantos bytes tem o
 ### 4 — requisitos agrupados (Jupiter) — depois do 3, ou com rebase
 
 ```
-Execute o plano docs/superpowers/plans/2026-09-14-jupiter-requisitos-agrupados.md usando a skill superpowers:executing-plans.
+Execute o plano docs/superpowers/plans/2026-09-14-jupiter-requisitos-agrupados.md, tarefa por tarefa, na ordem.
 
 Antes de começar: leia CLAUDE.md, depois o spec docs/superpowers/specs/2026-09-14-jupiter-requisitos-agrupados-design.md, depois o plano. Crie a branch feat/jupiter-requisitos-agrupados a partir da main atualizada. Se o PR "ficha por seção" já tiver sido mergeado, parta dele; se estiver aberto, avise no PR que os dois tocam usp_mcp/jupiter/server.py e faça rebase antes de pedir merge. Se estiver num worktree novo, crie o venv com `uv venv && uv pip install -e ".[dev]"`.
 
@@ -98,7 +98,7 @@ Ao final me diga: PR aberto (link), o que divergiu do plano, e cole a saída de 
 ### 5 — saída sem jargão — depois do 2 e do 3
 
 ```
-Execute o plano docs/superpowers/plans/2026-09-14-saida-sem-jargao.md usando a skill superpowers:executing-plans.
+Execute o plano docs/superpowers/plans/2026-09-14-saida-sem-jargao.md, tarefa por tarefa, na ordem.
 
 Pré-requisito: os PRs "semana numa chamada" (RUCard) e "ficha por seção" (Jupiter) já mergeados na main. Confira com `git log origin/main --oneline | grep -iE "semana|seção|secoes"`; se faltar algum, pare e me avise.
 

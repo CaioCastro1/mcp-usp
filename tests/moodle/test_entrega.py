@@ -474,3 +474,128 @@ def test_e12_sao_duas_ferramentas_e_nenhuma_escolhe_entre_salvar_e_entregar(
     # a de entregar avisa que não desfaz, a de rascunho avisa que não entrega.
     assert "NÃO tem como ser desfeito" in ferramentas["entregar"]["description"]
     assert "NÃO é entrega feita" in ferramentas["salvar_rascunho"]["description"]
+
+
+# ----------------------------------------------------------- 16/09/2026
+# Dois defeitos medidos depois do spec. O primeiro é do PRÓPRIO spec: a lista
+# das "quatro coisas" que entram no código não tem o verbo, e a Camada 2 reabria
+# o que a Camada 1 tinha separado. O segundo é do cliente, mas só aqui ele tem
+# a cara que importa: "Feito" impresso sobre uma recusa do site.
+
+
+def _rascunho_com_texto_e_arquivo():
+    """O estado em que os DOIS verbos passam pela camada 5: rascunho editável,
+    com texto online (para `salvar_rascunho`) e um arquivo (para `entregar`)."""
+    return status_de_entrega(status="draft", com_texto_online=True)
+
+
+def test_e15_o_codigo_do_rascunho_nao_confirma_a_entrega(disciplinas_brutas):
+    """E15 — o código amarra o VERBO, não só o estado.
+
+    Caminho real: a pessoa pede "salva aí", recebe o plano do rascunho com o
+    código, diz "agora entrega" — e o mesmo código, para o mesmo estado, faria
+    `mod_assign_submit_for_grading` sair sem o plano de entrega ter sido
+    mostrado. É o caso "uma palavra de distância" que a Camada 1 separa,
+    reaberto pela Camada 2. O spec lista quatro coisas no hash; são cinco.
+    """
+    respostas = _respostas(disciplinas_brutas, _rascunho_com_texto_e_arquivo())
+    respostas[ESCRITA] = []
+    respostas["mod_assign_save_submission"] = []
+    cliente = ClienteFalso(respostas)
+
+    plano_rascunho = asyncio.run(
+        ent.salvar_rascunho(
+            cliente, "PTC3314", NOME_DA_ENTREGA, "texto do rascunho", agora=AGORA
+        )
+    )
+    plano_entrega = _entregar(cliente)
+    assert not plano_rascunho.escreveu and not plano_entrega.escreveu
+    assert plano_rascunho.codigo != plano_entrega.codigo, (
+        "o MESMO código confirma salvar e entregar — o plano do rascunho "
+        "autoriza a escrita que não tem volta"
+    )
+
+    # O código do rascunho, apresentado a `entregar`, é código velho: não
+    # escreve, e a resposta traz o plano de ENTREGA para a pessoa ler.
+    resposta = _entregar(cliente, confirmacao=plano_rascunho.codigo)
+    assert not resposta.escreveu
+    assert cliente.escritas == [], f"entregou com o código do rascunho: {cliente.escritas}"
+    assert resposta.recusa == "codigo_velho"
+    assert "Plano de entrega" in resposta.texto
+
+    # E o contrário: o de rascunho não grava a partir do código de entrega.
+    segunda = asyncio.run(
+        ent.salvar_rascunho(
+            cliente, "PTC3314", NOME_DA_ENTREGA, "texto do rascunho",
+            confirmacao=plano_entrega.codigo, agora=AGORA,
+        )
+    )
+    assert not segunda.escreveu
+    assert cliente.escritas == []
+
+    # Cada verbo com o próprio código continua funcionando, senão a cura seria
+    # dois verbos que não escrevem nunca.
+    feito = _entregar(cliente, confirmacao=plano_entrega.codigo)
+    assert feito.escreveu
+    assert [f for f, _ in cliente.escritas] == [ESCRITA]
+
+
+def test_e15b_o_codigo_de_verbos_diferentes_difere_para_o_mesmo_plano(
+    disciplinas_brutas,
+):
+    """A metade de unidade de E15: `codigo_do_plano` é função do verbo."""
+    atividade = ent.projetar_atividades(
+        entregas_falsas([(CURSO_PTC3314, [(ASSIGNID, NOME_DA_ENTREGA, PRAZO, 0)])])
+    )[0]
+    plano = ent.montar_plano(_rascunho_com_texto_e_arquivo(), atividade, "PTC3314")
+
+    assert ent.codigo_do_plano(plano, verbo="entrega") != ent.codigo_do_plano(
+        plano, verbo="rascunho"
+    )
+    assert ent.codigo_do_plano(plano, verbo="entrega") == ent.codigo_do_plano(
+        plano, verbo="entrega"
+    )
+
+
+def test_e16_recusa_do_site_na_escrita_nao_vira_feito(disciplinas_brutas, monkeypatch):
+    """E16 — HTTP 200 com `[{"warningcode": ...}]` é recusa, e "Feito" é mentira.
+
+    Aqui o cliente é o `ClienteMoodle` DE VERDADE com transporte injetado, e não
+    o dublê: o defeito mora na tradução de erro do cliente, e um dublê que
+    devolve o que o teste mandou não passaria por ela. Nada sai para a rede.
+    """
+    from usp_mcp.moodle.cliente import ClienteMoodle
+    from usp_mcp.moodle.erros import ErroMoodle
+
+    monkeypatch.setenv(politica.NOME_DA_FLAG, "1")
+    respostas = _respostas(disciplinas_brutas, _rascunho_editavel())
+    respostas[ESCRITA] = [
+        {
+            "item": "assignment",
+            "itemid": ASSIGNID,
+            "warningcode": "submissionsclosed",
+            "message": "Submissions are closed",
+        }
+    ]
+    saiu = []
+
+    def transporte(*, url, dados):
+        saiu.append(dados["wsfunction"])
+        return respostas[dados["wsfunction"]]
+
+    cliente = ClienteMoodle(
+        token="TOKEN-SINTETICO-NAO-E-CREDENCIAL",
+        url="https://exemplo.invalid",
+        transporte=transporte,
+    )
+
+    plano = _entregar(cliente)
+    assert not plano.escreveu and plano.codigo
+
+    with pytest.raises(ErroMoodle) as e:
+        _entregar(cliente, confirmacao=plano.codigo)
+    texto = str(e.value)
+    assert "submissionsclosed" in texto
+    assert "feito" not in texto.lower()
+    # A escrita FOI tentada — o que este teste nega é o "Feito", não a chamada.
+    assert saiu.count(ESCRITA) == 1
