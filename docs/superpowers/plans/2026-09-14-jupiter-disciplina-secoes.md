@@ -1,7 +1,6 @@
 # Ficha por seção, e uma ferramenta por pergunta — Plano de Implementação
 
-> **Para quem executa:** SUB-SKILL OBRIGATÓRIA — use `superpowers:subagent-driven-development`
-> (recomendado) ou `superpowers:executing-plans` para implementar tarefa por tarefa.
+> **Para quem executa:** implemente tarefa por tarefa, na ordem em que estão escritas.
 > Os passos usam checkbox (`- [ ]`) para acompanhamento.
 
 **Objetivo:** `disciplina` ganha o parâmetro `secoes` (padrão: só a ementa), perde
