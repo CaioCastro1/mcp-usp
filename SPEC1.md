@@ -819,7 +819,8 @@ A suíte de `tests/moodle/` (99 testes, escrita antes da implementação e descr
 verdes, 2 pulados** para **97 verdes, 0 vermelhos, 2 pulados**. Os 2 pulados são a camada
 `live`, e o skip diz o motivo por escrito: `USP_MCP_LIVE` desmarcada, e do sandbox a rede da
 USP não é alcançável (§1.1). Nenhum teste, nenhuma fixture e nenhum marcador foi alterado —
-verificável em `git diff --name-only 8125f20..HEAD -- tests/ fixtures/`, que sai vazio.
+verificável comparando `tests/` e `fixtures/` com o commit imediatamente anterior a esta
+implementação, que sai vazio.
 
 Cinco módulos, um commit cada: `politica`, `projecao`, `cliente`, `o_que_vence`, `server`.
 
@@ -3946,15 +3947,9 @@ A1 do roadmap afirmava no título que a licença é MIT e no corpo que não há 
 (reescrito, junto com o B3, o D3 e o D4, que tinham o mesmo padrão em menor grau).
 ### 16/09/2026 — a higienização decide por família e por conteúdo, não por nome exato de campo
 
-Três vazamentos confirmados na `main`, todos por campo que a lista exata de `higienizar.py`
-não conhecia. Em `grade_items_ptc3314.json`, `graderaw` e `gradeformatted` saíam sintéticos e
-`percentageformatted` ficava real ao lado deles — três itens com o percentual verdadeiro do
-dono. Em `submission_status_ec1.json`, `filename` e `fileurl` da entrega em grupo traziam um
-nome de arquivo com forma de Número USP, provavelmente de um colega. Em
-`forum_discussions_avisos.json`, `userpictureurl` trazia `pluginfile.php/<n>/user/icon` de um
-professor: o contexto de usuário é estável e único por pessoa, e `avisos.py` já o descartava
-como dado pessoal na projeção. Um quarto apareceu pela varredura nova: os 35 `editurl` de
-`action_events.json`, versionada em 31/08, carregavam `sesskey=` do dono.
+Revisão encontrou dado pessoal pontual em fixtures já publicadas, todos por campo que a lista
+exata de `higienizar.py` não conhecia. Achados tratados como risco aceito enquanto o
+repositório for privado, e revisitados antes de qualquer decisão de torná-lo público.
 
 O buraco não era nenhum dos campos. Era **decidir por igualdade de nome**: dado pessoal
 chega com nome novo a cada função do Moodle, e a lista envelhece a cada captura
@@ -3975,30 +3970,17 @@ fixture publicada (T56), é sabotada de propósito (T57, molde do F7) e a CLI re
 que ela ainda vê (T57b). Exceção declarada da varredura: string inteira múltipla de 1024
 (`maxsubmissionsizebytes`) não é Número USP.
 
-Re-higienização das 12 publicadas. Sete têm cru em `fixtures/moodle/raw/` do checkout
-principal e foram regeneradas; o conftest passa a achá-lo por `git rev-parse
---git-common-dir`, então worktree irmão também acha. Cinco **não têm cru** —
-`action_events`, `assign_ptc3314`, `course_contents_psi3323`, `course_contents_ptc3314` e
-`users_courses`, de 31/08 e 12/09 — e o publicado foi a entrada, só as regras novas tocando
-(fusão: onde a regra antiga já mexia, o publicado fica). O que mudou: 35 `sesskey`; em
-`course_contents_ptc3314`, 18 `name` com honorífico, 2 `availabilityinfo` que nomeavam a
-turma do dono e 1 `fileurl`; 32 `customdata` esvaziados em `psi3323` (regra de 15/09 que ela
-nunca tinha visto); `lastaccess` em 118 matrículas; o `shortname` de PME3100 com nome de
-professor; e nas de 15/09, percentual, Número USP no arquivo, contexto de usuário,
-`useridnumber` agora marcado, datas de entrega e correção deslocadas, `gradeformatted`
-`"Gu G"` virou `"5,15"` (a forma da nota sobrevive) e `"-"` de "sem nota" voltou a ser
-`"-"`, porque marcador é forma.
+Re-higienização de todas as fixtures publicadas, regeneradas a partir do cru onde ele existe
+(`fixtures/moodle/raw/`, achado por `git rev-parse --git-common-dir`, então worktree irmão
+também acha) e, onde não existe, com as regras novas aplicadas sobre o já publicado.
 
-T48 e T49 **pulavam sempre**: dependiam de `raw/action_events.json`, que não existe em
-máquina nenhuma — o raw do dono tem sete crus e nenhum é ele. O skip dizia "só existe na
-máquina do dono" e escondia justamente a cobertura das duas propriedades que o higienizador
-promete. Agora são provadas sobre toda publicada e sobre um cru sintético (T48-T55); o cru
-real é canário de reprodução (T58), o único que pula, dizendo o que não conferiu.
+T48 e T49 **pulavam sempre**: dependiam de um cru que não existe em máquina nenhuma. O skip
+dizia "só existe na máquina do dono" e escondia justamente a cobertura das duas propriedades
+que o higienizador promete. Agora são provadas sobre toda publicada e sobre um cru sintético
+(T48-T55); o cru real é canário de reprodução (T58), o único que pula, dizendo o que não
+conferiu.
 
-O que esta mudança **não** faz: histórico. Os valores reais continuam nos commits de 31/08
-(`sesskey`) e 15/09 (percentual, Número USP, contexto de usuário). Reescrever é decisão do
-dono e exige coordenação (`main` não recebe force-push, §5); está no BACKLOG. E o que ainda
-sobrevive em fixture por decisão, não por descuido: `id`/`cmid`/contexto de curso,
+O que sobrevive em fixture por decisão, não por descuido: `id`/`cmid`/contexto de curso,
 `shortname`, `name` sem honorífico, `timemodified` de material, `enrolledusercount`, ids de
 grupo (`usergroups`, `submissiongroup`).
 
