@@ -31,6 +31,26 @@ Mais os cantos de "abrir sem terminal pode surpreender": USP_MCP_NAO_ABRIR=1,
 sessao SSH e maquina sem `open`/`xdg-open` — nos tres o script nao abre nada e
 diz o que fez. Tudo offline; o `curl` e sempre um dube.
 
+Desde 17/09 a abertura nao para em "sai com 3": ela FICA DE VIGIA no clipboard
+e, quando ele muda para o endereco do link, segue sozinha ate gravar — uma
+invocacao, zero mensagens da pessoa. A secao V afirma o desenho da vigia, com um
+`pbpaste` dublado que segue um ROTEIRO (`clipboard_dublado`; o clipboard real
+desta maquina nunca e lido pela suite):
+
+  V1  detecta a mudanca e segue sozinha, com a conferencia do passo 5 batendo;
+  V2  o que JA estava no clipboard nao dispara (so mudanca conta) — salvo se ja
+      responde ao passaporte desta rodada, que e o caso de uma vigia que venceu
+      e foi reaberta dentro da validade;
+  V3  forma errada NAO encerra: a URL de ida vira uma frase e a vigia continua;
+  V4  o limite de tempo e respeitado, com 2 leituras por segundo e a saida 3
+      dizendo o que fazer;
+  V5  o que nao casa nao vaza — nem o conteudo, nem o tamanho, nem em disco; e
+      dez copias erradas nao viram dez broncas;
+  V6  sem pbpaste/wl-paste/xclip, por SSH ou com USP_MCP_VIGIA_SEGUNDOS=0 nao ha
+      vigia, o script diz por que e cai no fluxo em duas invocacoes;
+  V7  base64 nu nao dispara a vigia (dispararia em qualquer coisa parecida com
+      base64, e o decodificador diria o tamanho ao recusar).
+
 Nenhum token real entra aqui: o payload e montado com o WSTOKEN sintetico do
 test_token_decode.py, e o siteid e md5(MOODLE_URL + passaporte) calculado no
 teste — a mesma formula que o passo 5 usa, para que "bate" seja bate de verdade.
@@ -52,9 +72,12 @@ import pytest
 from tests.git import esta_ignorado
 from tests.moodle.conftest import RAIZ
 from tests.moodle.test_token_decode import (  # noqa: F401 — as fixtures entram pelo namespace
+    MARCADOR_PAYLOAD,
     PRIVATE,
+    SITEID,
     URL_DE_IDA,
     WSTOKEN,
+    clipboard_dublado,
     curl_dublado,
     navegador_dublado,
     payload,
@@ -140,9 +163,59 @@ def curl_registrado(raiz) -> str:
 
 
 def abrir(raiz, **kw):
-    """A invocacao de abertura: sem terminal e com stdin vazio."""
+    """A invocacao de abertura: sem terminal e com stdin vazio. O clipboard
+    dublado nao tem roteiro, entao a vigia (1 s, pelo arnes) vence sem achar
+    nada — e a abertura, como era ate 16/09, sai com 3."""
     kw.setdefault("path", curl_registrado(raiz))
     return token_sh(raiz, "", **kw)
+
+
+def roteiro(raiz, passos: dict[int, str]) -> None:
+    """O que o `pbpaste` dublado devolve na leitura de indice i, para cada i em
+    `passos`; entre um indice e o seguinte o conteudo fica. Zera o contador e o
+    log da rodada anterior, para que a leitura 0 seja a primeira desta."""
+    d = raiz / "clipboard"
+    shutil.rmtree(d, ignore_errors=True)
+    d.mkdir()
+    for arquivo in ("pbpaste.n", "pbpaste.log"):
+        (raiz / arquivo).unlink(missing_ok=True)
+    for i, conteudo in passos.items():
+        (d / str(i)).write_text(conteudo, encoding="utf-8")
+
+
+def leituras(raiz) -> int:
+    """Quantas vezes o `pbpaste` dublado foi chamado."""
+    log = raiz / "pbpaste.log"
+    return len(log.read_text(encoding="utf-8").splitlines()) if log.exists() else 0
+
+
+def vigiar(raiz, passos: dict[int, str], segundos: int = 3, **kw):
+    """A abertura com um roteiro de clipboard e um limite de vigia proprio."""
+    roteiro(raiz, passos)
+    kw.setdefault("path", curl_registrado(raiz))
+    env = dict(kw.pop("env", None) or {})
+    env.setdefault("USP_MCP_VIGIA_SEGUNDOS", str(segundos))
+    return token_sh(raiz, "", env=env, **kw)
+
+
+def chamadas_ao_curl(raiz) -> int:
+    log = raiz / "curl.log"
+    return len(log.read_text(encoding="utf-8").splitlines()) if log.exists() else 0
+
+
+def path_minimo(tmp_path, *nomes_extras: str) -> str:
+    """Um PATH so com o que o script usa ate o passo 3 — sem `open`, `xdg-open`,
+    `pbpaste`, `wl-paste` nem `xclip`. E o chao de um servidor sem interface."""
+    minimo = tmp_path / "bin_minimo"
+    minimo.mkdir(exist_ok=True)
+    for nome in ("bash", "dirname", "grep", "sed", "head", "date", "mkdir", "rm",
+                 "sleep", "cat", "wc", "tr", "cut", "cp", *nomes_extras):
+        real = shutil.which(nome)
+        assert real, f"sem `{nome}` nesta maquina; o teste precisa dele para montar o PATH minimo"
+        destino = minimo / nome
+        if not destino.exists():
+            destino.symlink_to(real)
+    return str(minimo)
 
 
 def entregar(raiz, colado: str, *args: str):
@@ -419,6 +492,11 @@ def test_n5b_a_pessoa_no_terminal_continua_vendo_tudo_numa_invocacao_so(raiz_tok
     caminhos.
     """
     ambiente = {k: v for k, v in os.environ.items() if k not in ("SSH_CONNECTION", "SSH_TTY")}
+    # O `pbpaste` dublado entra no PATH por precaucao: o caminho do terminal so
+    # le o clipboard se a pessoa der Enter em branco, e este teste digita o
+    # payload — mas um PATH com o `pbpaste` real e um convite a ler o clipboard
+    # de quem roda a suite no dia em que isso mudar.
+    clipboard_dublado(raiz_token)
     ambiente["PATH"] = f"{navegador_dublado(raiz_token)}:{curl_dublado(raiz_token, JSON_OK)}"
     ambiente["TERM"] = "dumb"
 
@@ -473,22 +551,19 @@ def test_sessao_ssh_nao_abre_navegador_e_diz_por_que(raiz_token):
     assert "sessao SSH" in saida
     assert "SUA maquina" in saida
     assert arquivo_passaporte(raiz_token).exists()
+    # E nao vigia: o clipboard que `pbpaste` alcanca por SSH e o da maquina
+    # remota, e o endereco vai ser copiado na da pessoa (V6).
+    assert "o clipboard que eu leria e o da maquina remota" in saida
+    assert leituras(raiz_token) == 0, "leu o clipboard numa sessao SSH"
+    assert "pbpaste | ./scripts/token.sh" in saida
 
 
 def test_maquina_sem_open_nem_xdg_open_diz_e_segue(raiz_token, tmp_path):
     """Servidor sem interface: PATH minimo com so o que o script usa ate o passo
     3, e sem `open` nem `xdg-open`. Ele diz que nao ha como abrir, e o resto da
     abertura segue — a URL esta impressa para ser aberta em outro lugar."""
-    minimo = tmp_path / "bin_minimo"
-    minimo.mkdir()
-    for nome in ("bash", "dirname", "grep", "sed", "head", "date", "mkdir", "rm",
-                 "sleep", "cat", "wc", "tr", "cut", "cp"):
-        real = shutil.which(nome)
-        assert real, f"sem `{nome}` nesta maquina; o teste precisa dele para montar o PATH minimo"
-        (minimo / nome).symlink_to(real)
-
     r = token_sh(
-        raiz_token, "", path=str(minimo), navegador=False,
+        raiz_token, "", path=path_minimo(tmp_path), navegador=False, clipboard=False,
         env={"DISPLAY": "", "WAYLAND_DISPLAY": ""},
     )
     saida = r.stdout + r.stderr
@@ -497,6 +572,229 @@ def test_maquina_sem_open_nem_xdg_open_diz_e_segue(raiz_token, tmp_path):
     assert "Abra a URL acima" in saida
     assert not (raiz_token / "open.log").exists()
     assert arquivo_passaporte(raiz_token).exists()
+
+
+# ---------------------------------------------------------- V: a vigia do clipboard
+
+
+def test_v1_a_vigia_detecta_a_mudanca_e_segue_sozinha(raiz_token):
+    """V1 — o pedido inteiro numa invocacao: abre, vigia, o clipboard muda para
+    o endereco do link, e o script vai ate gravar. Zero mensagens da pessoa.
+
+    O anuncio da vigia tem de vir ANTES de qualquer resultado dela, no texto
+    que a pessoa le: o que e lido, com que frequencia, por quanto tempo, o que
+    dispara, o que acontece com o resto e como desligar. Nao e para esconder.
+    """
+    r = vigiar(raiz_token, {0: "um texto qualquer que ja estava no clipboard", 2: MARCADOR_PAYLOAD})
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+
+    anuncio = saida.find("AVISO, antes de comecar: vou LER o clipboard")
+    achado = saida.find("o clipboard mudou para algo que comeca com `moodlemobile://token=`")
+    assert 0 <= anuncio < achado, "a vigia agiu antes de se anunciar, ou nao se anunciou"
+    assert "a cada" in saida and "0,5 s" in saida
+    assert "por ate 3 s" in saida
+    assert "USP_MCP_VIGIA_SEGUNDOS=0" in saida, "nao disse como desligar"
+    assert "nao guardo, nao" in saida and "nao digo o tamanho" in saida
+
+    assert "Seguindo sozinho a partir daqui" in saida
+    assert "confere: o payload responde a ESTA rodada" in saida
+    assert "nao confere" not in saida
+    assert "vigia encerrada" not in saida
+    assert "Saida 3" not in saida
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+    assert not arquivo_passaporte(raiz_token).exists(), "uso unico: devia ter sido consumido"
+    assert len(aberturas(raiz_token)) == 1
+    assert chamadas_ao_curl(raiz_token) == 1
+    assert leituras(raiz_token) == 3, "marco + 2 leituras ate a mudanca no indice 2"
+    assert WSTOKEN not in saida, "ecoou o token (Invariante 3)"
+    assert PRIVATE not in saida, "ecoou o privatetoken (§2.2)"
+
+
+def test_v2_o_que_ja_estava_no_clipboard_nao_dispara(raiz_token):
+    """V2 — clipboard velho: o endereco de OUTRA rodada ja esta la quando a
+    vigia comeca. Disparar nele daria um passaporte que nao bate; ele e o
+    marco, e so uma mudanca conta. A vigia vence sem agir, e nada e gravado."""
+    antes = (raiz_token / ".env").read_text(encoding="utf-8")
+    r = vigiar(raiz_token, {0: payload_para("1111111111")}, segundos=1)
+    saida = r.stdout + r.stderr
+    assert r.returncode == SAIDA_AGUARDANDO, saida
+    assert "ja tinha um endereco com a forma certa, mas de OUTRA rodada" in saida
+    assert "so uma MUDANCA conta" in saida
+    assert "vigia encerrada sem o endereco" in saida
+    assert "4/7" not in saida, "decodificou o que ja estava la"
+    assert chamadas_ao_curl(raiz_token) == 0
+    assert (raiz_token / ".env").read_text(encoding="utf-8") == antes
+    assert arquivo_passaporte(raiz_token).exists(), "a vigia que venceu consumiu o passaporte"
+
+
+def test_v2b_o_que_ja_estava_no_clipboard_dispara_se_responde_a_esta_rodada(raiz_token):
+    """V2b — a excecao conferida do V2. A vigia venceu (a pessoa demorou), o
+    agente rodou o script de novo dentro da validade: o passaporte e reaproveitado,
+    a pagina aberta e a mesma, e o endereco que a pessoa copiou nesse meio tempo
+    JA esta no clipboard — com o siteid deste passaporte. Esperar uma mudanca
+    aqui seria esperar por nada: o link da pagina e o mesmo. O script confere
+    (md5 do passaporte guardado) e segue sem esperar."""
+    assert vigiar(raiz_token, {}, segundos=1).returncode == SAIDA_AGUARDANDO
+    p, _ = ler_passaporte(raiz_token)
+
+    r = vigiar(raiz_token, {0: payload_para(p)}, segundos=1)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+    assert "reaproveitando o da rodada de ha" in saida
+    assert "responde ao" in saida and "passaporte DESTA rodada" in saida
+    assert "Seguindo sem esperar" in saida
+    assert leituras(raiz_token) == 1, "esperou mudanca num endereco que ja era desta rodada"
+    assert "confere: o payload responde a ESTA rodada" in saida
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+    assert not arquivo_passaporte(raiz_token).exists()
+
+
+def test_v3_a_url_de_ida_nao_encerra_a_vigia_ensina_e_segue(raiz_token):
+    """V3 — o ganho de verdade. O erro nº 1 medido (copiar a URL da propria
+    pagina) matava a tentativa; de vigia, ele vira uma frase com a cura e a
+    espera continua. A pessoa copia certo em seguida e o script grava, sem ter
+    gastado o passaporte nem uma chamada na conta com o erro."""
+    r = vigiar(raiz_token, {0: "", 2: URL_DE_IDA, 4: MARCADOR_PAYLOAD})
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+    assert "veio a URL de IDA" in saida
+    assert "Copiar endereco do link" in saida
+    assert "Continuo de vigia" in saida
+    assert "Seguindo sozinho a partir daqui" in saida
+    assert "confere: o payload responde a ESTA rodada" in saida
+    assert chamadas_ao_curl(raiz_token) == 1, "a URL de ida custou uma chamada, ou o acerto nao chegou"
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+    # A URL de ida nao e ecoada — nem o passaporte dela, nem o host.
+    assert "passport=1234567890" not in saida
+    assert "edisciplinas.usp.br/admin" not in saida
+
+
+def test_v4_a_vigia_respeita_o_limite_e_sai_dizendo_o_que_fazer(raiz_token):
+    """V4 — tempo. A chamada do agente tem teto; uma vigia que passa dele deixa
+    o agente sem resposta. O limite e respeitado em leituras (2 por segundo, mais
+    o marco) e em relogio, e a saida 3 diz o caminho que continua existindo:
+    `pbpaste | ./scripts/token.sh`, ou rodar de novo para voltar a vigiar."""
+    antes = (raiz_token / ".env").read_text(encoding="utf-8")
+    inicio = time.monotonic()
+    r = vigiar(raiz_token, {0: "nada muda"}, segundos=2)
+    duracao = time.monotonic() - inicio
+    saida = r.stdout + r.stderr
+    assert r.returncode == SAIDA_AGUARDANDO, saida
+    assert 2.0 <= duracao < 15.0, f"a vigia de 2 s durou {duracao:.1f} s"
+    assert leituras(raiz_token) == 1 + 2 * 2, "marco + 2 leituras por segundo"
+    assert "vigia encerrada sem o endereco" in saida
+    assert "2 s e o clipboard nao mudou" in saida
+    assert "pbpaste | ./scripts/token.sh" in saida
+    assert "de novo para eu voltar a vigiar" in saida
+    assert "Saida 3 = aguardando" in saida
+    assert arquivo_passaporte(raiz_token).exists()
+    assert (raiz_token / ".env").read_text(encoding="utf-8") == antes
+    assert chamadas_ao_curl(raiz_token) == 0
+
+
+SEGREDO_ALHEIO = "Senha-Que-Nao-E-Minha!2026#xyz-Q"  # 32 chars, como um token — de proposito
+
+
+def test_v5_o_que_nao_casa_nao_vaza_em_lugar_nenhum(raiz_token):
+    """V5 — privacidade. Na janela da vigia a pessoa copia uma senha e um trecho
+    de e-mail antes de acertar. Nada dos dois pode sair: nem o conteudo, nem o
+    tamanho ("N bytes" e o tamanho de um segredo alheio), nem em arquivo algum
+    da raiz. O segredo tem 32 caracteres, a forma de um token, para que a
+    assercao sobre o tamanho nao passe por acidente."""
+    outro = "Rascunho-9f3k: reuniao adiada para quinta, avisar o pessoal"
+    r = vigiar(raiz_token, {0: "", 2: SEGREDO_ALHEIO, 4: outro, 6: MARCADOR_PAYLOAD}, segundos=5)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+    for conteudo in (SEGREDO_ALHEIO, outro):
+        assert conteudo not in saida, "ecoou conteudo que nao casou"
+        assert conteudo[:8] not in saida, "ecoou o comeco de conteudo que nao casou"
+        n = len(conteudo)
+        assert f"{n} bytes" not in saida and f"{n} caracteres" not in saida, "disse o tamanho"
+    assert saida.count("o clipboard mudou, mas o que veio nao comeca com") == 2
+    assert "nao guardei, nao imprimi e nao digo o tamanho" in saida
+    # Em disco: nada fora do proprio roteiro carrega o conteudo.
+    for arquivo in raiz_token.rglob("*"):
+        if arquivo.is_symlink() or not arquivo.is_file() or "clipboard" in arquivo.parts:
+            continue
+        assert SEGREDO_ALHEIO.encode() not in arquivo.read_bytes(), f"o segredo foi para {arquivo}"
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+
+
+def test_v5b_dez_copias_erradas_nao_viram_dez_broncas(raiz_token):
+    """V5b — a vigia ensina, mas nao insiste: tres avisos e depois silencio ate
+    o acerto. Quem copia dez coisas seguidas le tres frases, nao dez."""
+    passos = {0: ""}
+    for i in range(1, 11):
+        passos[i] = f"QZX-{i}-copia-que-nao-serve"
+    passos[12] = MARCADOR_PAYLOAD
+    r = vigiar(raiz_token, passos, segundos=8)
+    saida = r.stdout + r.stderr
+    assert r.returncode == 0, saida
+    assert saida.count("o clipboard mudou, mas") == 3, "avisou mais (ou menos) que o teto"
+    assert saida.count("daqui em diante so falo quando aparecer o endereco") == 1
+    assert "QZX-" not in saida, "ecoou conteudo que nao casou"
+    assert "Seguindo sozinho a partir daqui" in saida
+    assert f"MOODLE_TOKEN={WSTOKEN}\n" in (raiz_token / ".env").read_text(encoding="utf-8")
+
+
+def test_v6_sem_ferramenta_de_clipboard_nao_ha_vigia_e_o_fluxo_em_duas_etapas_segue(raiz_token, tmp_path):
+    """V6 — portabilidade. Sem pbpaste/wl-paste/xclip (servidor sem interface)
+    nao ha o que vigiar: o script diz isso, nao se anuncia de vigia, e cai no
+    caminho de ontem — abre (aqui, com o `open` dublado), guarda o passaporte,
+    sai 3 e diz para entregar por cano."""
+    r = token_sh(
+        raiz_token, "", path=path_minimo(tmp_path), clipboard=False,
+        env={"DISPLAY": "", "WAYLAND_DISPLAY": "", "USP_MCP_VIGIA_SEGUNDOS": "90"},
+    )
+    saida = r.stdout + r.stderr
+    assert r.returncode == SAIDA_AGUARDANDO, saida
+    assert "nao ha clipboard para vigiar" in saida
+    assert "AVISO, antes de comecar" not in saida, "anunciou uma vigia que nao existe"
+    assert not (raiz_token / "pbpaste.log").exists()
+    assert len(aberturas(raiz_token)) == 1
+    assert "pbpaste | ./scripts/token.sh" in saida
+    assert "Saida 3 = aguardando" in saida
+    assert arquivo_passaporte(raiz_token).exists()
+
+
+def test_v6b_usp_mcp_vigia_segundos_zero_desliga_a_vigia_e_diz_isso(raiz_token):
+    """V6b — o interruptor que o anuncio promete. Desligada, nenhuma leitura
+    acontece e o fluxo em duas invocacoes segue como era."""
+    r = abrir(raiz_token, env={"USP_MCP_VIGIA_SEGUNDOS": "0"})
+    saida = r.stdout + r.stderr
+    assert r.returncode == SAIDA_AGUARDANDO, saida
+    assert "vigia do clipboard desligada a pedido" in saida
+    assert leituras(raiz_token) == 0
+    assert "pbpaste | ./scripts/token.sh" in saida
+    assert arquivo_passaporte(raiz_token).exists()
+
+
+def test_v6c_limite_que_nao_e_numero_reprova_antes_de_abrir_qualquer_coisa(raiz_token):
+    """V6c — Invariante 6: um valor errado na chave e erro legivel, nao uma
+    vigia de duracao indefinida nem um navegador aberto a toa."""
+    r = abrir(raiz_token, env={"USP_MCP_VIGIA_SEGUNDOS": "muito"})
+    assert r.returncode == 2
+    assert "USP_MCP_VIGIA_SEGUNDOS" in r.stderr
+    assert aberturas(raiz_token) == []
+
+
+def test_v7_base64_nu_nao_dispara_a_vigia(raiz_token):
+    """V7 — o caminho por stdin aceita o base64 sem o esquema; a vigia NAO.
+    Disparar nele obrigaria a decodificar qualquer coisa parecida com base64 que
+    passe pelo clipboard, e o decodificador diz o tamanho ao recusar. De vigia,
+    so a forma exata age; o base64 nu e "nao comeca com", sem tamanho."""
+    antes = (raiz_token / ".env").read_text(encoding="utf-8")
+    nu = payload(SITEID, WSTOKEN, PRIVATE)
+    r = vigiar(raiz_token, {0: "", 2: nu}, segundos=2)
+    saida = r.stdout + r.stderr
+    assert r.returncode == SAIDA_AGUARDANDO, saida
+    assert "o clipboard mudou, mas o que veio nao comeca com" in saida
+    assert "4/7" not in saida, "decodificou o base64 nu de vigia"
+    assert nu[:8] not in saida
+    assert f"{len(nu)} bytes" not in saida and f"{len(nu)} caracteres" not in saida
+    assert (raiz_token / ".env").read_text(encoding="utf-8") == antes
+    assert chamadas_ao_curl(raiz_token) == 0
 
 
 def test_o_passaporte_guardado_e_gitignorado():

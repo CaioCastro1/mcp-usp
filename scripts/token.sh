@@ -7,15 +7,28 @@
 #       ./scripts/token.sh --auto           # tenta capturar o redirect sozinho (ver abaixo)
 #       ./scripts/token.sh --navegador="Google Chrome"   # so com --auto
 #       USP_MCP_NAO_ABRIR=1 ./scripts/token.sh           # nunca abre navegador
+#       USP_MCP_VIGIA_SEGUNDOS=0 ./scripts/token.sh      # nao vigia o clipboard (ver abaixo)
 #
-# Em DUAS invocacoes, que e como um agente de codigo roda isto (sem terminal):
+# Em UMA invocacao sem terminal, que e como um agente de codigo roda isto:
+#
+#       ./scripts/token.sh              # abre o navegador e FICA DE VIGIA no clipboard
+#
+# Abre a pagina certa e, por ate 90 s, le o clipboard a cada 0,5 s esperando ele
+# MUDAR para algo que comece com `moodlemobile://token=`. Quando muda, segue
+# sozinho ate gravar; se a pessoa copiar a coisa errada, o script diz o que veio
+# errado e continua esperando. O que ja estava no clipboard nao conta, e o que
+# nao tem a forma certa nao e guardado, impresso nem medido. A vigia e anunciada
+# antes de comecar, no texto que a pessoa le. Sem pbpaste/wl-paste/xclip (ou em
+# sessao SSH, onde o clipboard alcancavel e o da maquina remota) nao ha vigia, e
+# o script cai no fluxo em DUAS invocacoes, que continua existindo:
 #
 #       ./scripts/token.sh              # abre o navegador na pagina certa e sai com 3
 #       pbpaste | ./scripts/token.sh    # depois que a pessoa copiou o endereco do link
 #
 # A primeira guarda o passaporte em .cache/passaporte (ao lado do .env, 0600) por
 # 10 minutos; a segunda o reaproveita, e a conferencia do passo 5 continua valendo
-# entre as duas. Saida 3 = "aguardando o payload", nao erro: nada foi gravado.
+# entre as duas. Saida 3 = "aguardando o payload", nao erro: nada foi gravado. A
+# vigia que encerra sem o endereco sai do mesmo jeito, com 3.
 #
 # Sete passos, na ordem em que estao no desenho de 10/09/2026
 # (docs/superpowers/specs/2026-09-10-script-token-moodle-design.md):
@@ -84,7 +97,7 @@ for arg in "$@"; do
     --manual) manual=1 ;;
     --auto) manual=0 ;;
     --navegador=*) navegador="${arg#--navegador=}" ;;
-    -h|--ajuda|--help) sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--ajuda|--help) sed -n '2,70p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;
   esac
 done
@@ -101,6 +114,157 @@ SAIDA_AGUARDANDO=3
 
 # Quanto tempo um passaporte guardado vale, em segundos. O porque esta no passo 2.
 VALIDADE_PASSAPORTE=600
+
+# A forma que o clipboard tem de ter para o script AGIR sobre ele. Tudo depois
+# de `token=` e a credencial; o prefixo e publico e e o unico pedaco do valor que
+# alguma mensagem deste script pode citar.
+ESQUEMA='moodlemobile://token='
+
+# Quanto tempo a vigia do clipboard dura, em segundos. 0 desliga e volta ao fluxo
+# em duas invocacoes. O porque dos 90 esta junto da vigia, no passo 3.
+VIGIA_SEGUNDOS="${USP_MCP_VIGIA_SEGUNDOS:-90}"
+case "$VIGIA_SEGUNDOS" in
+  ""|*[!0-9]*) echo "USP_MCP_VIGIA_SEGUNDOS='$VIGIA_SEGUNDOS' nao e um numero de segundos (0 desliga a vigia)" >&2; exit 2 ;;
+esac
+
+# Quantas vezes a vigia avisa sobre conteudo que NAO e o endereco antes de
+# calar. Tres: o primeiro aviso ensina, o segundo confirma que a pessoa ainda
+# esta tentando, o terceiro diz que vai calar. Depois disso quem copia dez coisas
+# seguidas nao recebe dez broncas, e o unico evento que ainda fala e o acerto.
+MAX_AVISOS_VIGIA=3
+
+# Qual ferramenta le o clipboard DESTA maquina. Vazio = nenhuma, e sem ela nao
+# ha vigia. `wl-paste` e `xclip` so contam com a sessao grafica que eles exigem:
+# num servidor sem interface eles existem no PATH e falham, e "existe" mentiria.
+CLIP=""
+achar_leitor_de_clipboard() {
+  if command -v pbpaste >/dev/null 2>&1; then CLIP="pbpaste"
+  elif command -v wl-paste >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then CLIP="wl-paste"
+  elif command -v xclip >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then CLIP="xclip"
+  fi
+}
+# Imprime o clipboard. Falha (clipboard vazio no X11 devolve erro) vira vazio:
+# vazio nao e conteudo, e a vigia o ignora.
+ler_clipboard() {
+  case "$CLIP" in
+    pbpaste)  pbpaste ;;
+    wl-paste) wl-paste ;;
+    xclip)    xclip -selection clipboard -o ;;
+  esac 2>/dev/null || true
+}
+# Sem espaco/quebra de linha nas pontas. So bash, sem processo: roda por leitura.
+aparar() {
+  local t="$1"
+  t="${t#"${t%%[![:space:]]*}"}"
+  printf '%s' "${t%"${t##*[![:space:]]}"}"
+}
+tem_a_forma() { [ "${1:0:${#ESQUEMA}}" = "$ESQUEMA" ]; }
+
+# O endereco em $1 responde ao passaporte DESTA rodada? Decodifica em memoria,
+# pelo mesmo helper do passo 4, e compara o siteid com md5(wwwroot+passaporte)
+# — a mesma formula do passo 5. Nada e impresso: o stderr do helper e engolido,
+# porque aqui a pergunta e "e desta rodada?", nao "esta certo?".
+payload_e_desta_rodada() {
+  local campos sid esperado
+  campos=$(printf '%s' "$1" | "$PY" scripts/_decodificar_token.py 2>/dev/null) || return 1
+  sid=$(printf '%s\n' "$campos" | sed -n 's/^siteid=//p')
+  esperado=$("$PY" -c 'import hashlib,sys; print(hashlib.md5((sys.argv[1]+sys.argv[2]).encode()).hexdigest())' \
+    "$MOODLE_URL" "$passaporte")
+  [ -n "$sid" ] && [ "$sid" = "$esperado" ]
+}
+
+# A vigia. Le o clipboard a cada 0,5 s por ate $1 segundos e devolve 0 com
+# `valor` preenchido quando ele MUDAR para algo que comece com $ESQUEMA; devolve
+# 1 quando o tempo acaba. Quatro regras, e cada uma tem um motivo:
+#
+#   1. Privacidade. Vigiar e ler o clipboard repetidamente, e nessa janela a
+#      pessoa pode copiar uma senha. O script so AGE sobre conteudo com a forma
+#      exata; tudo o mais fica numa variavel, e comparado com a leitura anterior
+#      e descartado. Nao vai para disco, nao e impresso, nao e contado — nem em
+#      "N bytes", que e o tamanho de um segredo alheio. Base64 nu, que o caminho
+#      por stdin aceita, NAO dispara a vigia: dispararia em qualquer coisa
+#      parecida com base64, e o decodificador diria o tamanho ao recusar.
+#   2. Clipboard velho. O que ja esta la quando a vigia comeca e o MARCO, nao um
+#      achado: a URL de uma tentativa anterior dispararia na hora e daria um
+#      passaporte que nao bate. So mudanca conta. Uma excecao, e ela e conferida:
+#      se o marco ja tem a forma certa E responde ao passaporte desta rodada (que
+#      pode ter sido reaproveitado de uma vigia que venceu), ele E desta rodada.
+#   3. Tempo. Quem chama e um agente com teto por chamada (120 s por padrao no
+#      Claude Code), e uma vigia infinita estoura o teto e deixa o agente sem
+#      resposta nenhuma — o pior desfecho (Invariante 6). 90 s: o passo manual
+#      leva ~20 s medidos, e sobram 30 s para o arranque, o `open` (ate 2 s), a
+#      decodificacao, a chamada a USP e a gravacao, mesmo quando o acerto vem no
+#      ultimo tique. Ajustavel por USP_MCP_VIGIA_SEGUNDOS; 0 desliga.
+#   4. Forma errada ensina e segue. O erro nº 1 medido e copiar a URL da propria
+#      pagina; hoje ele mata a tentativa. Aqui ele vira uma frase e a vigia
+#      continua. Com teto: MAX_AVISOS_VIGIA avisos e depois silencio, para que
+#      dez copias seguidas nao virem dez broncas.
+vigiar_clipboard() {
+  local segundos="$1" marco leitura t avisos=0 i tiques
+  marco=$(ler_clipboard)
+  t=$(aparar "$marco")
+  if tem_a_forma "$t"; then
+    if payload_e_desta_rodada "$t"; then
+      nota "o clipboard JA tinha um endereco com a forma certa, e ele responde ao"
+      nota "passaporte DESTA rodada: e o da pagina que esta aberta. Seguindo sem esperar."
+      valor="$t"; return 0
+    fi
+    nota "o clipboard ja tinha um endereco com a forma certa, mas de OUTRA rodada (o"
+    nota "passaporte nao bate). Ele fica como marco: so uma MUDANCA conta."
+  fi
+  tiques=$((segundos * 2))
+  for ((i = 0; i < tiques; i++)); do
+    sleep 0.5
+    leitura=$(ler_clipboard)
+    [ "$leitura" = "$marco" ] && continue
+    marco="$leitura"
+    t=$(aparar "$leitura")
+    [ -z "$t" ] && continue
+    if tem_a_forma "$t"; then
+      nota "o clipboard mudou para algo que comeca com \`$ESQUEMA\`: e o endereco do link."
+      nota "Seguindo sozinho a partir daqui."
+      valor="$t"; return 0
+    fi
+    avisos=$((avisos + 1))
+    [ "$avisos" -gt "$MAX_AVISOS_VIGIA" ] && continue
+    case "$t" in
+      *launch.php*|http://*|https://*)
+        # O caso medido (12/09/2026), e o unico em que da para dizer o que houve.
+        aviso "o clipboard mudou, mas veio a URL de IDA — a da PAGINA — e nao a de VOLTA."
+        nota "As duas sao URLs, por isso se confundem; so a segunda carrega o token."
+        nota "BOTAO DIREITO no link azul 'Clique aqui se a aplicacao nao abrir"
+        nota "automaticamente' -> 'Copiar endereco do link'. Nao clique com o esquerdo."
+        nota "Continuo de vigia; nada foi gravado." ;;
+      *)
+        aviso "o clipboard mudou, mas o que veio nao comeca com \`$ESQUEMA\`."
+        nota "Ignorado: nao guardei, nao imprimi e nao digo o tamanho. Continuo de vigia." ;;
+    esac
+    if [ "$avisos" -eq "$MAX_AVISOS_VIGIA" ]; then
+      nota "Foram $MAX_AVISOS_VIGIA avisos; daqui em diante so falo quando aparecer o endereco"
+      nota "certo. Sigo de vigia ate o tempo acabar."
+    fi
+  done
+  return 1
+}
+
+# A saida da abertura que NAO chegou ao payload: diz o que sobra para a pessoa
+# e como entregar, e sai com SAIDA_AGUARDANDO. Usada pela vigia que venceu e
+# pela maquina onde nao ha vigia.
+sair_aguardando() {
+  nota "O proximo passo e da PESSOA, na pagina que acabou de abrir (ou na URL acima):"
+  nota "  botao DIREITO no link azul 'Clique aqui se a aplicacao nao abrir"
+  nota "  automaticamente' -> 'Copiar endereco do link'. Nao clique com o esquerdo."
+  nota "Com o endereco no clipboard, rode:"
+  nota "  pbpaste | ./scripts/token.sh"
+  nota "  (Linux: wl-paste | ./scripts/token.sh  ou  xclip -selection clipboard -o | ./scripts/token.sh)"
+  nota "Ou rode ./scripts/token.sh de novo para eu voltar a vigiar o clipboard."
+  nota "Se passou --sobrescrever agora, passe de novo."
+  nota "O passaporte desta rodada esta em $ARQ_PASSAPORTE por ${VALIDADE_PASSAPORTE}s e"
+  nota "serve uma vez: a proxima invocacao o reaproveita e a conferencia do passo 5 fecha."
+  nota "Nada foi gravado — o .env so muda depois de o token autenticar no passo 6."
+  nota "Saida $SAIDA_AGUARDANDO = aguardando o payload, nao erro."
+  exit "$SAIDA_AGUARDANDO"
+}
 
 # Abre a URL no navegador padrao e DIZ o que aconteceu. Nunca derruba o script:
 # nao conseguir abrir e um aviso com a cura (abra a URL a mao), nao um erro.
@@ -356,12 +520,13 @@ if [ -z "$valor" ]; then
     IFS= read -rs valor < /dev/tty || true
     printf '\n'
     if [ -z "$valor" ]; then
-      if command -v pbpaste >/dev/null 2>&1; then valor=$(pbpaste)
-      elif command -v wl-paste >/dev/null 2>&1; then valor=$(wl-paste)
-      elif command -v xclip >/dev/null 2>&1; then valor=$(xclip -selection clipboard -o)
-      else nota "sem pbpaste/wl-paste/xclip nesta maquina"
+      achar_leitor_de_clipboard
+      if [ -n "$CLIP" ]; then
+        valor=$(ler_clipboard)
+        [ -n "$valor" ] && nota "li do clipboard (\`$CLIP\`)."
+      else
+        nota "sem pbpaste/wl-paste/xclip nesta maquina"
       fi
-      [ -n "$valor" ] && nota "li do clipboard."
     fi
   else
     # Sem terminal, o stdin decide o que esta invocacao e. Le-lo ANTES de abrir
@@ -373,26 +538,56 @@ if [ -z "$valor" ]; then
     else
       # Stdin vazio e sem terminal: e um agente de codigo rodando o script. Ate
       # 16/09 isto imprimia a URL, NAO abria o navegador (o `open` morava dentro
-      # do `[ -t 0 ]`) e morria em "Nada foi colado" — a pessoa tinha de copiar a
-      # URL do texto do agente, abrir, copiar o link, e a rodada seguinte ainda
-      # dava aviso de passaporte. Agora esta invocacao ABRE a pagina certa, deixa
-      # o passaporte guardado e sai aguardando. O que sobra para a pessoa e o
-      # botao direito no link.
+      # do `[ -t 0 ]`) e morria em "Nada foi colado". De 16/09 a 17/09 abria a
+      # pagina, guardava o passaporte e saia com 3 — e a pessoa tinha de dizer
+      # "colei" para o agente rodar `pbpaste | ./scripts/token.sh`. Agora esta
+      # invocacao ABRE a pagina certa e FICA DE VIGIA no clipboard: quando ele
+      # mudar para o endereco do link, o script segue sozinho ate gravar. Uma
+      # invocacao, zero mensagens da pessoa. O que sobra para ela e o botao
+      # direito no link. A vigia so existe onde ha clipboard para vigiar; nos
+      # outros casos o script diz por que e cai no fluxo em duas invocacoes.
       abrir_navegador "$url_manual"
-      titulo "3/7  aguardando o payload — rodada em duas etapas"
-      nota "Nao veio nada pelo stdin e nao ha terminal para perguntar. O proximo"
-      nota "passo e da PESSOA, na pagina que acabou de abrir (ou na URL acima):"
-      nota "  botao DIREITO no link azul 'Clique aqui se a aplicacao nao abrir"
-      nota "  automaticamente' -> 'Copiar endereco do link'. Nao clique com o esquerdo."
-      nota "Com o endereco no clipboard, rode:"
-      nota "  pbpaste | ./scripts/token.sh"
-      nota "  (Linux: wl-paste | ./scripts/token.sh  ou  xclip -selection clipboard -o | ./scripts/token.sh)"
-      nota "Se passou --sobrescrever agora, passe de novo."
-      nota "O passaporte desta rodada esta em $ARQ_PASSAPORTE por ${VALIDADE_PASSAPORTE}s e"
-      nota "serve uma vez: a segunda invocacao o reaproveita e a conferencia do passo 5 fecha."
-      nota "Nada foi gravado — o .env so muda depois de o token autenticar no passo 6."
-      nota "Saida $SAIDA_AGUARDANDO = aguardando o payload, nao erro."
-      exit "$SAIDA_AGUARDANDO"
+      achar_leitor_de_clipboard
+      sem_vigia=""
+      if [ "$VIGIA_SEGUNDOS" = "0" ]; then
+        sem_vigia="USP_MCP_VIGIA_SEGUNDOS=0: vigia do clipboard desligada a pedido."
+      elif [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]; then
+        # O mesmo motivo de nao abrir navegador por SSH: o clipboard que `pbpaste`
+        # alcanca daqui e o da maquina REMOTA, e o endereco vai ser copiado na da
+        # pessoa. Vigiar o clipboard errado esperaria para sempre por nada.
+        sem_vigia="sessao SSH: o clipboard que eu leria e o da maquina remota, e voce vai copiar na sua. Sem vigia."
+      elif [ -z "$CLIP" ]; then
+        sem_vigia="sem pbpaste/wl-paste/xclip nesta maquina (ou sem sessao grafica): nao ha clipboard para vigiar."
+      fi
+
+      if [ -n "$sem_vigia" ]; then
+        titulo "3/7  aguardando o payload — rodada em duas etapas"
+        aviso "$sem_vigia"
+        nota "Nao veio nada pelo stdin e nao ha terminal para perguntar."
+        sair_aguardando
+      fi
+
+      # O anuncio vem ANTES da primeira leitura, no texto que a pessoa le. Nao e
+      # para esconder: ela precisa saber que o clipboard esta sendo lido, o que
+      # dispara, o que acontece com o resto, e como desligar.
+      titulo "3/7  de vigia no clipboard — copie o endereco do link e eu sigo sozinho"
+      nota "AVISO, antes de comecar: vou LER o clipboard desta maquina (\`$CLIP\`) a cada"
+      nota "0,5 s, por ate ${VIGIA_SEGUNDOS} s, esperando ele MUDAR para algo que comece com"
+      nota "\`$ESQUEMA\`. So isso me faz agir. Qualquer outra coisa que voce copiar"
+      nota "nesse intervalo (uma senha, um trecho de texto) eu ignoro: nao guardo, nao"
+      nota "imprimo, nao registro e nao digo o tamanho. O que ja esta no clipboard agora"
+      nota "tambem nao conta — so mudanca."
+      nota "Se copiar a coisa errada, eu digo o que veio errado e continuo esperando."
+      nota "Para nao vigiar: USP_MCP_VIGIA_SEGUNDOS=0 ./scripts/token.sh (fluxo em duas"
+      nota "invocacoes, com \`pbpaste | ./scripts/token.sh\` depois de copiar)."
+      nota ""
+      if ! vigiar_clipboard "$VIGIA_SEGUNDOS"; then
+        titulo "3/7  vigia encerrada sem o endereco — rodada em duas etapas"
+        nota "${VIGIA_SEGUNDOS} s e o clipboard nao mudou para \`$ESQUEMA\`. Parei de ler."
+        sair_aguardando
+      fi
+      # `valor` veio da vigia: a conferencia abaixo e os passos 4-7 seguem como no
+      # caminho por stdin.
     fi
   fi
 
@@ -412,7 +607,6 @@ if [ -z "$valor" ]; then
   # So existe no caminho manual. Na captura automatica o valor vem do navegador
   # com o esquema NOSSO (`uspmcp://`), nao passa por clipboard nenhum, e conferir
   # contra `moodlemobile://` ali daria alarme falso em toda rodada boa.
-  ESQUEMA='moodlemobile://token='
   bytes=$(printf '%s' "$valor" | wc -c | tr -d ' ')
   if [ "$(printf '%s' "$valor" | cut -c1-${#ESQUEMA})" = "$ESQUEMA" ]; then
     nota "confere: comeca com \`$ESQUEMA\`, $bytes bytes no total."
