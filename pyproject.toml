@@ -102,7 +102,12 @@ Issues = "https://github.com/CaioCastro1/mcp-usp/issues"
 # `requirements*.txt` continuam existindo, e não por nostalgia: os três `main()`
 # mandam `pip install -r requirements.txt` quando o SDK falta, e há teste sobre
 # essa frase exata (`tests/{jupiter,moodle}/test_server_stdio.py`).
-dev = ["pytest>=8,<10"]
+# `pyyaml` é do C10, e só dele: sem um parser de verdade, o teste que guarda o
+# workflow lê YAML como texto — que foi exatamente o buraco por onde passou um
+# arquivo que o GitHub recusa a abrir, com a suíte inteira verde (§9, 17/09).
+# Escrever um segundo parser aqui seria a mesma pergunta com duas
+# implementações, que é o preço que este repositório já pagou três vezes.
+dev = ["pytest>=8,<10", "pyyaml>=6,<7"]
 
 # TRÊS entry points, um por servidor — e não UM só com argumento de sistema
 # espelhando o `scripts/servidor.sh`. A alternativa foi considerada e perde por

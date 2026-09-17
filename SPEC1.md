@@ -3985,3 +3985,34 @@ O que sobrevive em fixture por decisão, não por descuido: `id`/`cmid`/contexto
 grupo (`usergroups`, `submissiongroup`).
 
 ---
+
+### 17/09/2026 — o teste que guardava o CI lia o workflow como texto, e o GitHub lê como YAML
+
+O CI ficou **vermelho na `main` por três merges seguidos sem ninguém perceber**, e não por
+um teste que reprovou: por nenhum. As runs falharam em **0s, sem job nenhum e sem log** —
+a forma que o GitHub usa quando não consegue carregar o arquivo. O merge de 16/09 que levou
+o runner para Linux deixou dois blocos de comentário colados e o `runs-on` com indentação de
+dois espaços, no nível de `jobs:` em vez de dentro do job. YAML inválido.
+
+A suíte seguiu verde o tempo todo, e corretamente para o que ela fazia: os nove testes de
+`tests/test_ci.py` leem o workflow com `read_text` e regex — `runs-on:\s*ubuntu` casa igual
+num arquivo que carrega e num que o GitHub recusa. Nenhum deles abria o arquivo como o
+GitHub abre. É o item 11 do `CLAUDE.md` na forma mais cara: o teste que existe para guardar
+o CI foi o que não viu o CI cair. A própria PR que quebrou o arquivo foi mergeada com a run
+dela já vermelha.
+
+**C10** fecha: `yaml.safe_load` em todo workflow, mais a forma mínima que o GitHub exige —
+`jobs` é mapa não vazio, cada job é mapa, cada job declara `runs-on` e `steps`. As cinco
+asserções foram verificadas por sabotagem, uma a uma: YAML quebrado, job com valor de
+string, chave de job escrita no nível de `jobs:` (o defeito real), job sem `steps`, arquivo
+sem `jobs`. Cada uma reprova com a sua própria mensagem.
+
+O preço é uma dependência **de teste**: `pyyaml` no extra `dev` e no `requirements-dev.txt`.
+Runtime segue `mcp>=2,<3` e nada mais. A alternativa — checar indentação à mão — seria uma
+segunda implementação de "isto é YAML válido?", que é a forma que o §9 de 12/09 registra
+como cara, e ainda pegaria menos. Sem o `pyyaml` instalado, C10 **pula dizendo exatamente o
+que não conferiu** (Invariante 7) — menos dentro do CI, onde o pulo é reprovação: ali o
+pacote é instalado com `.[dev]` a cada run, e um C10 que pula no runner seria o runner
+validando a si mesmo por texto.
+
+---
