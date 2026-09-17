@@ -4056,3 +4056,40 @@ Este registro não nomeia arquivo, campo nem commit, e isso é de propósito: a 
 repositório vai a público.
 
 ---
+### 17/09/2026 — o repositório se chama `usp-mcp`, e a vitrine passa a dizer para que serve
+
+O repositório foi a público com a vitrine vazia, e isso foi **medido**, não achado: a
+consulta à API devolvia `description: ""`, `repositoryTopics: null`, `homepageUrl: ""`,
+nenhuma release, e wiki e projects ligados e vazios — duas abas mortas ao lado do README.
+Quem chegasse por busca não tinha uma linha dizendo o que o projeto é.
+
+Somado a isso, a raiz tinha **seis arquivos `.md`**, e no celular o GitHub lista os
+arquivos antes de renderizar o README: o primeiro contato de quem só queria o cardápio do
+bandejão era `CLAUDE.md`, `CONTRIBUTING.md` e um `SPEC1.md` de 4.005 linhas.
+
+O que mudou: descrição e dez topics preenchidos, wiki e projects desligados, issues
+mantidas (são o canal que o projeto de fato precisa), `CONTRIBUTING.md` movido para
+`.github/` — o GitHub procura nos três lugares e segue mostrando o banner ao abrir issue ou
+PR —, e uma seção `## Escopo e contribuição` própria no README. O texto dessa seção já
+existia, enterrado dentro de `## Rodando a partir do código`, seção que anuncia ser de quem
+mexe no código: estava invisível justamente para quem o aviso é.
+
+**Descartado, e por quê:** mover `SPEC1.md` e `CLAUDE.md` para fora da raiz. 72 e 37
+arquivos rastreados apontam para eles, o `SPEC1.md` é a autoridade declarada do projeto, e
+o preço seria reescrever referência em 72 arquivos para ganhar uma linha a menos numa
+listagem. A raiz continua com quatro `.md`.
+
+**O nome.** O repositório era `mcp-usp` e tudo o mais era `usp-mcp`: o pacote, os três
+comandos `usp-mcp-*` e a pasta que o README manda criar (`~/usp-mcp`). Quem seguia o guia
+digitava as duas formas em dois minutos. Renomeado para `usp-mcp`, com os endereços
+atualizados no README, no `CONTRIBUTING.md`, no `pyproject.toml` e nos dois `AGENTE` de
+User-Agent. O GitHub responde 301 do nome antigo para o novo, e o registro histórico
+(`docs/`, handoffs, specs) **não foi reescrito**: ele conta o que aconteceu.
+
+O redirect é a parte que merece a nota. Ele não é garantia: morre no dia em que qualquer
+conta registrar `CaioCastro1/mcp-usp`, e aí a instalação quebra sem nada ter mudado aqui —
+a mesma falha calada do `Castro1` de 14/09, só que com data de validade desconhecida. Por
+isso o U4 entrou junto: instrução de instalação que ainda cite o nome antigo reprova o
+gate, enquanto registro histórico segue livre para citá-lo.
+
+---

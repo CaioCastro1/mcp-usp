@@ -68,7 +68,7 @@ URL_BASE = "https://uspdigital.usp.br/rucard/servicos"
 
 # Identificável e com contato, como no Jupiter: quem administra o RUCard tem que
 # conseguir saber quem está batendo, e falar com alguém.
-AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/mcp-usp)"
+AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/usp-mcp)"
 
 # O cardápio muda uma vez por semana, mas a virada não tem hora conhecida — por
 # isso um TTL curto o bastante para não atravessar a segunda-feira dormindo, com

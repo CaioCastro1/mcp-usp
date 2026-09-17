@@ -75,7 +75,7 @@ Ele instala, configura e te guia no único passo que precisa da sua mão.
 ```text
 Instale o usp-mcp neste computador e me conecte a ele.
 
-1. Clone https://github.com/CaioCastro1/mcp-usp em ~/usp-mcp, crie um venv em
+1. Clone https://github.com/CaioCastro1/usp-mcp em ~/usp-mcp, crie um venv em
    ~/usp-mcp/.venv e instale com `pip install -e ".[dev]"`. Copie o `.env.example` para
    `.env`, na mesma pasta, e rode `./scripts/gate.sh` para confirmar que ficou tudo certo.
 2. Registre os três servidores (moodle, jupiter, rucard) no meu Claude Code, no escopo
@@ -103,7 +103,7 @@ motivo.
 Depois cole estes quatro comandos, um de cada vez:
 
 ```bash
-git clone https://github.com/CaioCastro1/mcp-usp.git ~/usp-mcp
+git clone https://github.com/CaioCastro1/usp-mcp.git ~/usp-mcp
 python3 -m venv ~/usp-mcp/.venv
 ~/usp-mcp/.venv/bin/pip install -e ~/usp-mcp
 cp ~/usp-mcp/.env.example ~/usp-mcp/.env
@@ -353,7 +353,7 @@ e redistribuir, desde que mantenha o aviso de autoria. O texto completo está no
 
 O que este projeto mais precisa não é código: é saber quando a USP mudou alguma coisa e a
 resposta parou de bater. Se uma pergunta que funcionava parou, ou se o passo da chave
-travou, [abra uma issue](https://github.com/CaioCastro1/mcp-usp/issues/new/choose) — há um
+travou, [abra uma issue](https://github.com/CaioCastro1/usp-mcp/issues/new/choose) — há um
 modelo para cada um dos dois casos, e o relato leva meio minuto. **Nunca cole o valor do
 seu token**, nem em issue, nem em log.
 
@@ -368,7 +368,7 @@ já tem tudo o que precisa pela seção *Instalando*: ela baixa o projeto inteir
 script da chave vem junto.
 
 ```bash
-git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
+git clone git@github.com:CaioCastro1/usp-mcp.git && cd usp-mcp
 uv venv
 uv pip install -e ".[dev]"
 cp .env.example .env

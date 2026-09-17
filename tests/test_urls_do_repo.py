@@ -13,7 +13,7 @@ A regra NÃO é "toda URL do GitHub aponta para nós": o `SPEC1.md` e as `notas/
 citam `loyaniu/moodle-mcp`, `moodle/moodle`, `uspdev/senhaunica-*` e outros, e
 proibir isso mataria a comparação com o concorrente e a referência ao core. A
 regra é mais estreita e é a que pega o defeito real: **URL que aponta para um
-repositório chamado `mcp-usp` tem de ter o dono certo.**
+repositório chamado `usp-mcp` tem de ter o dono certo.**
 
 Offline, custa um `read_text` por arquivo, e entra no gate junto com o resto.
 """
@@ -30,8 +30,13 @@ RAIZ = pathlib.Path(__file__).resolve().parents[1]
 # teste reprova e obriga a decisão a ser declarada aqui — é o mesmo desenho do
 # T7 sobre a allowlist. Derivar do `git remote` pareceria mais esperto e seria
 # pior: numa cópia clonada de um fork o teste passaria a abençoar a URL errada.
+#
+# E mudou: em 17/09/2026 o repositório passou de `mcp-usp` para `usp-mcp`, para
+# bater com o nome do pacote, com os comandos `usp-mcp-*` e com a pasta que o
+# README manda criar. O nome velho vira `ANTIGO` e ganha U4, logo abaixo.
 DONO = "CaioCastro1"
-REPO = "mcp-usp"
+REPO = "usp-mcp"
+ANTIGO = "mcp-usp"
 
 # Casa `github.com/dono/repo` e `github.com:dono/repo` (a forma SSH do clone),
 # com ou sem `.git` no fim, e com ou sem caminho depois, como `/issues` e `/blob/...`.
@@ -114,18 +119,18 @@ def test_u3_a_varredura_enxerga_as_duas_formas_e_o_dono_errado(tmp_path):
     """
     falso = tmp_path / "x.md"
     falso.write_text(
-        "clone https://github.com/CaioCastro1/mcp-usp.git aqui\n"
-        "e git@github.com:Castro1/mcp-usp.git ali\n"
+        "clone https://github.com/CaioCastro1/usp-mcp.git aqui\n"
+        "e git@github.com:Castro1/usp-mcp.git ali\n"
         "e https://github.com/loyaniu/moodle-mcp que é de outro projeto\n"
-        'e Issues = "https://github.com/Castro1/mcp-usp/issues" no metadado\n',
+        'e Issues = "https://github.com/Castro1/usp-mcp/issues" no metadado\n',
         encoding="utf-8",
     )
 
     achados = list(enderecos_de(falso))
-    assert (1, "CaioCastro1", "mcp-usp") in achados, "não pegou a forma https com .git"
-    assert (2, "Castro1", "mcp-usp") in achados, "não pegou a forma ssh"
+    assert (1, "CaioCastro1", "usp-mcp") in achados, "não pegou a forma https com .git"
+    assert (2, "Castro1", "usp-mcp") in achados, "não pegou a forma ssh"
     assert (3, "loyaniu", "moodle-mcp") in achados, "não pegou repositório de terceiro"
-    assert (4, "Castro1", "mcp-usp") in achados, (
+    assert (4, "Castro1", "usp-mcp") in achados, (
         "não pegou o endereço com caminho depois do nome do repositório. É a "
         "forma do `Issues` do `[project.urls]`, e sem ela o dono errado ali "
         "passaria batido"
@@ -135,4 +140,32 @@ def test_u3_a_varredura_enxerga_as_duas_formas_e_o_dono_errado(tmp_path):
     assert erradas == [(2, "Castro1"), (4, "Castro1")], (
         "a regra ou deixou passar o dono errado, ou reclamou de repositório de "
         f"terceiro: {erradas}"
+    )
+
+
+def test_u4_a_instrucao_de_instalacao_nao_usa_mais_o_nome_velho():
+    """U4 — o nome velho funciona por redirect, e é justamente por isso.
+
+    Depois do rename de 17/09/2026 o GitHub responde 301 de
+    `CaioCastro1/mcp-usp` para `CaioCastro1/usp-mcp`, então uma instrução
+    esquecida continua levando a pessoa ao lugar certo e ninguém reclama. O
+    redirect não é garantia: ele morre no dia em que qualquer conta criar um
+    repositório com o nome antigo, e aí a instalação quebra sem nada ter
+    mudado aqui — a mesma classe de falha calada do `Castro1` de 14/09, só que
+    com data de validade desconhecida.
+
+    Vale só para os DOCUMENTOS, que são as instruções. `SPEC1.md`, `notas/` e
+    `docs/` citam o nome velho porque registram o que aconteceu, e reescrever
+    registro para satisfazer teste é a troca errada.
+    """
+    achados = []
+    for nome in DOCUMENTOS:
+        achados += [
+            (nome, linha) for linha, _, repo in enderecos_de(RAIZ / nome) if repo == ANTIGO
+        ]
+    assert not achados, (
+        f"instrução de instalação ainda manda buscar `{ANTIGO}`:\n  "
+        + "\n  ".join(f"{n}, linha {l}" for n, l in achados)
+        + f"\nO nome é {REPO!r} desde 17/09/2026. Hoje o redirect salva; no dia "
+        "em que alguém registrar o nome antigo, para de salvar."
     )
