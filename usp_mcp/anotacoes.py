@@ -25,7 +25,7 @@ carregam dicionário, e a conversão para `ToolAnnotations` acontece dentro de
 ## Por que `idempotentHint` não está nas de leitura
 
 O protocolo diz que `idempotentHint` só tem significado quando `readOnlyHint` é
-falso. Declará-lo numa das doze de leitura seria um campo sem referente: custa
+falso. Declará-lo numa das treze de leitura seria um campo sem referente: custa
 bytes no fio, parece informação e não é nenhuma. O projeto já tem uma regra
 irmã (J1) contra mandar ao cliente palavra que não ajuda a agir.
 
@@ -53,9 +53,9 @@ responder de cache local é o dia em que este campo tem de mudar — e ele exist
 """
 from __future__ import annotations
 
-# As doze de leitura: o_que_vence, material, diagnostico, ja_entreguei, notas,
-# avisos, o_que_mudou, disciplinas, atrasadas (Moodle), disciplina e requisitos
-# (Jupiter), bandejao (RUCard).
+# As treze de leitura: o_que_vence, material, diagnostico, ja_entreguei, notas,
+# avisos, o_que_mudou, disciplinas, atrasadas, questionarios (Moodle),
+# disciplina e requisitos (Jupiter), bandejao (RUCard).
 SO_LEITURA = {
     # Nenhuma delas chama função de escrita. No Moodle a allowlist é inteira de
     # leitura, e continua sendo depois de 15/09: as duas funções de escrita que

@@ -24,10 +24,11 @@ def disciplinas_brutos():
 pytestmark = pytest.mark.contrato
 
 
-# As dez que existem sempre. Ordem de nascimento, e cada crescimento é decisão
+# As onze que existem sempre. Ordem de nascimento, e cada crescimento é decisão
 # registrada no §9: `material` em 31/08, `baixar_arquivo` em 01/09,
 # `diagnostico`, `ja_entreguei`, `notas`, `avisos`, `o_que_mudou`, `disciplinas`
-# e `atrasadas` em 14/09.
+# e `atrasadas` em 14/09, e `questionarios` em 17/09 — questionário é outro
+# objeto do Moodle, e `ja_entreguei` o recusa por escrito.
 SEMPRE = [
     "o_que_vence",
     "material",
@@ -39,6 +40,7 @@ SEMPRE = [
     "o_que_mudou",
     "disciplinas",
     "atrasadas",
+    "questionarios",
 ]
 
 # As duas de 15/09, e as únicas do projeto que dependem do ambiente: só existem
@@ -48,7 +50,7 @@ SO_COM_A_FLAG = ["salvar_rascunho", "entregar"]
 
 
 def test_expoe_exatamente_uma_ferramenta():
-    """T42 — dez ferramentas, ou doze com a flag de entrega ligada.
+    """T42 — onze ferramentas, ou treze com a flag de entrega ligada.
 
     A lista é exata, e não um `in`, porque o ponto é obrigar quem acrescenta a
     próxima a passar por aqui — é este teste que transforma "acrescentei uma

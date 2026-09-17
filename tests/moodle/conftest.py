@@ -945,3 +945,192 @@ def entregas_falsas(
             else []
         ),
     }
+
+
+# --------------------------------------------------------------------------
+# `mod_quiz_get_quizzes_by_courses` e `mod_quiz_get_user_attempts` — **FIXTURE
+# ESCRITA À MÃO**, e aqui o rótulo pesa mais do que em qualquer seção acima.
+#
+# **Não é captura, e a captura ainda não existe.** Este worktree não tem token,
+# e o spec `2026-09-17-questionario-como-objeto-design.md` nasceu ANTES da
+# medição, de propósito e por escrito. A FORMA vem da declaração das duas
+# funções no core do Moodle 5.0 (`mod/quiz/classes/external.php`,
+# `get_quizzes_by_courses_returns` e `get_user_attempts_returns`) e do que
+# `notas/moodle-catalogo.md` §3.8 registra delas. Se a conta de ALUNO recebe
+# `attempts`, `timeopen` e `timeclose` é a hipótese principal do spec, e é por
+# isso que o sentinela `AUSENTE` existe: ele monta a resposta SEM a chave, que
+# é como QO12 e QO14 exercitam a degradação que o código promete.
+#
+# O que aqui é REAL: o `courseid` 142036 e os treze pares (nome, `iteminstance`)
+# dos itens `quiz` de `grade_items_ptc3314.json`, captura de 15/09 — o
+# `iteminstance` de um item de nota de quiz é o id da instância do quiz, que é
+# o `quizid` que `get_user_attempts` pede. É isso que faz o `quizid` ENVIADO
+# ser conferido contra um id de verdade. Os prazos, o `attempts` permitido e as
+# tentativas são inventados.
+#
+# Consequência, dita aqui para não ser descoberta depois: nenhuma razão de
+# projeção medida contra este payload é medida de coisa nenhuma. Quem rodar ao
+# vivo primeiro: capture, higienize (§3.3 — a resposta de tentativas traz
+# `userid`) e troque isto por fixture de verdade. QO25 diz o comando.
+AUSENTE = object()
+
+CURSO_PTC3314 = 142036
+
+# (quizid, nome), na ordem do boletim. Reais, ver acima.
+QUIZZES_PTC3314 = (
+    (233466, "Teste semanal - 1 - parâmetros de LT e propagação"),
+    (233467, "Teste semanal - 2 - reflexão de degrau, sem perdas"),
+    (233468, "Teste semanal - 3 - reflexão de degrau, com perdas"),
+    (233469, "Teste semanal - 4 - transitório em cargas não resistivas"),
+    (233470, "Teste semanal - 5 - RPS, COE e impedância."),
+    (233471, "Teste semanal - 6 - Ábaco de Smith"),
+    (233472, "Teste semanal - 7 - potência e perdas em LT"),
+    (233473, "Teste semanal - 8 - casamento de impedância"),
+    (233474, "Teste semanal - 9 - propagação de ondas planas em RPS"),
+    (233475, "Teste semanal - 10 - polarização de ondas"),
+    (233476, "Teste semanal - 11 - propagação de ondas em condutores"),
+    (233477, "Teste semanal - 12 - reflexões em vários dielétricos"),
+    (233478, "Teste semanal - 13 - incidência oblíqua"),
+)
+QUIZ_T12 = 233477
+
+_INTRO_DE_QUIZ = (
+    "<p dir=\"ltr\">Teste semanal sobre o conteúdo da aula. Você tem três "
+    "tentativas e vale a maior nota. Leia a apostila antes.</p>"
+) * 3
+
+
+def questionario_falso(
+    quizid: int,
+    nome: str,
+    *,
+    course: int = CURSO_PTC3314,
+    timeopen=0,
+    timeclose=0,
+    attempts=3,
+    grademethod: int = 1,
+) -> dict:
+    """Um item de `quizzes`, na forma declarada no core.
+
+    `timeopen`, `timeclose` e `attempts` aceitam `AUSENTE` para OMITIR a chave:
+    é a única forma de exercitar "o site não mandou" sem inventar um valor, e
+    a diferença entre chave ausente e `0` é justamente o que a projeção tem de
+    ler certo (`timeclose: 0` é "sem fechamento"; `attempts: 0` é "ilimitadas";
+    chave ausente é "não sei", e "não sei" tem de sair escrito).
+
+    `intro` está aqui de propósito: é o campo gordo da resposta, e a projeção
+    só prova que o descarta se ele chegar a estar na entrada.
+    """
+    item = {
+        "id": quizid,
+        "coursemodule": 6000000 + quizid,
+        "course": course,
+        "name": nome,
+        "intro": _INTRO_DE_QUIZ,
+        "introformat": 1,
+        "introfiles": [],
+        "timelimit": 0,
+        "overduehandling": "autosubmit",
+        "graceperiod": 0,
+        "preferredbehaviour": "deferredfeedback",
+        "canredoquestions": 0,
+        "attemptonlast": 0,
+        "grademethod": grademethod,
+        "decimalpoints": 2,
+        "questiondecimalpoints": -1,
+        "sumgrades": 10.0,
+        "grade": 10.0,
+        "hasfeedback": 0,
+        "hasquestions": 1,
+        "section": 3,
+        "visible": 1,
+        "groupmode": 0,
+        "groupingid": 0,
+        "lang": "",
+    }
+    if timeopen is not AUSENTE:
+        item["timeopen"] = timeopen
+    if timeclose is not AUSENTE:
+        item["timeclose"] = timeclose
+    if attempts is not AUSENTE:
+        item["attempts"] = attempts
+    return item
+
+
+def questionarios_falsos(itens, *, com_warning=False) -> dict:
+    """`mod_quiz_get_quizzes_by_courses`: `{quizzes, warnings}`."""
+    return {
+        "quizzes": list(itens),
+        "warnings": (
+            [
+                {
+                    "item": "module",
+                    "itemid": 6372372,
+                    "warningcode": "1",
+                    "message": "Sem direito de acesso a este módulo",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }
+
+
+def tentativa_falsa(
+    *,
+    attemptid: int = 910001,
+    quizid: int = QUIZ_T12,
+    userid: int = 8214,
+    attempt: int = 1,
+    state: str = "finished",
+    timefinish: int = 1789246800,
+    sumgrades=7.25,
+) -> dict:
+    """Um item de `attempts`, na forma declarada no core.
+
+    `id` (o `attemptid`) e `sumgrades` estão aqui de propósito e com valores
+    reconhecíveis: QO19 prova que NENHUM dos dois sai no texto. O primeiro é a
+    fronteira R1 do spec; o segundo é nota bruta, e nota é assunto de `notas`.
+
+    `state` aceita `inprogress`: é como QO21 prova que a projeção conta só o que
+    está `finished` mesmo que o site ignore o `status` enviado.
+    """
+    em_curso = state != "finished"
+    return {
+        "id": attemptid,
+        "quiz": quizid,
+        "userid": userid,
+        "attempt": attempt,
+        "uniqueid": attemptid + 5000,
+        "layout": "1,2,3,0,4,5,0",
+        "currentpage": 0,
+        "preview": 0,
+        "state": state,
+        "timestart": timefinish - 1800,
+        "timefinish": 0 if em_curso else timefinish,
+        "timemodified": timefinish,
+        "timemodifiedoffline": 0,
+        "timecheckstate": None,
+        "sumgrades": None if em_curso else sumgrades,
+        "gradednotificationsenttime": None if em_curso else timefinish,
+    }
+
+
+def tentativas_falsas(tentativas=(), *, com_warning=False) -> dict:
+    """`mod_quiz_get_user_attempts`: `{attempts, warnings}`. Sem tentativa é
+    lista VAZIA — o ponto 2 da medição pendente do spec diz que isto é hipótese."""
+    return {
+        "attempts": list(tentativas),
+        "warnings": (
+            [
+                {
+                    "item": "quiz",
+                    "itemid": QUIZ_T12,
+                    "warningcode": "1",
+                    "message": "Uma tentativa não pôde ser lida com esta credencial",
+                }
+            ]
+            if com_warning
+            else []
+        ),
+    }

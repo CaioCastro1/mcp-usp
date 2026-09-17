@@ -165,18 +165,24 @@ def test_e4_o_que_ficou_e_recusado_nas_tres_combinacoes(funcao, monkeypatch):
 # ----------------------------------------------------------------- E5 e E6
 
 
-def test_e5_o_bloqueio_permanente_tem_38_nomes_e_nao_tem_as_duas_de_assign():
-    """E5 — a conta, que caiu de 40 para 38 em 15/09/2026.
+def test_e5_o_bloqueio_permanente_tem_40_nomes_e_nao_tem_as_duas_de_assign():
+    """E5 — a conta: 40 até 15/09/2026, 38 depois que duas saíram, e 40 de novo
+    em 17/09/2026 quando duas LEITURAS entraram.
 
     Um número exato num teste é chato de propósito: ele obriga quem mexe na
     lista a dizer quantos nomes entraram ou saíram, e é a única coisa que pega
-    uma remoção acidental no meio de uma lista de quarenta linhas.
+    uma remoção acidental no meio de uma lista de quarenta linhas. As duas de
+    17/09 são `mod_quiz_get_attempt_data` e `mod_quiz_get_attempt_summary` —
+    enunciado de prova em curso —, e a razão está no spec
+    `2026-09-17-questionario-como-objeto-design.md` (R4) e em `test_politica_
+    questionario.py` (QO2). O número voltar a 40 é coincidência de aritmética,
+    não de conteúdo: são outros dois nomes.
     """
-    assert len(politica.BLOQUEIO_PERMANENTE) == 38, (
+    assert len(politica.BLOQUEIO_PERMANENTE) == 40, (
         f"o bloqueio permanente tem {len(politica.BLOQUEIO_PERMANENTE)} nomes. "
-        "Ele tinha 40 até 15/09/2026, quando duas saíram por decisão "
-        "registrada. Se saiu ou entrou mais alguma, a decisão vem antes deste "
-        "número."
+        "Ele tinha 40 até 15/09/2026, 38 depois que duas saíram por decisão "
+        "registrada, e 40 desde 17/09/2026 com duas leituras que entraram. Se "
+        "saiu ou entrou mais alguma, a decisão vem antes deste número."
     )
     for funcao in AS_DUAS:
         assert funcao not in politica.BLOQUEIO_PERMANENTE, (

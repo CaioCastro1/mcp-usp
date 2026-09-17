@@ -82,7 +82,9 @@ _REGISTRO_NAO_E_FATO = (
 
 _ONDE_VER_MAIS = (
     "Para ver TODAS as entregas de uma disciplina, vencidas ou não, use "
-    "`ja_entreguei`; para o que ainda vai vencer, `o_que_vence`."
+    "`ja_entreguei`; para o que ainda vai vencer, `o_que_vence`; para "
+    "questionário que fechou sem tentativa finalizada, `questionarios` com a "
+    "disciplina."
 )
 
 

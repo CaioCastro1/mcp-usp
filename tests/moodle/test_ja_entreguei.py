@@ -400,6 +400,31 @@ def test_j16_disciplina_sem_entrega_diz_o_que_nao_cobre(disciplinas_brutas):
         "não disse que quiz não passa por aqui — o calendário vê 6 disciplinas "
         "e `get_assignments` vê 4 (§9, 28/08)"
     )
+    # 17/09/2026: a recusa continua, e passa a dizer para onde ir. Até aqui ela
+    # mandava para `o_que_vence`, que só sabe a data — foi o beco em que o dono
+    # caiu ao perguntar por um questionário (spec de 17/09, Decisão 5).
+    assert "questionarios" in r.texto, "recusou questionário sem dizer onde ele mora"
+
+
+def test_j26_busca_que_nao_casa_diz_onde_o_questionario_mora(
+    disciplinas_brutas, entregas_ptc3314
+):
+    """J26 — o ramo em que o dono caiu, e que recusava em silêncio.
+
+    "Já entreguei o Teste 12?" cai em `busca_sem_resultado`: a disciplina tem
+    quatro entregas e nenhuma se chama assim. Até 17/09/2026 este ramo listava
+    as quatro e parava — não anexava `COBERTURA`, então quem perguntou por um
+    questionário pelo nome não ouvia a palavra "questionário". É o ramo exato
+    da pergunta, e o único que ficava mudo sobre ela.
+    """
+    c = _cliente(disciplinas_brutas, entregas_ptc3314)
+
+    r = ja_entreguei(c, "PTC3314", entrega="Teste semanal - 12", agora=AGORA)
+
+    assert r.vazio_por == "busca_sem_resultado"
+    assert "questionário" in r.texto.lower(), "o ramo da pergunta ficou mudo sobre quiz"
+    assert "questionarios" in r.texto, "não disse onde o questionário mora"
+    assert not [f for f, _ in c.chamadas if f.endswith("submission_status")]
 
 
 def test_j17_erro_do_cliente_nao_vira_nao_entreguei(disciplinas_brutas, entregas_ptc3314):

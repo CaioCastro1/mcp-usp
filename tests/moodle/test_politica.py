@@ -65,6 +65,15 @@ PREFIXOS_DE_LEITURA = (
     # tem `add` no nome, fica de fora por não casar — o que está certo, porque
     # ela não responde pergunta nenhuma deste projeto.
     "mod_forum_get_",
+    # 17/09/2026, com a ferramenta `questionarios`. A família `mod_quiz_` tem as
+    # três escritas mais perigosas do §2.2 e quatro `view_*` que disparam
+    # evento; `mod_quiz_get_` não casa com nenhuma delas. Casa, porém, com
+    # `get_attempt_data`, `get_attempt_summary`, `get_attempt_review`,
+    # `get_user_best_grade` e `get_user_quiz_attempts` — cinco leituras que o
+    # projeto recusa por escrito (duas no bloqueio permanente, três por
+    # omissão). É a primeira vez que o teto cobre função recusada, e por isso
+    # QO4 e QO5 existem: prefixo é teto, e a autorização é igualdade exata.
+    "mod_quiz_get_",
 )
 
 # P4 vigia estes três nomes. Escrito à mão, e não derivado do módulo, porque
@@ -252,6 +261,14 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
     `mod_forum_get_forum_discussions`, e **não** a `mod_forum_get_discussions`
     do comparável, que não existe neste Moodle.
 
+    E de 11 para 13 em 17/09, com `questionarios`: questionário é outro objeto
+    do Moodle, e `mod_assign_*` não o vê. `mod_quiz_get_quizzes_by_courses` diz
+    que ele existe, quando fecha e quantas tentativas permite;
+    `mod_quiz_get_user_attempts` diz quantas o aluno finalizou. São DUAS e não
+    três: `mod_quiz_get_user_best_grade` ficou de fora porque a nota do
+    questionário já sai em `notas`, e um segundo número por outro caminho é o
+    problema, não a solução (spec de 17/09, Decisão 2).
+
     O teste segue travando o conjunto INTEIRO — é o que impede a próxima sessão
     de acrescentar "só mais uma" sem passar pelo §9.
     """
@@ -268,6 +285,8 @@ def test_superficie_da_fatia_e_exatamente_uma_funcao():
             "mod_forum_get_forums_by_courses",
             "mod_forum_get_forum_discussions",
             "core_course_get_updates_since",
+            "mod_quiz_get_quizzes_by_courses",
+            "mod_quiz_get_user_attempts",
         }
     )
 
