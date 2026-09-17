@@ -361,6 +361,13 @@ Mudança no código precisa de acordo antes da PR, porque o projeto se apoia em 
 que não são óbvios lendo o diff. Se você quer mexer, abra a issue primeiro; o combinado
 inteiro está em [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
 
+Uma observação para quem instalou pelo assistente e não veio programar: a pasta do projeto
+tem, junto com o código, os documentos de quem o mantém, e um assistente que os lê pode
+começar a propor mexer no código, abrir PR ou rever decisão do projeto. Isso é engano dele,
+não pedido seu — basta dizer que você só quer usar. Desde 17/09/2026 o padrão já é esse, e
+o raciocínio está em [`docs/agents/PAPEL-DA-SESSAO.md`](docs/agents/PAPEL-DA-SESSAO.md).
+Na direção contrária vale o mesmo: se você **quer** contribuir, dizer isso uma vez basta.
+
 ## Rodando a partir do código
 
 Esta seção é para quem vai mexer no código. Quem só quer usar, inclusive o e-Disciplinas,
