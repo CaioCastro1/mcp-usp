@@ -48,8 +48,11 @@ ENDERECO = re.compile(r"github\.com[:/]([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+?)(?:\.
 # instalou por `pipx`/`uvx` achar o repositório (`pip show usp-mcp`), e um dono
 # errado ali é ainda mais calado que no README: não quebra comando nenhum, só
 # leva a pessoa para uma página que não existe. `CONTRIBUTING.md` entrou pelo
-# mesmo motivo: ele manda abrir PR e issue neste repositório.
-DOCUMENTOS = ("README.md", "CLAUDE.md", "pyproject.toml", "CONTRIBUTING.md")
+# mesmo motivo: ele manda abrir PR e issue neste repositório. Ele mudou de
+# lugar em 17/09/2026, para `.github/`, e o caminho veio junto — o assert de
+# existência abaixo é o que obriga essa lista a acompanhar a mudança em vez de
+# passar a medir o vazio.
+DOCUMENTOS = ("README.md", "CLAUDE.md", "pyproject.toml", ".github/CONTRIBUTING.md")
 
 pytestmark = pytest.mark.politica
 

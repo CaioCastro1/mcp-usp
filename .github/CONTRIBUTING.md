@@ -4,14 +4,14 @@ O README convida a abrir issue ou pull request. Este arquivo diz o que é precis
 para que a sua PR seja aceita.
 
 Ele é curto de propósito. Quase tudo que você precisa saber está em
-[`docs/agents/CONVENTIONS.md`](docs/agents/CONVENTIONS.md), que tem o nome errado
+[`docs/agents/CONVENTIONS.md`](../docs/agents/CONVENTIONS.md), que tem o nome errado
 para quem chega: o arquivo é das convenções do repositório, e vale para gente
 tanto quanto para agente. Aqui ficam só as regras que não se negociam, com o
 ponteiro para onde cada uma é explicada. **O detalhe não é copiado**, porque
 cópia diverge do original e a divergência aparece justamente quando alguém
 confia nela.
 
-Leia também o [`CLAUDE.md`](CLAUDE.md), que tem os comandos do dia a dia e as
+Leia também o [`CLAUDE.md`](../CLAUDE.md), que tem os comandos do dia a dia e as
 regras críticas em uma página. A autoridade sobre qualquer fato do projeto é o
 `SPEC1.md`.
 
@@ -45,7 +45,7 @@ existe só na janela de quem conversou, e some.
 Vale reler a Definição de Pronto do §5 do `CLAUDE.md`. Em resumo: o dado que
 sustenta a mudança está registrado, nenhum segredo nem dado pessoal entrou no
 git, e o que você achou de passagem foi para
-[`docs/decisions/BACKLOG-correcoes.md`](docs/decisions/BACKLOG-correcoes.md) em
+[`docs/decisions/BACKLOG-correcoes.md`](../docs/decisions/BACKLOG-correcoes.md) em
 vez de virar desvio.
 
 Duas coisas que costumam surpreender quem chega:
