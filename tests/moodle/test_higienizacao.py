@@ -4,14 +4,12 @@ Estes são os únicos testes da suíte que passam HOJE: `scripts/higienizar.py`
 existe. Servem de piso — se eles ficarem vermelhos, nenhum outro teste significa
 coisa alguma, porque o insumo deixou de ser confiável.
 
-16/09/2026: T48 e T49 pulavam SEMPRE. Dependiam de `fixtures/moodle/raw/
-action_events.json`, e esse cru não existe em máquina nenhuma há semanas — o
-`raw/` do checkout principal tem sete arquivos e nenhum é ele. O skip dizia "só
-existe na máquina do dono", e a cobertura que ele escondia era exatamente a das
-duas propriedades que o higienizador promete. No mesmo dia três vazamentos
-foram confirmados na `main` (percentual real ao lado da nota trocada, Número
-USP de um colega em `filename`, contexto de usuário de um professor em
-`userpictureurl`), e nenhum teste aqui teria acusado.
+16/09/2026: T48 e T49 pulavam SEMPRE. Dependiam de um cru que não existe em
+máquina nenhuma há semanas — o `raw/` do checkout principal tem sete arquivos e
+nenhum é ele. O skip dizia "só existe na máquina do dono", e a cobertura que ele
+escondia era exatamente a das duas propriedades que o higienizador promete. No
+mesmo dia, revisão encontrou dado pessoal pontual em fixtures já publicadas que
+nenhum teste aqui teria acusado.
 
 Agora as propriedades são provadas sobre TODA fixture publicada e sobre um cru
 sintético que exercita cada família (T48-T55), a varredura por conteúdo roda
