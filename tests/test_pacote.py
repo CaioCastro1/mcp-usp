@@ -22,6 +22,7 @@ A divisão do trabalho, para ninguém achar que um cobre o outro:
 | P4 | o nome do comando é o `serverInfo.name` (L2 trava o outro lado) | nada |
 | P5 | a `version` do pacote é a que o `initialize` anuncia | um `ast.parse` |
 | P6 | o comando INSTALADO sobe o servidor certo, de outro cwd | um processo |
+| P7 | o User-Agent que vai para a USP diz a versão do pacote | um import |
 
 Nada aqui toca a rede da USP nem lê credencial: P6 para no `initialize`, como o
 handshake e como L1/L2 — nos três servidores o cliente da API só é construído
@@ -288,3 +289,42 @@ def test_p6_o_entry_point_instalado_sobe_o_servidor_certo(sistema, tmp_path):
             "porque lá as duas strings estão bem-formadas."
         )
         assert cliente.vivo()
+
+
+# ------------------------------- P7: o que o projeto diz sobre si mesmo do lado de lá
+
+
+def test_p7_o_user_agent_diz_a_versao_do_pacote():
+    """P7 — a versão viajava copiada à mão, e envelheceu calada.
+
+    Até 17/09/2026 os dois clientes traziam o literal `usp-mcp/0.1` no
+    User-Agent, e o pacote foi para `1.0.0` em 15/09 sem que nada reclamasse:
+    esse número não quebra chamada nenhuma e a USP não o lê, então nenhum teste
+    tinha por que olhar. É a mesma família do `Castro1` de 14/09 — defeito que
+    só aparece na máquina de quem está do outro lado.
+
+    P5 já trava a versão contra o que o `initialize` anuncia. P7 trava contra o
+    que sai no fio, que é o único lugar em que uma pessoa de fora da USP pode
+    nos identificar.
+    """
+    from usp_mcp import AGENTE
+    from usp_mcp.jupiter.cliente import AGENTE as do_jupiter
+    from usp_mcp.rucard.cliente import AGENTE as do_rucard
+
+    do_pacote = _pyproject()["project"]["version"]
+
+    assert AGENTE.startswith(f"usp-mcp/{do_pacote} "), (
+        f"o User-Agent é {AGENTE!r} e o pacote diz {do_pacote!r}. Quem "
+        "administra o sistema do outro lado lê essa string para saber quem "
+        "está batendo, e ela está descrevendo outra versão."
+    )
+    assert "0+sem-instalacao" not in AGENTE, (
+        "o agente caiu no valor de fora-de-instalação. Ele existe para checkout "
+        "solto; num ambiente com `pip install -e` presente, ele significa que a "
+        "metadata do pacote não foi encontrada — e P7 mediria o vazio."
+    )
+    assert do_jupiter == do_rucard == AGENTE, (
+        "os clientes deixaram de compartilhar o agente do pacote. Dois literais "
+        "iguais em arquivos diferentes divergem: foi exatamente assim que a "
+        "versão ficou em 0.1."
+    )
