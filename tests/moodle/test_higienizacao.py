@@ -45,21 +45,35 @@ _spec = importlib.util.spec_from_file_location("higienizar", RAIZ / "scripts" / 
 hig = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(hig)
 
-# cru → publicada. `raw/users_courses.json` é a captura de 15/09 e vira
-# `users_courses_15-09.json`; a `users_courses.json` publicada é de 31/08 e o
-# cru dela não existe mais. Cinco publicadas não têm cru: `action_events`,
-# `assign_ptc3314`, `course_contents_psi3323`, `course_contents_ptc3314` e
-# `users_courses`. Para elas, o publicado foi a entrada da re-higienização de
-# 16/09, e só as regras novas as tocaram.
+# cru → publicada, e este mapa foi **medido** em 17/09/2026, não escrito de
+# memória. O que existia antes afirmava três coisas erradas ao mesmo tempo, e
+# nenhuma delas podia aparecer: dos sete pares declarados, cinco nomeavam um cru
+# que não existe no disco (T58 pulava, calado), e os dois que existiam eram de
+# OUTRA captura — 74 matrículas e 70 itens de nota no cru de 31/08 contra 47 e
+# 45 nas publicadas de 15/09. Resultado: o canário reprovava o gate na máquina
+# do dono acusando diferença de dado como se fosse de higienização, e no CI,
+# onde `raw/` não existe, pulava inteiro. Zero verificação, nas duas pontas.
+#
+# A medição foi exaustiva e offline: higienizar cada um dos 14 crus e comparar
+# com cada uma das 15 publicadas. Três reproduzem, byte a byte, e são estes.
+# Uma delas desmente o comentário antigo em particular: a `users_courses.json`
+# publicada TEM cru, e é o de 31/08 — a que não tem é a `users_courses_15-09`.
+#
+# As doze publicadas de fora não entram por decreto: três são fixtures de erro
+# (sem cru por natureza), e as outras nove vêm da captura de 15/09, que foi
+# publicada **sem guardar o cru**. Recapturar custa chamada da conta do dono
+# (Regra de Ouro, §3.1) e é decisão dele, registrada no backlog. Quem publicar
+# a próxima captura sem guardar o cru recria exatamente este buraco.
 PARES_CRU = {
-    "forum_discussions_avisos.json": "forum_discussions_avisos.json",
-    "forums_ptc3314.json": "forums_ptc3314.json",
-    "grade_items_ptc3314.json": "grade_items_ptc3314.json",
-    "grades_overview.json": "grades_overview.json",
-    "submission_status_ec1.json": "submission_status_ec1.json",
-    "updates_since_ptc3314.json": "updates_since_ptc3314.json",
-    "users_courses.json": "users_courses_15-09.json",
+    "action_events.json": "action_events.json",
+    "course_contents_142033.json": "course_contents_psi3323.json",
+    "users_courses.json": "users_courses.json",
 }
+
+# Escrito à mão: sem isto, esvaziar `PARES_CRU` deixaria T58 verde sem comparar
+# nada, que é a forma de falso-verde que este arquivo persegue — e foi
+# literalmente o estado do arquivo até 17/09, com cinco pares fantasmas.
+PARES_ESPERADOS = 3
 
 
 def _cru_sintetico() -> dict:
@@ -483,3 +497,18 @@ def test_t58_o_cru_quando_existe_reproduz_a_publicada(cru, publicada):
         )
     esperado = json.loads((FIXTURES / publicada).read_text(encoding="utf-8"))
     assert hig.higienizar(json.loads(origem.read_text(encoding="utf-8"))) == esperado
+
+
+def test_t58b_o_canario_nao_pode_encolher_em_silencio():
+    """T58b — anti-vácuo do T58, que é o único teste com skip embutido.
+
+    T58 pula quando o cru não existe, e é o certo: no CI `raw/` não existe e
+    nada disso é alcançável. Mas skip e lista vazia se parecem de fora, e um
+    par removido para calar uma reprovação não deixaria rastro nenhum.
+    """
+    assert len(PARES_CRU) == PARES_ESPERADOS, (
+        f"o canário de reprodução tem {len(PARES_CRU)} pares e a conta declarada "
+        f"é {PARES_ESPERADOS}. Se um par saiu, diga aqui por que saiu e baixe o "
+        "número junto — foi o que 17/09 fez ao trocar sete pares declarados por "
+        "três medidos. Se um entrou, suba o número."
+    )

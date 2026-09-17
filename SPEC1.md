@@ -4093,3 +4093,50 @@ isso o U4 entrou junto: instrução de instalação que ainda cite o nome antigo
 gate, enquanto registro histórico segue livre para citá-lo.
 
 ---
+
+### 17/09/2026 — o canário de higienização não comparava nada, e mediu-se em vez de supor
+
+O `gate.sh` reprovava na máquina do dono em dois parâmetros de T58, o teste que promete que
+o cru, quando existe, reproduz a fixture publicada. A leitura fácil era "fixture velha".
+A medição disse outra coisa, e pior.
+
+Dos **sete** pares que o mapa declarava, **cinco nomeavam um arquivo cru que não existe no
+disco**. T58 pula quando o cru falta — por desenho, e é o certo, porque no CI `raw/` não
+existe —, então esses cinco passavam a vida pulando, calados. Os **dois** restantes
+existiam e eram de **outra captura**: 74 matrículas e 70 itens de nota no cru de 31/08,
+contra 47 e 45 nas publicadas de 15/09. O canário acusava diferença de **dado** como se
+fosse de **higienização**.
+
+Somando as duas pontas: verificação real, zero. No CI, zero por skip; na máquina do dono,
+zero por reprovação que não era sobre o que o teste diz medir. E a reprovação tinha custo
+próprio — barrava commit de quem estivesse mexendo em qualquer outra coisa.
+
+**O que foi medido**, offline e sem tocar a rede: higienizar cada um dos 14 crus e comparar
+com cada uma das 15 publicadas, exaustivamente. Três reproduzem byte a byte, e são os três
+que ficam. Uma delas desmente o comentário que estava no arquivo: a `users_courses.json`
+publicada **tem** cru, é o de 31/08, e a que não tem é a `users_courses_15-09`.
+
+As doze de fora não saíram por decreto: três são fixtures de erro, que não têm cru por
+natureza, e as outras nove vêm da captura de 15/09, **publicada sem guardar o cru**.
+Recapturar custa chamada da conta do dono (Regra de Ouro, §3.1) e é decisão dele. O que
+fica escrito, porque é a causa e não o sintoma: quem publicar a próxima captura sem guardar
+o cru recria este buraco inteiro.
+
+T58b entrou junto e trava o número de pares. Sem ele, remover um par para calar uma
+reprovação não deixaria rastro — que é exatamente como os cinco fantasmas sobreviveram.
+
+**Duas dívidas do mesmo dia fecharam junto.** O User-Agent que vai para a USP se anunciava
+como `usp-mcp/0.1` com o pacote em `1.0.0` desde 15/09: a versão estava declarada num lugar
+e copiada à mão em dois, e a cópia envelheceu calada porque aquele número não quebra
+chamada nenhuma e a USP não o lê. `VERSAO` e `AGENTE` passam a viver em
+`usp_mcp/__init__.py`, com a versão perguntada a `importlib.metadata`, e P7 trava o agente
+contra o `pyproject.toml` — recusando também o valor de fora-de-instalação, para não medir
+o vazio. É a mesma família do `Castro1` de 14/09: defeito que só aparece do lado de lá.
+
+E o CI voltou a rodar. O backlog de 17/09 registrava que ele existia e não rodava, por
+cobrança do GitHub Actions, e a própria linha previa que abrir o repositório mudaria isso.
+Mudou: repositório público não consome a cota paga. Seis runs no dia da abertura, seis
+completas, `gate (3.11)` e `gate (3.14)` em 42–54s. O `gate.sh` local deixou de ser a única
+porta — que era o defeito de origem, porque ele só roda quando alguém lembra.
+
+---

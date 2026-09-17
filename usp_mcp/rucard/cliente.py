@@ -50,6 +50,7 @@ import urllib.parse
 import urllib.request
 from datetime import date, datetime
 
+from usp_mcp import AGENTE
 from . import politica
 from .erros import (
     ConsultaNegada,
@@ -66,9 +67,9 @@ __all__ = [
 
 URL_BASE = "https://uspdigital.usp.br/rucard/servicos"
 
-# Identificável e com contato, como no Jupiter: quem administra o RUCard tem que
-# conseguir saber quem está batendo, e falar com alguém.
-AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/usp-mcp)"
+# O User-Agent vem do pacote (`usp_mcp/__init__.py`), com a versão perguntada
+# ao metadado em vez de repetida: as duas cópias à mão ficaram em `0.1` com o
+# pacote em 1.0.0. Segue no `__all__` daqui porque é onde os testes o leem.
 
 # O cardápio muda uma vez por semana, mas a virada não tem hora conhecida — por
 # isso um TTL curto o bastante para não atravessar a segunda-feira dormindo, com

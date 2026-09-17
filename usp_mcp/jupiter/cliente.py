@@ -29,6 +29,7 @@ import urllib.error
 import urllib.request
 from urllib.parse import quote
 
+from usp_mcp import AGENTE
 from usp_mcp.jupiter import dwr, politica
 from usp_mcp.jupiter.erros import ConsultaNegada, JupiterIndisponivel, RespostaInvalida
 from usp_mcp.jupiter.politica import CONSULTAS_PERMITIDAS
@@ -42,9 +43,9 @@ URL_BASE = "https://uspdigital.usp.br/jupiterweb/dwr/call/plaincall"
 # única que cita os currículos onde a exigência de fato mora.
 URL_PAGINA = "https://uspdigital.usp.br/jupiterweb"
 
-# Identificável e com contato, como o §9 do recon recomenda: quem administra o
-# JupiterWeb tem que conseguir saber quem está batendo, e falar com alguém.
-AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/usp-mcp)"
+# O User-Agent vem do pacote (`usp_mcp/__init__.py`), com a versão perguntada
+# ao metadado em vez de repetida: as duas cópias à mão ficaram em `0.1` com o
+# pacote em 1.0.0. Segue no `__all__` daqui porque é onde os testes o leem.
 
 # Um semestre. O dado desta fatia é ementa, crédito e pré-requisito — muda entre
 # semestres, e nunca por causa de uma pergunta repetida.
