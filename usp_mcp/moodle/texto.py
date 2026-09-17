@@ -21,6 +21,12 @@ que o texto de terceiro sai no resultado em vez de virar contagem. Mora aqui, e
 não em `avisos`, porque o próximo módulo que precisar dela vai ser o que lê
 `intro` de atividade — e a terceira semântica de "tirar a marcação" é como as
 duas de casamento por nome nasceram.
+
+`links` chegou em 17/09 e é a previsão acima se cumprindo: `material` precisou
+ler o `description` de bloco de texto (`label`) para achar o link que o professor
+deixou no meio da frase, e o título desse link é HTML que passa por `sem_html`.
+O extrator mora ao lado da limpeza pelo mesmo motivo que a limpeza mora ao lado
+do casamento: uma semântica de "o que é marcação e o que é texto" por servidor.
 """
 from __future__ import annotations
 
@@ -84,6 +90,38 @@ def sem_html(bruto: str) -> str:
     return _LINHAS_VAZIAS.sub("\n", "\n".join(
         linha.strip() for linha in legivel.splitlines()
     )).strip()
+
+
+# Uma âncora com `href`, aspas duplas ou simples, e o que houver até o fecho.
+# `[^>]*?` antes do `href` não atravessa `>`, então `<a name="x">` sem `href`
+# não casa com o `href` da âncora seguinte.
+_ANCORAS = re.compile(
+    r"""(?is)<a\b[^>]*?\bhref\s*=\s*(?:"([^"]*)"|'([^']*)')[^>]*>(.*?)</a\s*>"""
+)
+
+
+def links(bruto: str) -> list[tuple[str, str]]:
+    """(endereço, título) de cada `<a href>` do HTML, na ordem em que aparecem.
+
+    O endereço passa por `unescape` porque o Moodle grava `&amp;` no `href` e a
+    URL com `&amp;` literal não é a URL que o professor colou. O título passa por
+    `sem_html`, que já resolve entidade e marcação — `um <b>dois</b>` vira
+    `um dois`. Âncora sem `href` (`<a name=…>`) não é link e fica de fora. `src`
+    de imagem também: imagem não é link, e é `href` que o professor clica.
+
+    Mesma ressalva de `sem_html`: isto não interpreta HTML, extrai de um texto
+    que o filtro do Moodle já limpou. Quem classifica o que é material e o que é
+    ruído é quem chama — aqui só se separa endereço de título.
+    """
+    if not bruto or "href" not in bruto.lower():
+        return []
+    achados: list[tuple[str, str]] = []
+    for m in _ANCORAS.finditer(bruto):
+        endereco = m.group(1) if m.group(1) is not None else (m.group(2) or "")
+        endereco = _html.unescape(endereco).strip()
+        if endereco:
+            achados.append((endereco, sem_html(m.group(3))))
+    return achados
 
 
 def normalizar(s: str) -> str:
