@@ -72,4 +72,4 @@ informação: o que você pediu ao assistente, o que veio, e o que você esperav
 
 Mudança no código precisa de aprovação do dono do repositório. Sugestão é
 bem-vinda pelo caminho normal do GitHub, em
-<https://github.com/CaioCastro1/mcp-usp/issues>.
+<https://github.com/CaioCastro1/usp-mcp/issues>.

@@ -44,7 +44,7 @@ URL_PAGINA = "https://uspdigital.usp.br/jupiterweb"
 
 # Identificável e com contato, como o §9 do recon recomenda: quem administra o
 # JupiterWeb tem que conseguir saber quem está batendo, e falar com alguém.
-AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/mcp-usp)"
+AGENTE = "usp-mcp/0.1 (nao-oficial; +https://github.com/CaioCastro1/usp-mcp)"
 
 # Um semestre. O dado desta fatia é ementa, crédito e pré-requisito — muda entre
 # semestres, e nunca por causa de uma pergunta repetida.

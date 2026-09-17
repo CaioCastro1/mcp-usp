@@ -106,7 +106,7 @@ def test_d2_o_readme_nao_manda_preencher_o_token_para_o_gate():
 
 # Os comandos exatos do caminho manual, como se digitam. A ordem importa tanto
 # quanto em D1: o `cp` tem de vir antes de o README dizer "Pronto".
-CLONE = "git clone https://github.com/CaioCastro1/mcp-usp.git ~/usp-mcp"
+CLONE = "git clone https://github.com/CaioCastro1/usp-mcp.git ~/usp-mcp"
 INSTALACAO_EDITAVEL = "pip install -e ~/usp-mcp"
 CURA_MANUAL = "cp ~/usp-mcp/.env.example ~/usp-mcp/.env"
 
