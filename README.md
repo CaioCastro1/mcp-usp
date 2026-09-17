@@ -13,6 +13,9 @@ o que os autores usam, e a seção *Onde ele funciona* conta o resto.
 
 Projeto não-oficial, sem nenhum vínculo com a Universidade de São Paulo.
 
+Você não precisa saber programar para usar, nem contribuir com nada: instale, conecte e
+pergunte. Quem quiser mexer no código encontra o combinado em *Escopo e contribuição*.
+
 ## O que ele responde
 
 | Pergunta que você faz | Onde ele busca |
@@ -342,16 +345,27 @@ tamanho de cada arquivo, mas não devolve o endereço dele. Endereço sem a cred
 abre, e quem baixa de fato é a ferramenta de download, sem nunca pôr a sua chave num
 endereço.
 
+## Escopo e contribuição
+
+O repositório é público para ler, baixar e usar, sob licença MIT: você pode usar, modificar
+e redistribuir, desde que mantenha o aviso de autoria. O texto completo está no arquivo
+[`LICENSE`](LICENSE).
+
+O que este projeto mais precisa não é código: é saber quando a USP mudou alguma coisa e a
+resposta parou de bater. Se uma pergunta que funcionava parou, ou se o passo da chave
+travou, [abra uma issue](https://github.com/CaioCastro1/mcp-usp/issues/new/choose) — há um
+modelo para cada um dos dois casos, e o relato leva meio minuto. **Nunca cole o valor do
+seu token**, nem em issue, nem em log.
+
+Mudança no código precisa de acordo antes da PR, porque o projeto se apoia em invariantes
+que não são óbvios lendo o diff. Se você quer mexer, abra a issue primeiro; o combinado
+inteiro está em [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md).
+
 ## Rodando a partir do código
 
 Esta seção é para quem vai mexer no código. Quem só quer usar, inclusive o e-Disciplinas,
 já tem tudo o que precisa pela seção *Instalando*: ela baixa o projeto inteiro, e o
 script da chave vem junto.
-
-O repositório é público para ler, baixar e usar, sob licença MIT: você pode usar, modificar
-e redistribuir, desde que mantenha o aviso de autoria. O texto completo está no arquivo
-`LICENSE`. Mudanças necessitam de aprovação. Sugestão é bem-vinda pelo caminho normal do
-GitHub: abra uma issue, ou um fork com pull request.
 
 ```bash
 git clone git@github.com:CaioCastro1/mcp-usp.git && cd mcp-usp
