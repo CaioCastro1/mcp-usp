@@ -44,10 +44,16 @@ fixture. Custam um `read_text` por arquivo e entram no gate junto com o resto.
 """
 from __future__ import annotations
 
+import os
 import pathlib
 import re
 
 import pytest
+
+try:  # o extra `dev` traz; um ambiente sem ele faz C10 pular DIZENDO isso.
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover
+    yaml = None
 
 RAIZ = pathlib.Path(__file__).resolve().parents[1]
 WORKFLOWS = RAIZ / ".github" / "workflows"
@@ -362,3 +368,64 @@ def test_c7_as_varreduras_pegam_o_que_existem_para_pegar(tmp_path):
     assert liga_a_camada_live(limpo) == [], "acusou um comentário que só explica"
     assert segredos_em(limpo) == [], "acusou um workflow que não tem segredo nenhum"
     assert desliga_a_suite(limpo) == [], "acusou um workflow que roda o gate inteiro"
+
+
+# ------------------------------- C10: o GitHub consegue ABRIR o arquivo
+
+
+def test_c10_todo_workflow_e_yaml_que_o_github_consegue_carregar():
+    """C10 — os nove testes acima leem o workflow como TEXTO, e texto passa.
+
+    Custou três dias de CI vermelho: o merge de 16/09 deixou dois blocos de
+    comentário colados e o `runs-on` com indentação de dois espaços, fora do
+    job. O arquivo virou YAML inválido, o GitHub recusou antes de criar job
+    nenhum — falha em 0s, sem log —, e a suíte seguiu verde nos nove, porque
+    nenhum deles abre o arquivo como o GitHub abre. É o item 11 do `CLAUDE.md`
+    na forma mais cara: verde na suíte, vermelho no único lugar que importa.
+
+    Um parser de verdade, e não uma checagem de indentação escrita à mão: a
+    pergunta "isto é YAML válido?" já tem implementação, e este repositório já
+    pagou três vezes pelo preço de a mesma pergunta ter duas (§9, 12/09/2026).
+    """
+    if yaml is None:  # pragma: no cover - só num ambiente sem o extra `dev`
+        assert not os.environ.get("GITHUB_ACTIONS"), (
+            "o `pyyaml` não está instalado NO CI. C10 é o único teste que abre o "
+            'workflow como o GitHub abre; sem ele o runner valida a si mesmo '
+            'lendo texto. Instale com `pip install -e ".[dev]"`.'
+        )
+        pytest.skip(
+            "sem `pyyaml`: C10 não conferiu se o GitHub consegue CARREGAR os "
+            "workflows — e só isso. C1-C9 conferiram o conteúdo, como sempre. "
+            'Instale com `.venv/bin/python -m pip install -e ".[dev]"`.'
+        )
+
+    for arquivo in workflows():
+        try:
+            carregado = yaml.safe_load(arquivo.read_text(encoding="utf-8"))
+        except yaml.YAMLError as erro:
+            raise AssertionError(
+                f"{arquivo.name} não é YAML válido, então o GitHub recusa o "
+                f"arquivo inteiro: nenhum job roda, a falha vem em 0s e sem log, "
+                f"e nada nesta suíte percebe. Erro do parser:\n{erro}"
+            ) from None
+
+        jobs = (carregado or {}).get("jobs")
+        assert isinstance(jobs, dict) and jobs, (
+            f"{arquivo.name} carrega, mas não declara `jobs:` como um mapa de "
+            "trabalhos. Um workflow sem job é um arquivo que o GitHub aceita e "
+            "que não roda nada — o falso-verde que este repositório persegue."
+        )
+
+        for nome, trabalho in jobs.items():
+            assert isinstance(trabalho, dict), (
+                f"{arquivo.name}: o job `{nome}` não é um mapa. Quase sempre é "
+                "indentação: uma chave do job escrita no nível de `jobs:` vira "
+                "um job irmão, com nome de chave e sem nada dentro."
+            )
+            faltando = [c for c in ("runs-on", "steps") if c not in trabalho]
+            assert not faltando, (
+                f"{arquivo.name}: o job `{nome}` não declara "
+                f"{', '.join(f'`{c}`' for c in faltando)}. O GitHub exige os "
+                "dois; sem eles o arquivo é recusado na carga, do mesmo jeito "
+                "que um YAML quebrado."
+            )
