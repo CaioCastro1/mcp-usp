@@ -121,6 +121,12 @@ contrário. Os que mordem em toda sessão:
    duas ferramentas que as usam não existem no `tools/list`. O desenho e o que ele
    não protege estão em
    `docs/superpowers/specs/2026-09-15-entrega-com-confirmacao-design.md`.
+   Desde 17/09/2026 o servidor **conta em prosa** que essa capacidade existe e
+   está desligada — no `instructions` do `initialize` e no fim do `diagnostico`,
+   nunca com uma ferramenta a mais na lista. Se a próxima sessão pensar em
+   resolver "o assistente não sabe" com um item novo no `tools/list`, leia antes
+   `docs/superpowers/specs/2026-09-17-assistente-sabe-o-que-esta-desligado-design.md`:
+   a razão de a lista de ferramentas ser o lugar errado está lá.
 4. **Nenhum segredo no repositório** (Invariante 3). Nunca leia, imprima ou ecoe o
    valor de `MOODLE_TOKEN`. Fixture do Moodle só entra no git depois da higienização
    do §3.3 — nome, e-mail, `userid`, `fullname` de turma e notas viram valor sintético

@@ -136,3 +136,49 @@ def test_d6_custa_exatamente_uma_chamada():
 
     assert len(cliente.chamadas) == 1, f"chamou {len(cliente.chamadas)} vezes"
     assert cliente.chamadas[0][0] == "core_webservice_get_site_info"
+
+
+def test_d7_o_diagnostico_diz_o_que_esta_desligado_neste_servidor(monkeypatch):
+    """D7 (17/09/2026) — a outra metade de "isto funciona aqui?".
+
+    A tabela acima responde sobre o SITE: que funções o token alcança. Uma
+    capacidade que a configuração deste processo mantém desligada não falha em
+    nenhuma linha dela — ela simplesmente não aparece, e some sem deixar rastro.
+    Foi essa metade calada que fez o assistente não saber que existe um caminho
+    de escrita. A ferramenta para onde a pessoa já é mandada passa a dizê-lo.
+    """
+    monkeypatch.delenv(politica.NOME_DA_FLAG, raising=False)
+
+    texto = diag.diagnostico(_cliente(_SITE_COMPLETO))
+
+    assert "DESLIGADA" in texto
+    assert politica.NOME_DA_FLAG in texto, "não disse qual variável liga"
+    assert "NÃO tem desfazer" in texto, "não declarou o custo"
+    # E não estragou a tabela: o bloco novo é prosa no fim, não uma linha de
+    # ferramenta — D2 lê as reprovadas por essa marca.
+    assert "NÃO — faltam" not in texto
+
+
+def test_d7b_com_a_flag_ligada_o_diagnostico_diz_que_esta_ligada(monkeypatch):
+    monkeypatch.setenv(politica.NOME_DA_FLAG, "1")
+
+    texto = diag.diagnostico(_cliente(_SITE_COMPLETO))
+
+    assert "Escrita: LIGADA" in texto
+    assert "DESLIGADA" not in texto, f"diz as duas coisas ao mesmo tempo:\n{texto}"
+
+
+def test_d7c_site_sem_lista_de_funcoes_ainda_diz_o_estado_da_escrita(monkeypatch):
+    """D7c — o caminho que retorna cedo é o outro lugar onde a resposta some.
+
+    Um site que não devolve `functions` é justamente onde a pessoa está
+    configurando pela primeira vez, e é onde saber o que está desligado vale
+    mais. Um `return` antecipado engoliria o bloco sem ninguém ver.
+    """
+    monkeypatch.delenv(politica.NOME_DA_FLAG, raising=False)
+    mudo = {k: v for k, v in _SITE_COMPLETO.items() if k != "functions"}
+
+    texto = diag.diagnostico(_cliente(mudo))
+
+    assert "não devolveu a lista de funções" in texto
+    assert "DESLIGADA" in texto
