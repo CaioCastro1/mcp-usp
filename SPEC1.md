@@ -239,7 +239,10 @@ Não negociáveis, independentemente do que a descoberta sugerir.
 
 3. **Nenhum segredo no repositório.** Token e hash por env var. `.env` no gitignore.
    Fixtures higienizadas (nome, e-mail, `userid`, ids de turma, notas) antes de qualquer
-   commit.
+   commit. O invariante governa **o que entra**: vale para toda fixture daqui para frente,
+   sem exceção. O histórico anterior às regras de 16/09 carrega versões que não passaram
+   por elas, e isso foi aceito por decisão registrada (§9, 17/09/2026) — aceitar o passado
+   não afrouxa o presente.
 
 4. **Credencial pessoal nunca sai da máquina do dono.** Dado autenticado (Moodle) só no
    entrypoint local. Um servidor hospedado do projeto não recebe token de Senha Única de
@@ -4014,5 +4017,42 @@ como cara, e ainda pegaria menos. Sem o `pyyaml` instalado, C10 **pula dizendo e
 que não conferiu** (Invariante 7) — menos dentro do CI, onde o pulo é reprovação: ali o
 pacote é instalado com `.[dev]` a cada run, e um C10 que pula no runner seria o runner
 validando a si mesmo por texto.
+
+---
+
+### 17/09/2026 — o histórico anterior às regras de 16/09 fica como está, e o repositório pode abrir assim
+
+O portão que a decisão de 16/09 deixou marcado — risco aceito enquanto privado, **a
+revisitar antes de qualquer decisão de tornar público** — foi exercitado e fechado: o
+histórico fica como está, e abrir o repositório não depende de reescrevê-lo. Decisão dos
+dois autores.
+
+O que foi **medido** antes de decidir, e não suposto:
+
+- A ponta está limpa. 234 arquivos rastreados, nenhuma fixture acusada pela varredura por
+  conteúdo, nenhum cru, nenhum `.env`, nenhuma configuração de cliente.
+- O que o histórico alcançável por branch ainda carrega de dado real cabe em **um blob, um
+  campo** — uma forma de Número USP numa fixture higienizada pelas regras antigas, que não
+  conheciam aquele campo. É o mesmo mecanismo que o §9 de 16/09 registra: lista exata
+  envelhece a cada captura. As outras oito versões anteriores passam na varredura de hoje.
+- As capturas cruas, de antes da primeira higienização, **não são alcançáveis por branch
+  nenhuma**. Existem como objetos órfãos presos por refs de pull request — que são
+  read-only e que force-push não alcança.
+
+A alternativa foi **construída antes de ser descartada**, e não no papel: a reescrita com
+`filter-repo` rodou num espelho e foi verificada — 298 commits preservados, árvore da ponta
+byte a byte idêntica, os nove blobs de versão anterior substituídos pelo texto já
+higienizado, varredura limpa nos 1.618 objetos do histórico reescrito. Nada foi empurrado.
+Ela está descartada por decisão, não por não funcionar.
+
+O que pesou contra ela: **reescrever não tira nada do GitHub sozinho.** As refs de pull
+request seguem servindo os commits antigos por SHA em visualização em cache, e só saem por
+ticket no Suporte, que atua caso a caso. A única rota que de fato limparia — publicar a
+partir de um repositório novo — custaria as 86 threads de PR, que é onde mora boa parte do
+porquê das decisões deste projeto.
+
+Este registro não nomeia arquivo, campo nem commit, e isso é de propósito: a decisão de
+16/09 de guardar o registro **sem guardar o mapa** continua valendo, e vale mais agora que o
+repositório vai a público.
 
 ---
