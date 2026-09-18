@@ -45,9 +45,40 @@ tomada.
 ligada. Um texto que só falasse do estado desligado envelheceria calado no
 servidor de quem ligou — e "o assistente sabe o que está ligado" é a mesma
 pergunta, lida do outro lado.
+
+**Segundo defeito de uso real, um dia depois (18/09/2026).** Com o texto acima
+no ar, o dono pediu para entregar uma atividade e o assistente respondeu que
+não controlava isso e não sabia onde ficava o `.env`. Fez exatamente o que o
+texto mandava; o texto é que estava incompleto em duas coisas:
+
+1. **Não dizia onde o arquivo está, e o servidor sabe.** `usp_mcp.env.achar_env()`
+   devolve o caminho do `.env` que ESTE processo lê. Era informação na mão que
+   não passava adiante — "no arquivo .env do servidor" mandava a pessoa procurar.
+   Agora o caminho absoluto sai no texto, nos dois estados e nas duas versões
+   (a curta do diagnóstico inclusive). Quando `achar_env()` devolve None (o
+   pacote copiado para `site-packages`, por exemplo), o texto diz isso e diz por
+   onde a variável entra então, em vez de inventar um caminho provável.
+2. **Confundia "não ligar por conta própria" com "não ligar nunca".** São dois
+   casos, e o texto passou a separá-los com todas as letras. Por iniciativa do
+   assistente, ou por dedução do que a pessoa quis dizer, continua não sendo o
+   caminho — pedido de entrega não é pedido de ligar. Quando a pessoa pede de
+   forma inequívoca, o assistente pode editar aquele arquivo por ela.
+
+Apontar o assistente para o `.env` traz uma regra de segurança que é
+obrigatória e vem no mesmo parágrafo: **mexer só naquela linha e nunca imprimir
+o conteúdo do arquivo**, porque ele guarda o `MOODLE_TOKEN`. Sem essa frase,
+dar o caminho seria convidar o token a aparecer no meio de uma conversa. E como
+quem abre o arquivo vai ver `USP_MCP_ALLOW_WRITES` logo acima, com "WRITES" no
+nome, o texto diz o que ela faz de verdade: nada, nos três servidores.
+
+O que NÃO mudou em 18/09: o padrão segue sendo não escrever, as duas ferramentas
+seguem fora do `tools/list` com a flag desligada, e o texto segue sem palavra de
+recomendação — o teste que proíbe `ligue`, `habilite`, `recomendo`, `basta` e
+`é só` continua valendo, e a redação é que se curvou a ele.
 """
 from __future__ import annotations
 
+from ..env import achar_env
 from .politica import NOME_DA_FLAG
 
 # Os nomes das duas ferramentas de escrita. Escritos aqui, e não importados do
@@ -58,46 +89,9 @@ from .politica import NOME_DA_FLAG
 NOME_RASCUNHO = "salvar_rascunho"
 NOME_ENTREGAR = "entregar"
 
-# O fato nu, na versão que cabe em qualquer lugar: o diagnóstico usa esta, e as
-# instruções usam esta MAIS o parágrafo seguinte. Duas versões do mesmo fato,
-# uma contida na outra, e não dois textos que se parecem — foi assim que este
-# projeto aprendeu que a segunda cópia é a que envelhece calada.
-_DESLIGADA = (
-    f"Escrita: DESLIGADA. Este servidor só lê o e-Disciplinas agora. Existe uma "
-    f"capacidade de escrita neste projeto — salvar o texto do rascunho de uma "
-    f"entrega, e enviar uma entrega para correção — e ela está desligada, por "
-    f"isso as duas ferramentas dela não estão nesta conexão. Quem liga é a "
-    f"pessoa dona do token, pondo {NOME_DA_FLAG}=1 no arquivo .env do servidor e "
-    f"subindo o servidor de novo. Enviar uma entrega para correção NÃO tem "
-    f"desfazer, nem por aqui nem pela API do Moodle."
-)
-
-_DESLIGADA_RESTO = (
-    "Conte isso a quem perguntar o que dá para fazer por aqui, ou a quem pedir "
-    "para entregar alguma coisa: que a capacidade existe, que está desligada, o "
-    "que ela custa, e que ligar é decisão de quem responde pela conta — não sua, "
-    "e não deste processo. Ligar por conta própria não é o caminho, e insistir "
-    "também não: enquanto a variável não estiver no ambiente do servidor não há "
-    "ferramenta nenhuma para chamar, e não há o que tentar. Com a escrita "
-    "ligada, cada uma das duas ainda pede duas chamadas — a primeira mostra o "
-    "plano do que mudaria e não escreve nada."
-)
-
-_LIGADA = (
-    f"Escrita: LIGADA, por {NOME_DA_FLAG}=1 no ambiente deste servidor. As "
-    f"ferramentas `{NOME_RASCUNHO}` e `{NOME_ENTREGAR}` estão nesta conexão e "
-    f"escrevem no e-Disciplinas em nome de quem é dono do token. Cada uma pede "
-    f"duas chamadas: a primeira devolve o plano do que mudaria e um código, e só "
-    f"a segunda, repetindo o código, escreve. Enviar uma entrega para correção "
-    f"NÃO tem desfazer, nem por aqui nem pela API do Moodle."
-)
-
-_LIGADA_RESTO = (
-    "Diga que a escrita está ligada quando ela for relevante para a conversa: "
-    "quem ligou pode ter esquecido, e o custo de descobrir depois de enviar é o "
-    "que não tem volta. Quem desliga é a mesma pessoa que ligou, tirando a "
-    "variável do .env — não é passo seu."
-)
+# A outra variável de escrita do `.env`. Nomeada aqui só para o texto dizer o
+# que ela faz (nada), e não para ser lida: este módulo não consulta o valor dela.
+_A_OUTRA_FLAG = "USP_MCP_ALLOW_WRITES"
 
 # A primeira coisa que o cliente lê, e a razão de o resto existir. Ela diz o que
 # este texto NÃO é, para que ninguém o encha com o que já viaja na descrição de
@@ -121,6 +115,122 @@ def escrita_ligada() -> bool:
     return entrega_habilitada()
 
 
+def _onde_esta_o_env() -> str:
+    """Uma frase com o caminho absoluto do `.env` que este processo lê.
+
+    Pergunta ao `usp_mcp.env`, que é quem sabe, em vez de repetir a busca: se
+    a regra de onde procurar mudar lá, o texto daqui acompanha sem ninguém
+    lembrar de editar. Com None, diz que não achou e por onde a variável entra
+    então — um caminho provável mandaria a pessoa editar um arquivo que o
+    processo não lê, que é o defeito de 18/09 com outro nome.
+    """
+    caminho = achar_env()
+    if caminho is None:
+        return (
+            "Este processo não achou arquivo .env nenhum (procurou na raiz do "
+            "checkout e no checkout que tem o .git), então não há arquivo para "
+            "editar: aqui a variável só entra pelo ambiente de quem sobe o "
+            "servidor, como o bloco env da configuração do cliente MCP."
+        )
+    return f"O arquivo .env que este processo lê é {caminho}."
+
+
+# A regra de segurança, escrita uma vez e usada nos dois estados: quem edita o
+# `.env` para ligar e quem edita para desligar mexem no mesmo arquivo, e o
+# `MOODLE_TOKEN` está lá nas duas vezes.
+_COMO_EDITAR = (
+    f"mexa só na linha de {NOME_DA_FLAG} (acrescente-a se não existir) e nunca "
+    f"imprima nem cite o conteúdo do arquivo, nem em parte: ele guarda o "
+    f"MOODLE_TOKEN, credencial pessoal de quem é dono da conta. A mudança só "
+    f"vale depois de o servidor subir de novo, porque a variável é lida no "
+    f"ambiente do processo, e este já subiu com o valor de agora."
+)
+
+
+def _desligada() -> str:
+    # O fato nu, na versão que cabe em qualquer lugar: o diagnóstico usa esta,
+    # e as instruções usam esta MAIS `_desligada_resto()`. Duas versões do mesmo
+    # fato, uma contida na outra, e não dois textos que se parecem — foi assim
+    # que este projeto aprendeu que a segunda cópia é a que envelhece calada.
+    return (
+        f"Escrita: DESLIGADA. Este servidor só lê o e-Disciplinas agora. Existe "
+        f"uma capacidade de escrita neste projeto — salvar o texto do rascunho de "
+        f"uma entrega, e enviar uma entrega para correção — e ela está desligada, "
+        f"por isso as duas ferramentas dela não estão nesta conexão. Quem liga é "
+        f"a pessoa dona do token, pondo {NOME_DA_FLAG}=1 no arquivo .env do "
+        f"servidor e subindo o servidor de novo. {_onde_esta_o_env()} Enviar uma "
+        f"entrega para correção NÃO tem desfazer, nem por aqui nem pela API do "
+        f"Moodle."
+    )
+
+
+def _desligada_resto() -> str:
+    if achar_env() is None:
+        pedido = (
+            "Já se a pessoa pedir, com todas as letras, que a escrita seja "
+            "ligada, não há arquivo que você possa editar por ela: a variável "
+            "entra por onde o servidor é subido, e quem sabe onde isso está é "
+            "ela."
+        )
+    else:
+        pedido = (
+            "Já se a pessoa pedir, com todas as letras, que a escrita seja "
+            f"ligada, você pode editar aquele arquivo por ela. Ao editar, "
+            f"{_COMO_EDITAR}"
+        )
+    return (
+        "Conte isso a quem perguntar o que dá para fazer por aqui, ou a quem "
+        "pedir para entregar alguma coisa: que a capacidade existe, que está "
+        "desligada, o que ela custa, onde ela liga, e que ligar é decisão de "
+        "quem responde pela conta — não sua, e não deste processo. São dois "
+        "casos, e eles não se misturam. Ligar por conta própria não é o caminho, "
+        "e insistir também não: nem por iniciativa sua, nem por dedução do que a "
+        "pessoa quis dizer — pedido de entrega com a escrita desligada é pedido "
+        "de entrega, não pedido de ligar, e a resposta é contar o que está "
+        "acima. Enquanto a variável não estiver no ambiente do servidor não há "
+        f"ferramenta nenhuma para chamar, e não há o que tentar. {pedido} "
+        f"{_A_OUTRA_FLAG}, a outra variável de escrita deste projeto, não é o "
+        "caminho para isto: nos três servidores deste projeto ela não abre nada "
+        "— nem estas duas ferramentas, nem a lista de bloqueio permanente — e "
+        "pô-la em 1 não faz a escrita aparecer. Com a escrita ligada, cada uma "
+        "das duas ainda pede duas chamadas — a primeira mostra o plano do que "
+        "mudaria e não escreve nada."
+    )
+
+
+def _ligada() -> str:
+    return (
+        f"Escrita: LIGADA, por {NOME_DA_FLAG}=1 no ambiente deste servidor. "
+        f"{_onde_esta_o_env()} As ferramentas `{NOME_RASCUNHO}` e "
+        f"`{NOME_ENTREGAR}` estão nesta conexão e escrevem no e-Disciplinas em "
+        f"nome de quem é dono do token. Cada uma pede duas chamadas: a primeira "
+        f"devolve o plano do que mudaria e um código, e só a segunda, repetindo "
+        f"o código, escreve. Enviar uma entrega para correção NÃO tem desfazer, "
+        f"nem por aqui nem pela API do Moodle."
+    )
+
+
+def _ligada_resto() -> str:
+    if achar_env() is None:
+        volta = (
+            "a variável está no ambiente de quem sobe o servidor, não num "
+            "arquivo que você alcance por aqui, e quem sabe onde a pôs é ela."
+        )
+    else:
+        volta = (
+            f"você pode editar aquele arquivo por ela, com a mesma regra: "
+            f"{_COMO_EDITAR}"
+        )
+    return (
+        "Diga que a escrita está ligada quando ela for relevante para a "
+        "conversa: quem ligou pode ter esquecido, e o custo de descobrir depois "
+        "de enviar é o que não tem volta. Quem desliga é a mesma pessoa que "
+        "ligou, tirando a variável do ambiente do servidor e subindo o servidor "
+        "de novo — não é passo seu, nem por iniciativa própria nem por dedução. "
+        f"Se ela pedir com todas as letras, {volta}"
+    )
+
+
 def estado_da_escrita(*, curto: bool = False) -> str:
     """O estado da escrita em prosa, na versão curta ou na inteira.
 
@@ -128,10 +238,10 @@ def estado_da_escrita(*, curto: bool = False) -> str:
     um resumo parecido. É o que garante que o diagnóstico e o `initialize` não
     digam coisas diferentes sobre o mesmo servidor.
     """
-    base, resto = (_LIGADA, _LIGADA_RESTO) if escrita_ligada() else (
-        _DESLIGADA,
-        _DESLIGADA_RESTO,
-    )
+    if escrita_ligada():
+        base, resto = _ligada(), _ligada_resto()
+    else:
+        base, resto = _desligada(), _desligada_resto()
     return base if curto else f"{base}\n\n{resto}"
 
 
@@ -139,6 +249,7 @@ def instrucoes() -> str:
     """O texto do campo `instructions` do `initialize`.
 
     Montado a cada subida do processo, e não constante de módulo, porque ele
-    depende do ambiente: o servidor que sobe com a flag ligada diz outra coisa.
+    depende do ambiente: o servidor que sobe com a flag ligada diz outra coisa,
+    e o caminho do `.env` é o daquela máquina.
     """
     return f"{_ABERTURA}\n\n{estado_da_escrita()}"
