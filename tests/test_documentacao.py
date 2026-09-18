@@ -22,6 +22,22 @@ olham a outra seção. A cura foi o caminho manual clonar, criar o venv DENTRO d
 clone e instalar editável, que é o layout que `env.py`, o `.mcp.json` e o
 `servidor.sh` já suportam; D3 afirma os três passos pela string que se digita.
 
+D4 é de 18/09/2026 e guarda o caminho rápido, que é a mensagem que a pessoa
+cola no assistente. Até essa data era UMA mensagem, escrita num Mac para um Mac,
+e ela quebrava em quatro lugares no Windows, três deles invisíveis para quem
+cola: mandava rodar o `scripts/gate.sh`, que procura `.venv/bin/python`, caía no
+`python3` da Microsoft Store e reprovava 58 testes (o dono do projeto viu o
+assistente gastar sete minutos tentando entender se a quebra era real); apontava
+para `.venv/bin/`, que no Windows é `.venv\Scripts\` com `.exe`; mandava rodar
+`./scripts/token.sh` sem dizer que ali precisa do Git Bash; e terminava chamando
+`diagnostico`, que exige a chave e toca a USP, no exato momento em que a chave é
+o que falta. O gate, além disso, é ferramenta de pré-commit, e não tem o que
+fazer num roteiro de instalação em sistema nenhum. A cura foi uma mensagem por
+sistema, e a conferência virou o `--auto-verificar`, que é offline e não precisa
+de chave. D4 afirma isso pelo texto: três blocos, cada um com o endereço do
+repositório e o `--auto-verificar`, nenhum com gate, suíte ou `diagnostico`, e
+os caminhos do sistema certo em cada um.
+
 Documento também envelhece calado (é a lição do §9 de 31/08 sobre estado em
 `CLAUDE.md`/`README.md`): a diferença aqui é que a ordem errada volta a doer em
 toda pessoa nova, e não só na próxima sessão de IA.
@@ -138,3 +154,91 @@ def test_d3_o_caminho_manual_instala_dentro_do_clone_e_cria_o_env():
         "o README diz 'Pronto' antes de mandar criar o `.env`. Quem lê de cima "
         "para baixo abre o assistente sem a hash do bandejão."
     )
+
+
+# A conferência que funciona sem chave e sem rede, nos três servidores, como se
+# digita. É por `python -m` de propósito: o comando instalado (`usp-mcp-rucard`)
+# ignora o argumento e sai com 0 sem imprimir nada, medido em 18/09/2026.
+VERIFICACAO = "--auto-verificar"
+REPOSITORIO = "https://github.com/CaioCastro1/usp-mcp"
+# O que foi aprendido com uso e não pode sair da mensagem.
+UM_PASSO = "UM PASSO POR MENSAGEM"
+# Ferramenta de quem mantém, e a chamada que exige a chave: nenhuma entra no
+# roteiro de instalação. `pytest` cobre "rode a suíte" em qualquer forma.
+PROIBIDOS = ("gate.sh", "pytest", "diagnostico")
+
+
+def prompts_do_caminho_rapido() -> dict[str, str]:
+    """Os blocos ```text da subseção *O caminho rápido*, por sistema."""
+    instalando = bloco("Instalando")
+    inicio = instalando.find("### O caminho rápido")
+    fim = instalando.find("### O caminho manual")
+    assert inicio != -1 and fim != -1 and inicio < fim, (
+        "a seção Instalando perdeu *O caminho rápido* ou *O caminho manual*, ou "
+        "trocou a ordem. Se a estrutura mudou, este teste precisa saber."
+    )
+    rapido = instalando[inicio:fim]
+
+    prompts: dict[str, str] = {}
+    for sistema in ("Mac", "Windows", "Linux"):
+        marca = f"#### No {sistema}\n"
+        i = rapido.find(marca)
+        assert i != -1, (
+            f"o caminho rápido não tem mais a subseção `#### No {sistema}`. Uma "
+            "mensagem só, com 'se você estiver no Windows faça assim', é o que "
+            "quebrava: o assistente escolhia errado e a pessoa não percebia."
+        )
+        i_abre = rapido.find("```text\n", i)
+        i_fecha = rapido.find("\n```\n", i_abre + 1)
+        assert i_abre != -1 and i_fecha != -1, f"a subseção {sistema} não tem um bloco ```text"
+        prompts[sistema] = rapido[i_abre + len("```text\n") : i_fecha]
+    return prompts
+
+
+def test_d4_o_caminho_rapido_tem_um_prompt_por_sistema_e_confere_sem_chave():
+    prompts = prompts_do_caminho_rapido()
+
+    for sistema, prompt in prompts.items():
+        assert REPOSITORIO in prompt, (
+            f"o prompt do {sistema} não diz de onde clonar. Sem o endereço o "
+            "assistente adivinha, e é o mesmo bug do `Castro1` de 14/09 por outro caminho."
+        )
+        assert VERIFICACAO in prompt, (
+            f"o prompt do {sistema} não confere a instalação com `{VERIFICACAO}`. "
+            "É a única conferência que roda sem chave e sem rede nos três sistemas."
+        )
+        # ` -m usp_mcp.` e não `python -m`: no Windows o interpretador é `python.exe`.
+        assert " -m usp_mcp." in prompt, (
+            f"o prompt do {sistema} roda o `{VERIFICACAO}` sem `python -m`. Pelo "
+            "comando instalado o argumento é ignorado e a saída é 0 sem texto: um "
+            "verde que não conferiu nada."
+        )
+        assert UM_PASSO in prompt, (
+            f"o prompt do {sistema} perdeu o '{UM_PASSO}' do passo da chave. Foi "
+            "aprendido com uso: a lista inteira de uma vez ninguém lê."
+        )
+        assert "token.sh" in prompt, f"o prompt do {sistema} não obtém a chave do e-Disciplinas."
+        for proibido in PROIBIDOS:
+            assert proibido not in prompt, (
+                f"o prompt do {sistema} cita `{proibido}`. Gate e suíte são de quem "
+                "mantém o projeto, e `diagnostico` exige a chave que a instalação "
+                "ainda não tem: nenhum dos três confere uma instalação."
+            )
+
+    # Os caminhos são do sistema certo, e não do sistema em que o README foi escrito.
+    assert "Scripts" in prompts["Windows"] and ".exe" in prompts["Windows"], (
+        "o prompt do Windows não fala de `Scripts` nem de `.exe`: é o venv do Mac "
+        "de novo, e lá `.venv/bin/` não existe."
+    )
+    assert ".venv/bin" not in prompts["Windows"], (
+        "o prompt do Windows aponta para `.venv/bin`. No Windows essa pasta não existe."
+    )
+    assert "Git Bash" in prompts["Windows"], (
+        "o prompt do Windows não diz que o `token.sh` roda no Git Bash. No "
+        "PowerShell ele não roda, e o assistente não tem como saber sozinho."
+    )
+    for sistema in ("Mac", "Linux"):
+        assert ".venv/bin" in prompts[sistema], f"o prompt do {sistema} não aponta para `.venv/bin`."
+        assert "Scripts" not in prompts[sistema], (
+            f"o prompt do {sistema} fala de `Scripts`, que é a pasta do Windows."
+        )
