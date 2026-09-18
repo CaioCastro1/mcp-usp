@@ -85,10 +85,6 @@ Instale o usp-mcp neste computador e me conecte a ele.
    UM PASSO POR MENSAGEM: diga o que fazer, espere eu responder que fiz, e só então
    mande o próximo. Não me mande a lista inteira de uma vez.
 4. No fim, chame a ferramenta `diagnostico` e me diga o que ficou funcionando.
-
-Me explique em português comum. Eu não sei o que são MCP, venv, token nem escopo de
-usuário — quando precisar de uma dessas palavras, diga numa frase o que ela significa
-antes de usar.
 ```
 
 ### O caminho manual
