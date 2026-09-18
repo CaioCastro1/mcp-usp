@@ -25,7 +25,7 @@ ainda não chegou aqui — usa o script.
 """
 from __future__ import annotations
 
-from . import politica
+from . import capacidades, politica
 
 # O que cada ferramenta exposta por este servidor precisa que o site tenha.
 #
@@ -35,13 +35,19 @@ from . import politica
 # D4 trava a união disto contra a allowlist, que é o que impede a tabela de
 # envelhecer calada quando uma função nova entrar.
 #
-# `salvar_rascunho` e `entregar` (15/09/2026) NÃO entram aqui, e a omissão é
-# decidida: esta tabela responde "o que este servidor sempre oferece funciona no
-# seu Moodle?", e as duas só existem com `USP_MCP_ENTREGA=1`. Listá-las com a
-# flag desligada anunciaria, dentro de um texto que o modelo lê, duas
-# ferramentas que não estão no `tools/list` — que é exatamente o que o desenho
-# delas evita ao não aparecer. D4 continua travando a união contra a allowlist,
-# e as funções que as duas chamam não estão nela de propósito.
+# `salvar_rascunho` e `entregar` (15/09/2026) NÃO entram nesta TABELA, e a
+# omissão continua decidida: aqui a pergunta é "o site tem as funções de que
+# cada ferramenta precisa?", e ela não faz sentido para uma ferramenta que a
+# configuração deste processo não expõe. D4 continua travando a união contra a
+# allowlist, e as funções que as duas chamam não estão nela de propósito.
+#
+# Até 17/09/2026 esta omissão era a resposta INTEIRA: o diagnóstico não dizia
+# uma palavra sobre a escrita desligada, para não anunciar ferramenta fora do
+# `tools/list`. Isso protegia bem demais — o defeito relatado é justamente que
+# ninguém sabia da capacidade. A cura foi separar as duas coisas: a tabela segue
+# sem elas, e o estado da escrita sai em prosa no fim do texto, vindo de
+# `capacidades.py`, que explica por que uma frase não ensina a insistir e um
+# item na lista de ferramentas ensinaria.
 FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
     "o_que_vence": ("core_calendar_get_action_events_by_timesort",),
     "material": (
@@ -155,6 +161,7 @@ def formatar(info, disponiveis: frozenset[str]) -> str:
             "significa que não funcionam. Tente uma pergunta de verdade: o erro "
             "dela vai ser mais específico do que este aviso."
         )
+        linhas.append(f"\n{capacidades.estado_da_escrita(curto=True)}")
         return "\n".join(linhas)
 
     linhas.append(f"O seu token alcança {len(disponiveis)} funções neste site.")
@@ -180,6 +187,14 @@ def formatar(info, disponiveis: frozenset[str]) -> str:
             "omissão e o bloqueio permanente nega de novo — e é justamente esse "
             "número que faz as duas camadas valerem a pena."
         )
+
+    # O que este servidor NÃO oferece agora, e por quê. A tabela acima responde
+    # "o que daqui funciona no seu Moodle"; sem esta linha ela responde metade
+    # da pergunta, porque uma capacidade desligada some da resposta sem deixar
+    # rastro — e foi essa metade calada que fez o assistente não saber que a
+    # escrita existe. Ela cabe aqui, e não na tabela, porque não é sobre o SITE:
+    # é sobre a configuração deste processo, e não há função que falte para ela.
+    linhas.append(f"\n{capacidades.estado_da_escrita(curto=True)}")
 
     return "\n".join(linhas)
 

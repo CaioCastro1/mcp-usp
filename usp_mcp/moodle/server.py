@@ -25,6 +25,7 @@ from ..anotacoes import (
     para_o_sdk,
 )
 from ..env import carregar_env
+from . import capacidades
 from . import entrega as entrega_mod
 from . import politica
 from .arquivo import baixar_arquivo
@@ -343,9 +344,12 @@ def listar_ferramentas() -> list[dict]:
                 "Diz se este servidor funciona no Moodle configurado, e o que "
                 "ele alcança por lá: nome do site, versão do Moodle, quantas "
                 "funções o seu token atinge e qual das ferramentas daqui está "
-                "disponível. Use quando alguma ferramenta falhar sem motivo "
-                "claro, ao configurar o servidor pela primeira vez, ou para "
-                "responder 'isso funciona no Moodle da minha faculdade?'. "
+                "disponível. Diz também em que estado está a capacidade de "
+                "escrita deste servidor — ligada ou desligada — e de quem é a "
+                "decisão de mudá-lo. Use quando alguma ferramenta falhar sem motivo "
+                "claro, ao configurar o servidor pela primeira vez, para "
+                "responder 'isso funciona no Moodle da minha faculdade?', ou "
+                "para 'o que dá para fazer por aqui?'. "
                 "Custa UMA chamada ao Moodle e não lê disciplina nem entrega "
                 "nenhuma. Exige token já configurado: para checar um site ANTES "
                 "de ter token, o caminho é `scripts/compatibilidade.sh`, que não "
@@ -773,7 +777,17 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_disciplinas = portas[_NOME_DISCIPLINAS]
     porta_atrasadas = portas[_NOME_ATRASADAS]
     descritor = portas[_NOME_FERRAMENTA]
-    servidor = MCPServer(name="usp-mcp-moodle", version="1.0.0")
+    # `instructions` viaja no `initialize`, uma vez por conexão, e é o canal de
+    # INFORMAÇÃO que o `tools/list` não é: nada ali é chamável. É por ele que o
+    # assistente fica sabendo que existe uma capacidade de escrita desligada,
+    # sem que exista um item de lista para escolher, gastar e contornar — a
+    # razão inteira está em `capacidades.py`. Lido depois do `carregar_env()`
+    # acima, porque o texto depende da flag, que mora no mesmo arquivo do token.
+    servidor = MCPServer(
+        name="usp-mcp-moodle",
+        version="1.0.0",
+        instructions=capacidades.instrucoes(),
+    )
 
     def _chamar(nome: str, argumentos: dict) -> str:
         """A tradução do erro do domínio para o canal que o modelo lê.
