@@ -858,7 +858,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     # acima, porque o texto depende da flag, que mora no mesmo arquivo do token.
     servidor = MCPServer(
         name="usp-mcp-moodle",
-        version="1.0.0",
+        version="1.1.0",
         instructions=capacidades.instrucoes(),
     )
 
