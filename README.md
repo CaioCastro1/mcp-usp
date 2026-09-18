@@ -74,22 +74,44 @@ da tela, Windows tem o botão Iniciar embaixo, e quem usa Linux costuma saber qu
 ### O caminho rápido
 
 Se você já tem o Claude Code, escolha abaixo a mensagem do seu sistema, mande-a para ele
-e pule o resto desta seção. Ele instala, confere, configura e te guia no único passo que
-precisa da sua mão, que é o da chave do e-Disciplinas.
+e pule o resto desta seção. Ele instala, confere, configura e te guia nos passos que
+precisam da sua mão. Um deles acontece sempre, que é o da chave do e-Disciplinas. O outro
+só aparece se faltar o Python ou o `git` no seu computador, e o quanto ele resolve sozinho
+aí depende do sistema.
 
 As três mensagens fazem a mesma coisa. O que muda são os caminhos e os comandos de cada
 sistema, e é por isso que a mensagem de um sistema não serve num computador de outro: o
 assistente segue o que está escrito, e a pessoa que colou não tem como perceber o erro.
 A conferência que elas pedem roda sem internet e sem a chave, e é a mesma nos três.
 
+As três mandam o assistente instalar o que faltar, e não só explicar como se instala. Até
+onde ele consegue ir sozinho, porém, depende do sistema, e as mensagens dizem isso em vez
+de prometer o mesmo nos três. No Windows, o `winget` já vem com o Windows 11 e faz a
+instalação na sua conta: o Python entra sem perguntar nada, e o Git abre uma janela de
+confirmação do sistema que é sua para responder. No Mac, com o Homebrew já instalado nada
+é perguntado, mas instalar o próprio Homebrew pede a sua senha. No Linux, o instalador de
+programas da distribuição exige `sudo`, e senha ninguém digita por você. A regra, nos
+três, é a mesma: o assistente tenta instalar sozinho primeiro, e só pede "abra este site"
+quando não existe instalador de programas ou quando a senha é necessária. Quando for
+necessária, ele avisa logo no começo, em vez de você descobrir no meio.
+
 #### No Mac
 
 ```text
 Instale o usp-mcp neste computador e me conecte a ele. Estou num Mac.
 
-1. Confira se existe Python 3.11 ou mais novo (`python3 --version`) e se existe o `git`.
-   Se faltar um deles, me diga como instalar pelo site oficial e espere eu avisar que
-   instalei.
+1. Confira se existe Python 3.11 ou mais novo (`python3 --version`) e se existe o `git`,
+   que é o programa que baixa o projeto no passo 2. Se faltar algum, instale você mesmo,
+   em vez de só me explicar como se instala. Veja primeiro se este computador já tem o
+   Homebrew, que é o instalador de programas mais usado no Mac: se `brew --version`
+   responder, rode `brew install` com o que estiver faltando (`brew install python`,
+   `brew install git`, ou os dois) e siga, porque isso não pede senha. Se não
+   houver Homebrew, me diga isso antes de começar qualquer outra coisa: instalar o
+   próprio Homebrew pede a minha senha de administrador, e quem digita a senha sou eu.
+   Nesse caso me passe o comando que a página brew.sh mostra, espere eu rodar e digitar a
+   senha, e continue. Se eu responder que prefiro não instalar o Homebrew, o caminho sem
+   ele é baixar o Python em python.org e rodar `xcode-select --install`, que traz o `git`;
+   aí também espere eu avisar que terminei.
 2. Clone https://github.com/CaioCastro1/usp-mcp em ~/usp-mcp, crie um venv em
    ~/usp-mcp/.venv e instale com `~/usp-mcp/.venv/bin/pip install -e ~/usp-mcp`. Copie
    ~/usp-mcp/.env.example para ~/usp-mcp/.env.
@@ -111,18 +133,22 @@ Instale o usp-mcp neste computador e me conecte a ele. Estou num Mac.
    MOODLE_TOKEN está presente. Me diga o que ficou funcionando e o que eu ainda preciso
    fazer.
 
-Me explique em português comum. Eu não sei o que são MCP, venv, token nem escopo de
-usuário: quando precisar de uma dessas palavras, diga numa frase o que ela significa
-antes de usar.
+Me explique em português comum. Eu não sei o que são MCP, venv, token, Homebrew nem
+escopo de usuário: quando precisar de uma dessas palavras, diga numa frase o que ela
+significa antes de usar.
 ```
 
 #### No Windows
 
-Antes de mandar a mensagem, você precisa de dois programas, e os dois vêm de sites
-oficiais: o Python, em python.org (na instalação, marque a caixa "Add python.exe to
-PATH"), e o Git para Windows, em git-scm.com. O segundo traz junto o Git Bash, que o
-passo da chave usa. Se faltar um deles, o assistente vai pedir para você instalar e
-esperar.
+No Windows 11 você não precisa preparar nada antes de mandar a mensagem: o sistema já vem
+com o `winget`, que é o instalador de programas da Microsoft, e a mensagem abaixo manda o
+assistente usá-lo para instalar o Python e o Git se estiverem faltando. O Python entra só
+na sua conta e não pergunta nada. O Git abre a janela de confirmação do Windows, a que
+pergunta se você permite que o programa faça alterações no computador: responder é com
+você, e numa conta que não seja de administrador ela pede a senha de uma que seja. Num
+Windows mais antigo, que não tenha `winget`, o assistente cai no caminho dos sites
+oficiais: o Python em python.org, marcando na instalação a caixa "Add python.exe to
+PATH", e o Git em git-scm.com. Aí a instalação é sua, e ele espera.
 
 ```text
 Instale o usp-mcp neste computador e me conecte a ele. Estou no Windows. Não use
@@ -131,10 +157,20 @@ tem `Scripts`, e os programas terminam em `.exe`. Os comandos abaixo estão em
 PowerShell; se você rodar por outro terminal, adapte a forma, mas mantenha `Scripts` e
 `.exe`.
 
-1. Confira se existe Python 3.11 ou mais novo (`python --version`) e se existe o `git`.
-   Se o `python` abrir a Microsoft Store ou não existir, ou se faltar o git, me diga
-   como instalar pelo site oficial (python.org e git-scm.com) e espere eu avisar que
-   instalei. O Git para Windows é obrigatório: ele traz o Git Bash, que o passo 5 usa.
+1. Confira se existe Python 3.11 ou mais novo (`python --version`) e se existe o `git`,
+   que é o programa que baixa o projeto no passo 2. Se o `python` abrir a Microsoft Store
+   ou não existir, conte como ausente. Se faltar algum dos dois, instale você mesmo, em
+   vez de só me explicar como se instala: use o `winget`, que vem no Windows 11. Os
+   comandos são `winget install --id Python.Python.3.13 -e --scope user` e
+   `winget install --id Git.Git -e --scope user`; se `winget search Python.Python`
+   mostrar uma versão 3 mais nova que a 3.13, use a mais nova. O do Python instala só na
+   minha conta e não pergunta nada. O do Git abre a janela de confirmação do Windows, e
+   quem responde sou eu: me avise antes que ela vai aparecer, e espere. Depois de
+   instalar, abra uma janela nova do PowerShell e siga por ela: a janela que já estava
+   aberta não enxerga o que acabou de ser instalado. Se este Windows não tiver `winget`,
+   aí sim me diga para instalar pelos sites oficiais, o Python em python.org marcando a
+   caixa "Add python.exe to PATH" e o Git em git-scm.com, e espere eu avisar que
+   instalei.
 2. Clone https://github.com/CaioCastro1/usp-mcp em $HOME\usp-mcp, crie um venv em
    $HOME\usp-mcp\.venv e instale com
    `& $HOME\usp-mcp\.venv\Scripts\pip install -e $HOME\usp-mcp`. Copie
@@ -150,18 +186,20 @@ PowerShell; se você rodar por outro terminal, adapte a forma, mas mantenha `Scr
    C:\Users\MEU-USUARIO\usp-mcp\.venv\Scripts\usp-mcp-jupiter.exe e
    C:\Users\MEU-USUARIO\usp-mcp\.venv\Scripts\usp-mcp-rucard.exe, com o meu nome de
    usuário no lugar de MEU-USUARIO.
-5. O e-Disciplinas precisa de uma chave pessoal minha. O script que a obtém roda no Git
-   Bash, não no PowerShell: `bash ~/usp-mcp/scripts/token.sh`. Ele abre o navegador e fica
-   esperando eu copiar um endereço. Me guie pelo navegador. Não tente fazer esse passo
-   sozinho: ele exige que eu clique. UM PASSO POR MENSAGEM: diga o que fazer, espere eu
-   responder que fiz, e só então mande o próximo. Não me mande a lista inteira de uma
-   vez. Se o script encerrar sem receber o endereço, logo depois de eu copiar rode, no
-   Git Bash: `powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh`.
+5. O e-Disciplinas precisa de uma chave pessoal minha. O comando que a obtém foi
+   instalado no passo 2, ao lado dos três do passo 4, e roda aqui mesmo no PowerShell,
+   sem trocar de terminal: `& $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe`. Ele abre o
+   navegador e fica esperando eu copiar um endereço. Me guie pelo navegador. Não tente
+   fazer esse passo sozinho: ele exige que eu clique. UM PASSO POR MENSAGEM: diga o que
+   fazer, espere eu responder que fiz, e só então mande o próximo. Não me mande a lista
+   inteira de uma vez. Se o comando encerrar sem receber o endereço, logo depois de eu
+   copiar rode
+   `Get-Clipboard | & $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe`.
 6. No fim, rode de novo o comando do moodle do passo 3: agora ele tem de dizer que o
    MOODLE_TOKEN está presente. Me diga o que ficou funcionando e o que eu ainda preciso
    fazer.
 
-Me explique em português comum. Eu não sei o que são MCP, venv, token, Git Bash nem
+Me explique em português comum. Eu não sei o que são MCP, venv, token, winget nem
 escopo de usuário: quando precisar de uma dessas palavras, diga numa frase o que ela
 significa antes de usar.
 ```
@@ -171,14 +209,22 @@ significa antes de usar.
 ```text
 Instale o usp-mcp neste computador e me conecte a ele. Estou no Linux.
 
-1. Confira se existe Python 3.11 ou mais novo (`python3 --version`) e se existe o `git`.
-   Se faltar um deles, me diga como instalar pelo gerenciador de pacotes da minha
-   distribuição e espere eu avisar que instalei.
+1. Confira se existe Python 3.11 ou mais novo (`python3 --version`) e se existe o `git`,
+   que é o programa que baixa o projeto no passo 2. Se faltar algum, diga de uma vez, no
+   começo, que essa parte é minha: o instalador de programas daqui (`apt`, `dnf` ou
+   `pacman`, conforme a distribuição) só roda com `sudo`, o `sudo` pede a minha senha, e
+   senha quem digita sou eu. Não tente instalar sozinho nem me peça a senha. Veja qual
+   dos três existe nesta máquina, monte o comando, me explique numa frase o que ele
+   instala e espere eu rodar e avisar. Os pacotes são `python3`, `python3-venv` e `git`
+   no Debian e no Ubuntu (`sudo apt install python3 python3-venv git`), `python3` e `git`
+   no Fedora (`sudo dnf install python3 git`), e `python` e `git` no Arch
+   (`sudo pacman -S python git`).
 2. Clone https://github.com/CaioCastro1/usp-mcp em ~/usp-mcp, crie um venv em
    ~/usp-mcp/.venv e instale com `~/usp-mcp/.venv/bin/pip install -e ~/usp-mcp`. Copie
    ~/usp-mcp/.env.example para ~/usp-mcp/.env. Se a criação do venv falhar dizendo que
-   falta o ensurepip, o pacote do sistema que falta costuma se chamar python3-venv: me
-   diga como instalar e espere.
+   falta o ensurepip, o pacote do sistema que falta costuma se chamar python3-venv, e
+   vale a mesma regra do passo 1: monte o comando com `sudo`, me explique e espere eu
+   rodar.
 3. Confira a instalação com este comando, que não usa internet nem chave:
    `~/usp-mcp/.venv/bin/python -m usp_mcp.rucard.server --auto-verificar`. Repita
    trocando `rucard` por `jupiter` e depois por `moodle`. Os três têm de terminar sem
@@ -201,18 +247,22 @@ Instale o usp-mcp neste computador e me conecte a ele. Estou no Linux.
    MOODLE_TOKEN está presente. Me diga o que ficou funcionando e o que eu ainda preciso
    fazer.
 
-Me explique em português comum. Eu não sei o que são MCP, venv, token nem escopo de
+Me explique em português comum. Eu não sei o que são MCP, venv, token, sudo nem escopo de
 usuário: quando precisar de uma dessas palavras, diga numa frase o que ela significa
 antes de usar.
 ```
 
 O que acontece depois de colar, em qualquer dos três: o assistente roda os primeiros
-passos sozinho e mostra o que está fazendo. No passo da chave ele para e passa a falar
+passos sozinho e mostra o que está fazendo. Se faltar o Python ou o `git`, ele para logo
+no primeiro passo, e o que acontece aí depende do sistema, como está acima: no Windows ele
+instala, com a janela de confirmação do Git para você responder; no Mac com Homebrew ele
+instala e segue sozinho; no Linux, e no Mac sem Homebrew, ele monta o comando e devolve a
+vez para você, porque a senha é sua. No passo da chave ele para de novo e passa a falar
 com você, uma instrução por vez: abrir a página do e-Disciplinas, achar o link, copiar o
-endereço dele. É a única parte que precisa da sua mão, e a seção *Configuração* descreve
-essa página com calma, para o caso de você querer saber o que está clicando. Quando ele
-disser que terminou, feche e abra o Claude Code: é aí que os três servidores passam a
-existir para ele.
+endereço dele. Essa parada acontece sempre, e a seção *Configuração* descreve essa página
+com calma, para o caso de você querer saber o que está clicando. Quando ele disser que
+terminou, feche e abra o Claude Code: é aí que os três servidores passam a existir para
+ele.
 
 ### O caminho manual
 
@@ -224,9 +274,10 @@ python3 --version
 ```
 
 Se o Terminal responder que não conhece o comando `python3`, ou se o número for menor que
-3.11, instale a versão atual pelo site python.org antes de seguir. Com uma versão mais
-antiga, o passo de instalação abaixo falha com uma mensagem do pip que não explica o
-motivo.
+3.11, instale a versão atual pelo site python.org antes de seguir. Se você já usa o
+Homebrew, `brew install python` também serve, e é o que o caminho rápido pede ao
+assistente. Com uma versão mais antiga, o passo de instalação abaixo falha com uma
+mensagem do pip que não explica o motivo.
 
 Depois cole estes quatro comandos, um de cada vez:
 
@@ -257,7 +308,9 @@ Para conferir se deu certo:
 ls ~/usp-mcp/.venv/bin | grep usp
 ```
 
-Tem que aparecer `usp-mcp-jupiter`, `usp-mcp-moodle` e `usp-mcp-rucard`.
+Tem que aparecer `usp-mcp-jupiter`, `usp-mcp-moodle` e `usp-mcp-rucard`. Junto deles
+aparece também `usp-mcp-token`, que é o programa da chave do e-Disciplinas e não um
+servidor; ele entra na seção *Configuração*.
 
 Agora avise o assistente que eles existem. Em qualquer um dos caminhos abaixo você troca
 `SEU-USUARIO` pelo nome da sua conta no computador; se não souber qual é, o comando
@@ -366,38 +419,43 @@ Para conferir o que ficou no lugar, sem internet e sem chave:
 Com `jupiter` e `moodle` no lugar de `rucard`, confere os outros dois. Com isso, bandejão
 e JupiterWeb devem responder. De novo: em teoria; ninguém conferiu.
 
-O e-Disciplinas é o ponto fraco. O script que obtém a chave, `scripts/token.sh`, é escrito
-em bash, e o Windows não tem bash. O caminho é o **Git Bash**, que vem junto com o Git para
-Windows: abra-o e rode
+A chave do e-Disciplinas sai por um quarto comando, instalado junto com os três acima e na
+mesma pasta: `usp-mcp-token.exe`. Ele roda no PowerShell, como o resto desta subseção:
 
-```bash
-bash ~/usp-mcp/scripts/token.sh
+```powershell
+& $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe
 ```
 
-Desde 18/09/2026 o script sabe achar o Python de `.venv\Scripts`, ler a área de
-transferência pelo PowerShell (`Get-Clipboard`) e abrir o navegador pelo `rundll32`. Antes
-disso a vigia descrita na seção *Configuração* não existia no Windows, e foi isso que o
-dono do projeto encontrou ao instalar lá. Essas três escolhas estão testadas com dublês: o
-que está provado é que o script escolhe a ferramenta certa quando ela existe, não que a
+Este era o ponto fraco daqui até 18/09/2026, porque o programa que obtém a chave só
+existia em bash e o Windows não tem bash: quem instalava no Windows precisava instalar
+também o Git Bash e trocar de terminal só neste passo. O programa foi reescrito em Python
+e virou o comando acima. O `scripts/token.sh` continua existindo para quem está no Mac ou
+no Linux, e chama o mesmo código.
+
+O programa sabe achar o Python de `.venv\Scripts`, ler a área de transferência pelo
+PowerShell (`Get-Clipboard`) e abrir o navegador pelo `rundll32`. Antes de 18/09/2026 a
+vigia descrita na seção *Configuração* não existia no Windows, e foi isso que o dono do
+projeto encontrou ao instalar lá. Essas três escolhas estão testadas com dublês: o que
+está provado é que o programa escolhe a ferramenta certa quando ela existe, não que a
 ferramenta faz o que se espera num Windows real. Se a vigia não funcionar, o fluxo em dois
-passos continua valendo: copie o endereço do link e, no Git Bash, rode
+passos continua valendo: copie o endereço do link e rode
 
-```bash
-powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh
+```powershell
+Get-Clipboard | & $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe
 ```
 
-O WSL também roda o script, e ele reconhece esse caso: lê a área de transferência do
-Windows pelo `powershell.exe` e abre o navegador do Windows pelo `wslview`. Mas o clone, o
-ambiente isolado e o `.env` que o script grava têm de ser os mesmos que o assistente usa, e
-um ambiente isolado criado dentro do WSL não serve a um assistente rodando no Windows. Quem
-instalar pelo WSL tem de instalar tudo lá e apontar o assistente para lá. Isso tampouco foi
-conferido.
+Dentro do WSL vale o caminho do Linux, o `scripts/token.sh`, e ele reconhece esse caso:
+lê a área de transferência do Windows pelo `powershell.exe` e abre o navegador do Windows
+pelo `wslview`. Mas o clone, o ambiente isolado e o `.env` que o script grava têm de ser
+os mesmos que o assistente usa, e um ambiente isolado criado dentro do WSL não serve a um
+assistente rodando no Windows. Quem instalar pelo WSL tem de instalar tudo lá e apontar o
+assistente para lá. Isso tampouco foi conferido.
 
-Os demais scripts de `scripts/`, o de verificação antes de commit incluído, seguem sem
+Os outros arquivos de `scripts/`, o de verificação antes de commit incluído, seguem sem
 adaptação de propósito: são de quem mantém o projeto, e não de quem usa, e ainda
 procuram `.venv/bin/python`. Nenhum passo da instalação passa por eles. Se você usar o
-caminho rápido, a mensagem *No Windows* de lá já traz estes caminhos e o Git Bash; a de
-Mac não serve aqui, e o assistente não tem como perceber sozinho.
+caminho rápido, a mensagem *No Windows* de lá já traz estes caminhos e este comando da
+chave; a de Mac não serve aqui, e o assistente não tem como perceber sozinho.
 
 ## Configuração
 
@@ -414,6 +472,11 @@ baixou. Cole no terminal:
 ```
 
 Se você instalou pelo caminho rápido, a pasta é a mesma.
+
+No Windows o comando é outro, e roda no PowerShell:
+`& $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe`. Ele foi instalado junto com os três
+servidores, e não fica na pasta `scripts`. É o mesmo programa do bloco acima, e tudo o que
+esta seção diz vale para ele.
 
 Ele abre uma página do e-Disciplinas no seu navegador. Você precisa já estar logado na
 Senha Única. A página mostra três coisas, e duas são distração: a caixa verde "O seu
@@ -435,9 +498,9 @@ agir; qualquer outra coisa que você copiar nesse intervalo ele ignora, sem guar
 mostrar ou dizer o tamanho, e o que já estava no clipboard antes não conta. Se você
 copiar o endereço errado, ele diz o que veio errado e continua esperando. Passados os 90
 segundos sem o endereço, ele para de ler e diz como entregar depois:
-`pbpaste | ~/usp-mcp/scripts/token.sh` (no Windows, pelo Git Bash:
-`powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh`). Para
-rodar sem essa vigia, defina `USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador
+`pbpaste | ~/usp-mcp/scripts/token.sh` (no Windows, no PowerShell:
+`Get-Clipboard | & $HOME\usp-mcp\.venv\Scripts\usp-mcp-token.exe`). Para rodar sem essa
+vigia, defina `USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador
 sem ferramenta de clipboard (sem `pbpaste`, `wl-paste`, `xclip` nem PowerShell) a vigia não
 existe e o script diz isso.
 
@@ -457,7 +520,8 @@ abra o assistente e o e-Disciplinas passa a responder. Você não precisa abrir 
 arquivo, mas se um dia abrir, é essa a linha.
 
 Ela vence com o tempo e pode ser cancelada em `edisciplinas.usp.br`, em gerenciar tokens.
-Se um dia o e-Disciplinas parar de responder, rode `~/usp-mcp/scripts/token.sh` de novo.
+Se um dia o e-Disciplinas parar de responder, rode `~/usp-mcp/scripts/token.sh` de novo,
+ou, no Windows, o comando do PowerShell acima.
 
 ## Usando
 
@@ -697,7 +761,10 @@ manuscrita escaneada isso devolveria 9 bytes e chamaria de sucesso (§9, 01/09 e
 arquivo cai em `~/.cache/usp-mcp/moodle/`.
 
 São três comandos e não um com argumento: o nome de cada um é o mesmo `serverInfo.name`
-que o servidor responde no `initialize`. O porquê está no `pyproject.toml`.
+que o servidor responde no `initialize`. O porquê está no `pyproject.toml`. O
+`usp-mcp-token`, que obtém a chave do e-Disciplinas, é um quarto comando instalado ao lado
+deles, e não é servidor: é o mesmo programa que `scripts/token.sh` chama, e existe como
+comando porque no Windows não há bash.
 
 A conferência que a seção *Instalando* pede, `--auto-verificar`, existe nos três
 servidores desde 31/08/2026 e é offline: lista as ferramentas expostas, diz se achou o
@@ -713,6 +780,20 @@ instalação em 18/09/2026: o gate é verificação de pré-commit, procura `.ve
 e no Windows caía para o `python3` da Microsoft Store, com 58 testes reprovando por isso;
 e `diagnostico` exige a chave e faz uma chamada à USP, que é justamente o que ainda não
 existe no meio da instalação.
+
+Desde 18/09/2026 os três prompts do caminho rápido mandam o assistente instalar o que
+faltar, e não só ensinar a instalar. Os nomes de pacote foram conferidos no mesmo dia, e
+não escritos de memória. No `winget`, `Python.Python.3.13` e `Git.Git` existem nos
+manifestos oficiais (`microsoft/winget-pkgs`) e os dois trazem instalador de escopo de
+usuário; o do Python entra com `InstallAllUsers=0 PrependPath=1` e sem exigência de
+elevação, e o do Git declara `ElevationRequirement: elevatesSelf`, que é a janela de
+confirmação do Windows que o README avisa em vez de prometer instalação calada. No
+Homebrew, `brew install python` e `brew install git` resolvem para `python@3.14` e `git`.
+No Linux, `python3`, `python3-venv` e `git` existem no Debian, `python3` e `git` no
+Fedora, e `python` e `git` no Arch. O que está conferido é que os nomes existem e o que os
+manifestos declaram; nenhum desses comandos foi rodado num Windows ou num Linux de
+verdade. O `sudo` do Linux é o motivo de lá o texto parar e devolver a vez: senha não se
+digita por procuração, e descobrir isso no meio do caminho é pior do que ler no começo.
 
 Medido em 14/09/2026: instalação editável num venv limpo, e os três comandos subindo de
 `/tmp` com cliente MCP real. Em 16/09/2026 o caminho manual da seção *Instalando* foi
