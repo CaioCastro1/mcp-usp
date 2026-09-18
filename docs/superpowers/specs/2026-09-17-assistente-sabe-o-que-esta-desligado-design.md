@@ -267,3 +267,36 @@ aqui o que a decisão precisa carregar para lá:
 3. Que o padrão não mudou: a escrita continua desligada, e ligar continua sendo
    decisão de quem é dono do token. O que mudou é que agora a pessoa tem como
    saber que a decisão existe.
+
+## Adendo de 18/09/2026: o texto acima ficou incompleto em uso real
+
+Um dia depois de este texto entrar, o dono pediu ao assistente para entregar
+uma atividade e ouviu que ele **não controlava isso e não sabia onde ficava o
+`.env`**. O assistente fez o que o texto mandava; o texto é que faltou em duas
+coisas, e as duas foram consertadas em `usp_mcp/moodle/capacidades.py`:
+
+1. **Onde o arquivo está.** "No arquivo `.env` do servidor" não tem caminho, e o
+   servidor sabe o caminho: `usp_mcp.env.achar_env()` devolve o `.env` que
+   aquele processo lê. O texto passa a trazer o caminho absoluto, nos dois
+   estados e na versão curta do diagnóstico. Com `achar_env()` em `None` o texto
+   diz que não achou arquivo nenhum e por onde a variável entra então, em vez
+   de inventar um caminho provável.
+2. **"Não ligar por conta própria" não é "não ligar nunca".** O texto separa os
+   dois casos com todas as letras: nem por iniciativa do assistente, nem por
+   dedução do que a pessoa quis dizer (pedido de entrega não é pedido de
+   ligar); e, quando a pessoa pede de forma inequívoca, o assistente pode editar
+   aquele arquivo por ela. A mudança só vale depois de o servidor subir de novo.
+
+Apontar para o `.env` obrigou uma regra de segurança no mesmo parágrafo: mexer
+**só naquela linha** e **nunca imprimir o conteúdo do arquivo**, que guarda o
+`MOODLE_TOKEN`. E, como quem abre o arquivo vê `USP_MCP_ALLOW_WRITES` logo
+acima, o texto diz o que ela faz de verdade: não abre nada, nos três servidores.
+
+O que não mudou: o padrão segue não escrever, as duas ferramentas seguem fora
+do `tools/list` com a flag desligada (E14, G2), e a proibição de palavras de
+recomendação (C5) continua intacta; a redação é que se curvou a ela. O teto do
+C7 subiu de 1800 para 2600 caracteres por decisão, medido com um caminho de
+fixture para não depender da máquina. Testes novos: C9 a C14 na função pura,
+D7d no diagnóstico e G5 pelo fio. O texto vigente é o que
+`capacidades.instrucoes()` devolve; a cópia acima é a de 17/09 e fica como
+registro do que ficou faltando.

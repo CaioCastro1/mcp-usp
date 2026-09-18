@@ -24,6 +24,8 @@ partir:
 """
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from usp_mcp.moodle import capacidades, politica
@@ -153,18 +155,26 @@ def test_c6_o_texto_diz_que_ligar_nao_e_passo_do_assistente(desligada):
 
 
 @pytest.mark.parametrize("estado", ["desligada", "ligada"])
-def test_c7_as_instrucoes_cabem_no_orcamento_de_toda_conexao(estado, request):
+def test_c7_as_instrucoes_cabem_no_orcamento_de_toda_conexao(estado, request, env_em):
     """C7 — teto declarado, porque isto viaja em TODA conexão.
 
     O campo é o lugar certo para o que a lista de ferramentas não diz, e o lugar
     errado para o que ela já diz. Sem um teto, ele vira o sétimo README do
     repositório, pago em tokens por conexão. O número é generoso e existe para
     reprovar crescimento, não para brigar por uma frase.
+
+    O teto subiu de 1800 para 2600 em 18/09/2026, e foi decisão, não folga: o
+    texto ganhou o caminho do `.env`, a separação entre iniciativa própria e
+    pedido explícito, a regra de não imprimir o arquivo e a menção à outra
+    variável — cada um dos quatro é um defeito de uso real ou a segurança que
+    vem junto dele (C9-C14). Medido com o caminho da fixture: cerca de 2300, desligada.
+    Mede com `env_em`, e não com o `.env` de quem rodou, para que o número não
+    dependa do tamanho do caminho na máquina de cada um.
     """
     request.getfixturevalue(estado)
     texto = capacidades.instrucoes()
 
-    assert len(texto) <= 1800, (
+    assert len(texto) <= 2600, (
         f"as instruções estão com {len(texto)} caracteres. Elas carregam só o "
         "que o `tools/list` não tem como carregar — o que cada ferramenta faz "
         "já viaja na descrição dela."
@@ -187,3 +197,180 @@ def test_c8_os_nomes_daqui_sao_os_que_o_servidor_anuncia(ligada):
         "os nomes declarados em capacidades.py não são os que o servidor anuncia "
         f"com a flag ligada: {sorted(anunciadas)}"
     )
+
+
+# ---------------------------------------------------------------------------
+# C9-C14 (18/09/2026): o texto diz ONDE a variável mora e separa os dois casos.
+#
+# Segundo defeito de uso real, um dia depois do primeiro. O dono pediu para
+# entregar uma atividade; o assistente respondeu que não controlava isso e que
+# não sabia onde ficava o `.env`. Ele fez exatamente o que o texto mandava, e o
+# texto é que estava incompleto em duas coisas:
+#
+# 1. Não dizia o caminho do arquivo, e o servidor sabe: `usp_mcp.env.achar_env()`
+#    devolve o `.env` que ESTE processo lê. Informação na mão, não repassada.
+# 2. "Ligar por conta própria não é o caminho" foi lido como "não ligar nunca".
+#    São coisas diferentes, e o caso que faltava é o legítimo: a pessoa pedir,
+#    com todas as letras. Nesse caso o assistente pode editar o arquivo por ela.
+#
+# Apontar o assistente para o `.env` traz uma regra de segurança junto: o arquivo
+# guarda o `MOODLE_TOKEN`. Editar é mexer só naquela linha e nunca imprimir o
+# conteúdo — sem isso, indicar o caminho é convidar o token para a conversa.
+
+
+# 32 hex, a forma de um wstoken de verdade, para a asserção de vazamento não
+# passar por um valor que nenhum texto teria motivo de conter.
+TOKEN_FALSO = "0123456789abcdef0123456789abcdef"
+
+
+@pytest.fixture
+def env_em(tmp_path, monkeypatch):
+    """`achar_env()` passa a devolver um `.env` de mentira, num caminho longo e
+    reconhecível, para que estas asserções não dependam do `.env` de quem rodou
+    a suíte. O arquivo tem um token FALSO dentro, de propósito: prova que o
+    texto nunca lê o arquivo, só aponta para ele."""
+    caminho = tmp_path / "um" / "checkout" / "bem" / "fundo" / ".env"
+    caminho.parent.mkdir(parents=True)
+    caminho.write_text(
+        f"MOODLE_TOKEN={TOKEN_FALSO}\n{politica.NOME_DA_FLAG}=0\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(capacidades, "achar_env", lambda: caminho)
+    return caminho
+
+
+@pytest.fixture
+def sem_env(monkeypatch):
+    monkeypatch.setattr(capacidades, "achar_env", lambda: None)
+
+
+@pytest.mark.parametrize("estado", ["desligada", "ligada"])
+def test_c9_o_texto_traz_o_caminho_absoluto_do_env_que_este_processo_le(
+    estado, request, env_em
+):
+    """C9 — "no arquivo .env do servidor" sem caminho é a metade inútil da
+    informação, e o servidor tem a outra metade na mão."""
+    request.getfixturevalue(estado)
+
+    assert env_em.is_absolute()
+    assert str(env_em) in capacidades.instrucoes(), (
+        "as instruções não dizem ONDE está o .env que este processo lê"
+    )
+    assert str(env_em) in capacidades.estado_da_escrita(curto=True), (
+        "o diagnóstico usa a versão curta, e é para lá que a pessoa é mandada "
+        "quando está configurando — o caminho tem de estar nela também"
+    )
+
+
+def test_c9b_o_caminho_vem_do_achar_env_de_verdade_e_nao_de_uma_string(desligada):
+    """C9b — sem monkeypatch: o texto tem de concordar com `usp_mcp.env`.
+
+    Um caminho escrito à mão passaria no C9 e mentiria em toda máquina que não
+    fosse a de quem escreveu. O que vale é o que `achar_env()` devolve AQUI.
+    """
+    from usp_mcp.env import achar_env
+
+    texto = capacidades.instrucoes()
+    caminho = achar_env()
+    if caminho is None:
+        assert "não achou arquivo .env nenhum" in texto
+    else:
+        assert str(caminho.resolve()) in texto or str(caminho) in texto, (
+            f"o texto não traz {caminho}, que é o .env que este processo lê"
+        )
+
+
+@pytest.mark.parametrize("estado", ["desligada", "ligada"])
+def test_c10_sem_env_o_texto_diz_isso_e_nao_inventa_caminho(estado, request, sem_env):
+    """C10 — `achar_env()` devolve None (pacote copiado para site-packages, por
+    exemplo). Honestidade em vez de um caminho provável: mandar a pessoa editar
+    um arquivo que o processo não lê é o mesmo defeito com outro nome."""
+    request.getfixturevalue(estado)
+    texto = capacidades.instrucoes()
+
+    assert "não achou arquivo .env nenhum" in texto
+    assert not re.search(r"/\S*\.env\b", texto), (
+        f"sem .env o texto ainda aponta para um caminho:\n{texto}"
+    )
+    assert politica.NOME_DA_FLAG in texto, "sem arquivo a variável continua existindo"
+    assert "ambiente" in texto, (
+        "sem arquivo, a variável só entra pelo ambiente de quem sobe o processo — "
+        "o texto tem de dizer por onde, ou deixa a pessoa sem caminho nenhum"
+    )
+
+
+def test_c11_o_texto_separa_iniciativa_propria_de_pedido_explicito(desligada, env_em):
+    """C11 — a frase do C6 continua, e ganha a outra metade.
+
+    "Ligar por conta própria não é o caminho" cobre iniciativa do assistente e
+    dedução do que a pessoa quis dizer. Não cobre — e o texto antigo deixava
+    parecer que cobria — a pessoa pedir de forma inequívoca. Esse caso é
+    legítimo, e o texto passa a dizê-lo com todas as letras.
+    """
+    texto = capacidades.instrucoes()
+
+    # A metade que não muda: nem por iniciativa própria, nem por dedução.
+    assert "Ligar por conta própria não é o caminho" in texto
+    assert "dedução" in texto, (
+        "o texto precisa fechar a porta da dedução: 'entrega isso' com a escrita "
+        "desligada é pedido de entrega, não pedido de ligar"
+    )
+    # A metade que faltava: pedido inequívoco da pessoa.
+    assert "com todas as letras" in texto
+    assert "pode editar" in texto, (
+        "o texto não diz o que fazer quando a PESSOA pede — foi isso que fez o "
+        "assistente responder que 'não controlava' e parar"
+    )
+    # E o custo de a mudança não valer já: a variável é lida na subida.
+    assert "subir de novo" in texto or "subindo o servidor de novo" in texto
+    assert "lida no ambiente do processo" in texto
+
+
+@pytest.mark.parametrize("estado", ["desligada", "ligada"])
+def test_c12_editar_e_so_aquela_linha_e_nunca_imprimir_o_arquivo(
+    estado, request, env_em, monkeypatch
+):
+    """C12 — a regra de segurança que vem junto com o caminho.
+
+    O `.env` guarda o `MOODLE_TOKEN`. Apontar um assistente para lá sem esta
+    instrução é convidar o token a aparecer no meio de uma conversa. O texto
+    nomeia a variável (para o modelo saber POR QUE a regra existe) e nunca lê o
+    arquivo — o token falso escrito pela fixture não pode sair daqui.
+    """
+    request.getfixturevalue(estado)
+    monkeypatch.setenv("MOODLE_TOKEN", TOKEN_FALSO)
+    texto = capacidades.instrucoes()
+
+    assert "só na linha" in texto or "só naquela linha" in texto, (
+        "o texto não restringe a edição à linha da variável"
+    )
+    assert "nunca imprima" in texto, "o texto não proíbe imprimir o arquivo"
+    assert "MOODLE_TOKEN" in texto, (
+        "sem dizer o que o arquivo guarda, a proibição parece capricho"
+    )
+    assert TOKEN_FALSO not in texto, "o texto leu o .env — e vazou o que tem dentro"
+
+
+def test_c13_a_outra_variavel_e_nomeada_e_dita_pelo_que_faz(desligada, env_em):
+    """C13 — `USP_MCP_ALLOW_WRITES` mora no mesmo arquivo e tem "WRITES" no nome.
+
+    Quem for editar o `.env` vai vê-la. Sem uma frase aqui, a leitura óbvia é
+    que ela liga a escrita — e ela não abre nada, nos três servidores. O texto
+    diz o que ela faz de verdade, para ninguém pôr 1 nela achando que resolve.
+    """
+    texto = capacidades.instrucoes()
+
+    assert "USP_MCP_ALLOW_WRITES" in texto
+    assert "não abre nada" in texto, (
+        "nomeou a variável e não disse que ela não faz o que o nome sugere"
+    )
+
+
+def test_c14_com_a_flag_ligada_o_caminho_de_volta_tem_a_mesma_regra(ligada, env_em):
+    """C14 — simetria: desligar por pedido explícito é a mesma edição, com a
+    mesma regra de segurança, e o mesmo "só vale depois de subir de novo"."""
+    texto = capacidades.instrucoes()
+
+    assert "com todas as letras" in texto
+    assert "só na linha" in texto or "só naquela linha" in texto
+    assert "MOODLE_TOKEN" in texto
+    assert "subir de novo" in texto or "subindo o servidor de novo" in texto

@@ -131,3 +131,27 @@ def test_g4_as_instrucoes_nao_nomeiam_funcao_do_moodle(valor_da_flag):
         if f in instrucoes
     )
     assert not nomeadas, f"as instruções no fio nomeiam funções do Moodle: {nomeadas}"
+
+
+@pytest.mark.parametrize("valor_da_flag", ["0", "1"])
+def test_g5_as_instrucoes_no_fio_dizem_onde_esta_o_env_deste_processo(valor_da_flag):
+    """G5 (18/09/2026) — o caminho do `.env`, pelo fio.
+
+    Uso real de 17/09: o assistente respondeu que não sabia onde ficava o `.env`.
+    O servidor sabe (`usp_mcp.env.achar_env()`), e o processo filho sobe da
+    mesma árvore que este teste, então os dois têm de apontar para o mesmo
+    arquivo — ou os dois têm de dizer que não há nenhum. Pelo fio, e não pela
+    função pura, porque é no `initialize` que o assistente lê isso.
+    """
+    from usp_mcp.env import achar_env
+
+    instrucoes, _ = _abrir(valor_da_flag)
+    caminho = achar_env()
+
+    if caminho is None:
+        assert "não achou arquivo .env nenhum" in instrucoes
+    else:
+        assert str(caminho) in instrucoes, (
+            f"as instruções no fio não trazem {caminho}, que é o .env que o "
+            "processo lê"
+        )

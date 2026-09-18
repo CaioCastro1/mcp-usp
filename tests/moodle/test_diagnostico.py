@@ -182,3 +182,23 @@ def test_d7c_site_sem_lista_de_funcoes_ainda_diz_o_estado_da_escrita(monkeypatch
 
     assert "não devolveu a lista de funções" in texto
     assert "DESLIGADA" in texto
+
+
+def test_d7d_o_diagnostico_diz_onde_esta_o_env_que_este_processo_le(
+    monkeypatch, tmp_path
+):
+    """D7d (18/09/2026) — a pessoa é mandada ao diagnóstico quando está
+    configurando, e "ponha a variável no .env" sem caminho foi exatamente o que
+    deixou o assistente sem saber onde mexer. A versão curta traz o caminho."""
+    from usp_mcp.moodle import capacidades
+
+    monkeypatch.delenv(politica.NOME_DA_FLAG, raising=False)
+    caminho = tmp_path / "checkout" / ".env"
+    caminho.parent.mkdir()
+    caminho.write_text(f"{politica.NOME_DA_FLAG}=0\n", encoding="utf-8")
+    monkeypatch.setattr(capacidades, "achar_env", lambda: caminho)
+
+    texto = diag.diagnostico(_cliente(_SITE_COMPLETO))
+
+    assert str(caminho) in texto, "o diagnóstico não diz onde está o .env"
+    assert "NÃO — faltam" not in texto
