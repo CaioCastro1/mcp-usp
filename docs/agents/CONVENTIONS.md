@@ -116,6 +116,7 @@ fonte de verdade sobre o que aquela família cobre.
 | `T68-T114` | `tests/moodle/*.py` | material, arquivo, depósito, cliente e fronteira do Moodle |
 | `U1-U3` | `tests/test_urls_do_repo.py` | a URL que manda baixar o projeto aponta para ele |
 | `W1-W2` | `tests/test_ws.py` | o `scripts/ws.sh` acha o `.env` |
+| `TK1-TK8` | `tests/moodle/test_token_python.py` | o obtentor do token em Python (`usp_mcp/token/`): o entry point `usp-mcp-token` sobe, o módulo roda sem bash, o invólucro `token.sh` repassa código de saída, o token fica fora do argv do `curl` |
 | `WIN1-WIN7` | `tests/moodle/test_token_windows.py` | o `token.sh` em Windows: leitor de clipboard, lançador e Python escolhidos com dublês no PATH |
 
 Três coisas que a tabela revela e que valem ser ditas em voz alta, porque quem
