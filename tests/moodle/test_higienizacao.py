@@ -67,7 +67,12 @@ _spec.loader.exec_module(hig)
 PARES_CRU = {
     "action_events.json": "action_events.json",
     "course_contents_142033.json": "course_contents_psi3323.json",
-    "users_courses.json": "users_courses.json",
+    # O cru desta é a captura de 15/09 (47 matrículas), e a publicada de mesmo
+    # nome é a de 31/08 (74), mantida de propósito para os testes que contam
+    # matrícula. Parear pelo nome do arquivo comparava duas capturas
+    # DIFERENTES e reprovava na máquina de quem tem o cru, sem que nada
+    # estivesse errado com o higienizador.
+    "users_courses.json": "users_courses_15-09.json",
 }
 
 # Escrito à mão: sem isto, esvaziar `PARES_CRU` deixaria T58 verde sem comparar
