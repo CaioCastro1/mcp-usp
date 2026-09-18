@@ -32,19 +32,50 @@ PTC3314 são 4, e dentro deles moram os enunciados dos exercícios computacionai
 `href`). Quem tem o arquivo é `mod_assign_get_assignments`, e é por isso que
 `acervo` faz DUAS chamadas — a segunda só quando a primeira encontra entrega, o
 que mantém o Invariante 5 de pé para as disciplinas que não têm nenhuma.
+
+**O link no meio do texto, e a amostra que não o tem (17/09/2026).** O dono
+perguntou pelos slides de uma disciplina e ouviu "não tem nenhum"; os slides
+estavam num `<a href>` dentro de um bloco de texto da página (`label`, no
+vocabulário do Moodle). `label` não tem `contents`, então caía em `sem_conteudo`
+e o rodapé o chamava de "atividade com consulta própria" — falso duas vezes.
+Medido nas duas capturas versionadas: **zero** `label` e **zero** `href` em
+qualquer `description` ou `summary` (PSI3323: 32 módulos, 4 `description`
+somando 1.986 B, 11 `summary` somando 14.313 B; PTC3314: 75 módulos, 20
+`description` somando 6.233 B, 19 `summary` somando 9.958 B). O defeito é
+confirmado por leitura do código, não pela amostra; o custo real na disciplina
+que o motivou fica por medir quando ela for capturada. O que se mediu foi o
+contrário: emitir o texto ao redor do link custaria mais que a projeção inteira
+(~6.500 B), e por isso o que sai por link é o título da âncora, a URL e o começo
+do bloco — que o Moodle já cortou em `name`.
 """
 from __future__ import annotations
+
+import mimetypes
+from urllib.parse import unquote, urlsplit
 
 from dataclasses import dataclass
 from datetime import datetime
 
 from .disciplinas import carregar, resolver
 from .erros import ErroMoodle
-from .texto import casa, normalizar
+from .texto import casa, links, normalizar
 
 # Host + caminho que caracterizam arquivo servido pelo webservice do Moodle, e
 # que por isso exigiria o token para ser baixado.
 _MARCAS_INTERNAS = ("/webservice/", "pluginfile.php")
+
+# O módulo que é só texto na página da disciplina. Não tem `contents`, não tem
+# `url` de visualização, e não é atividade: o que ele tem de material é o link
+# que o professor deixou no meio da frase.
+_MODULO_DE_TEXTO = "label"
+
+# Caminhos que caracterizam página do próprio Moodle. Um link do texto para
+# `/mod/forum/view.php` aponta para uma atividade que o rodapé já declara; para
+# `/course/view.php`, para outra turma. Nenhum é material, e o host sozinho não
+# basta para reconhecê-los: o texto pode trazer o link relativo, sem host.
+_CAMINHOS_DO_MOODLE = (
+    "/mod/", "/course/", "/user/", "/grade/", "/login/", "/my/", "/calendar/", "/theme/",
+)
 
 # Quantas entregas sem anexo o rodapé nomeia antes de virar contagem. Três é o
 # que cabe numa linha e ainda deixa reconhecer o padrão do nome; o resto vira
@@ -84,6 +115,12 @@ class Item:
     mimetype: str | None = None
     secao: str = ""
     modulo: str = ""
+    # Veio de um `<a href>` no texto da página, não de `contents`. O rodapé de
+    # `material` conta estes para quem lê saber que o nome é o texto da âncora.
+    no_texto: bool = False
+    # A âncora não dizia o que é (embrulhava só uma imagem, ou o texto era a
+    # própria URL). O nome vira o host, e a linha declara a falta.
+    sem_titulo: bool = False
 
 
 @dataclass(frozen=True)
@@ -120,6 +157,10 @@ class Conteudo:
     sem_conteudo: tuple[str, ...]
     entregas: tuple[Entrega, ...] = ()
     avisos: tuple[str, ...] = ()
+    # Links do texto que NÃO viraram item (para dentro do Moodle, e-mail, âncora)
+    # e blocos de texto sem link nenhum. Contados, nunca omitidos calados.
+    links_ignorados: int = 0
+    textos_sem_link: int = 0
 
 
 @dataclass(frozen=True)
@@ -173,10 +214,44 @@ def projetar_material(bruto) -> Conteudo:
 
     entregas: list[Entrega] = []
 
+    # Duas passadas, e a primeira é barata: os hosts do próprio Moodle (para
+    # reconhecer link que aponta para dentro dele) e as URLs que `contents` já
+    # publica (para não listar duas vezes o que o `description` de um módulo
+    # `url` repete). Com uma passada só, o link do texto sairia antes de a
+    # projeção saber que o módulo seguinte publica a mesma URL.
+    hosts = _hosts_do_moodle(bruto)
+    ja_vistas = _urls_ja_publicadas(bruto)
+    links_ignorados = 0
+    textos_sem_link = 0
+
     for secao in bruto or ():
-        itens: list[Item] = []
+        nome_secao = secao.get("name") or ""
+        # O `summary` da seção é texto da página tanto quanto o `label`, só que
+        # sem módulo: o link que mora nele entra na seção, sem rótulo de módulo.
+        itens, ignorados = _links_do_texto(
+            secao.get("summary"), secao=nome_secao, modulo="", hosts=hosts, ja_vistas=ja_vistas
+        )
+        links_ignorados += ignorados
+        total += len(itens)
         for modulo in secao.get("modules") or ():
-            if modulo.get("modname") == "assign":
+            modname = modulo.get("modname") or ""
+            nome_modulo = modulo.get("name") or ""
+            if modname == _MODULO_DE_TEXTO:
+                # Bloco de texto: o que ele tem de material é o link dentro dele.
+                # Não vai para `sem_conteudo` porque não é atividade e não tem
+                # consulta própria — o rodapé antigo dizia as duas coisas, e as
+                # duas eram falsas. Texto sem link nenhum é contado à parte.
+                do_texto, ignorados = _links_do_texto(
+                    modulo.get("description"), secao=nome_secao, modulo=nome_modulo,
+                    hosts=hosts, ja_vistas=ja_vistas,
+                )
+                links_ignorados += ignorados
+                if not do_texto and not ignorados:
+                    textos_sem_link += 1
+                itens.extend(do_texto)
+                total += len(do_texto)
+                continue
+            if modname == "assign":
                 # Registrada mesmo sem `contents`, e é o registro que decide se
                 # a segunda chamada vale a pena: sem `assign` nenhum, perguntar
                 # por anexo de entrega só pode devolver vazio (Invariante 5).
@@ -191,26 +266,162 @@ def projetar_material(bruto) -> Conteudo:
             if not conteudos:
                 # Invariante 7: fórum e entrega não têm `contents`. Sumir com
                 # eles faria a lista parecer o espaço inteiro quando não é.
-                sem_conteudo.add(modulo.get("modname") or "?")
-                continue
+                sem_conteudo.add(modname or "?")
             for conteudo in conteudos:
                 itens.append(
                     _item_de(
                         conteudo,
-                        modname=modulo.get("modname") or "",
-                        secao=secao.get("name") or "",
-                        modulo=modulo.get("name") or "",
+                        modname=modname,
+                        secao=nome_secao,
+                        modulo=nome_modulo,
                     )
                 )
                 total += 1
-        secoes.append(Secao(nome=secao.get("name") or "", itens=tuple(itens)))
+            # O `description` de qualquer módulo tem a mesma forma que o do
+            # `label`, e um link nele é material do mesmo jeito. O que já saiu
+            # por `contents` (o `url` que repete a própria URL) não sai de novo.
+            do_texto, ignorados = _links_do_texto(
+                modulo.get("description"), secao=nome_secao, modulo=nome_modulo,
+                hosts=hosts, ja_vistas=ja_vistas,
+            )
+            links_ignorados += ignorados
+            itens.extend(do_texto)
+            total += len(do_texto)
+        secoes.append(Secao(nome=nome_secao, itens=tuple(itens)))
 
     return Conteudo(
         secoes=tuple(secoes),
         total_itens=total,
         sem_conteudo=tuple(sorted(sem_conteudo)),
         entregas=tuple(entregas),
+        links_ignorados=links_ignorados,
+        textos_sem_link=textos_sem_link,
     )
+
+
+def _hosts_do_moodle(bruto) -> frozenset[str]:
+    """Os hosts que o próprio payload diz serem do Moodle.
+
+    Todo módulo traz `modicon` no host do site, e quase todo traz `url`; os
+    `resource` trazem `fileurl` no webservice. Derivar daí, e não de
+    configuração, é o que faz a regra valer para o Moodle de outra faculdade
+    sem ninguém precisar dizer qual é o host.
+    """
+    hosts: set[str] = set()
+    for secao in bruto or ():
+        for modulo in secao.get("modules") or ():
+            for chave in ("url", "modicon"):
+                if (host := urlsplit(modulo.get(chave) or "").netloc):
+                    hosts.add(host)
+            for conteudo in modulo.get("contents") or ():
+                fileurl = conteudo.get("fileurl") or ""
+                if any(marca in fileurl for marca in _MARCAS_INTERNAS):
+                    if (host := urlsplit(fileurl).netloc):
+                        hosts.add(host)
+    return frozenset(hosts)
+
+
+def _urls_ja_publicadas(bruto) -> set[str]:
+    return {
+        conteudo.get("fileurl")
+        for secao in bruto or ()
+        for modulo in secao.get("modules") or ()
+        for conteudo in modulo.get("contents") or ()
+        if conteudo.get("fileurl")
+    }
+
+
+def _classificar(url: str, hosts: frozenset[str]) -> str:
+    """`externo`, `arquivo` (do webservice, baixável) ou `ignorar`.
+
+    `ignorar` cobre o que não é material: âncora da própria página (`#`),
+    e-mail (`mailto:`), `javascript:`, link relativo (que só pode ser do próprio
+    Moodle) e link absoluto para o host do Moodle ou para caminho de página
+    dele. O que esses apontam ou já está na lista (um `resource`), ou é
+    atividade que o rodapé declara, ou é outra turma.
+    """
+    if not url.startswith(("http://", "https://")):
+        return "ignorar"
+    if any(marca in url for marca in _MARCAS_INTERNAS):
+        return "arquivo"
+    partes = urlsplit(url)
+    if partes.netloc in hosts or partes.path.startswith(_CAMINHOS_DO_MOODLE):
+        return "ignorar"
+    return "externo"
+
+
+def _titulo_util(titulo: str, url: str) -> str | None:
+    """O texto da âncora, quando ele diz algo que a URL não diz.
+
+    Vazio (âncora que embrulha só uma imagem), a própria URL, ou coisa sem letra
+    nem número não é título — e inventar um seria pior do que declarar que não
+    há. `www.` sem esquema é URL escrita à mão, e é o caso mais comum de âncora
+    cujo texto é o próprio endereço.
+    """
+    t = (titulo or "").strip()
+    if not t or "://" in t or t.lower().startswith("www.") or not normalizar(t):
+        return None
+    if normalizar(t) in normalizar(url):
+        return None
+    return t
+
+
+def _item_de_link(url: str, titulo: str, classe: str, *, secao: str, modulo: str) -> Item:
+    titulo_util = _titulo_util(titulo, url)
+    partes = urlsplit(url)
+    if classe == "arquivo":
+        # Arquivo que o professor arrastou para dentro do texto. O nome é o do
+        # arquivo (é ele que `baixar_arquivo` casa e grava em disco, com
+        # extensão); o título da âncora, quando há, é o rótulo — como o nome do
+        # módulo é para um `resource`. Tamanho e data não vêm: o `href` é só a
+        # URL, e o tipo sai da extensão, que é o que há.
+        nome = unquote(partes.path.rsplit("/", 1)[-1]) or titulo_util or partes.netloc
+        mimetype = mimetypes.guess_type(nome)[0]
+        return Item(
+            nome=nome,
+            tipo=_tipo_de("", mimetype),
+            tamanho=None,
+            modificado=None,
+            url_externa=None,
+            fileurl_bruta=url,
+            fileid=_fileid(url),
+            mimetype=mimetype,
+            secao=secao,
+            modulo=titulo_util or modulo,
+            no_texto=True,
+        )
+    return Item(
+        nome=titulo_util or partes.netloc,
+        tipo="link",
+        tamanho=None,
+        modificado=None,
+        url_externa=url,
+        secao=secao,
+        modulo=modulo,
+        no_texto=True,
+        sem_titulo=titulo_util is None,
+    )
+
+
+def _links_do_texto(
+    html: str | None, *, secao: str, modulo: str, hosts: frozenset[str], ja_vistas: set[str]
+) -> tuple[list[Item], int]:
+    """Os `<a href>` de um campo de texto viram itens; devolve também quantos
+    foram ignorados por não serem material. URL repetida (já publicada por
+    `contents`, ou já saída de outro bloco) não sai de novo e não conta como
+    ignorada: o destino está na lista."""
+    itens: list[Item] = []
+    ignorados = 0
+    for url, titulo in links(html or ""):
+        classe = _classificar(url, hosts)
+        if classe == "ignorar":
+            ignorados += 1
+            continue
+        if url in ja_vistas:
+            continue
+        ja_vistas.add(url)
+        itens.append(_item_de_link(url, titulo, classe, secao=secao, modulo=modulo))
+    return itens, ignorados
 
 
 def _item_de(conteudo: dict, *, modname: str, secao: str, modulo: str) -> Item:
@@ -299,6 +510,8 @@ def _com_anexos(conteudo: Conteudo, anexos: AnexosDeEntrega) -> Conteudo:
         sem_conteudo=tuple(n for n in conteudo.sem_conteudo if n != "assign"),
         entregas=conteudo.entregas,
         avisos=conteudo.avisos + anexos.avisos,
+        links_ignorados=conteudo.links_ignorados,
+        textos_sem_link=conteudo.textos_sem_link,
     )
 
 
@@ -388,6 +601,8 @@ def _formatar_item(item: Item) -> str:
         partes.append(f", {item.tamanho // 1024} kB")
     if item.modificado:
         partes.append(f", {item.modificado.strftime('%d/%m/%Y')}")
+    if item.sem_titulo:
+        partes.append(", sem título no texto")
     partes.append("]")
     linha = "".join(partes)
     if (rotulo := rotulo_do_modulo(item)) is not None:
@@ -407,6 +622,38 @@ def _entregas_sem_anexo(conteudo: Conteudo) -> tuple[str, ...]:
     """
     com_arquivo = {i.modulo for s in conteudo.secoes for i in s.itens}
     return tuple(e.nome for e in conteudo.entregas if e.nome not in com_arquivo)
+
+
+def _avisos_do_texto(conteudo: Conteudo, mostrados: list[Item]) -> list[str]:
+    """O que a leitura do texto da página achou e o que ela deixou de fora.
+
+    Três contagens, e nenhuma some calada (Invariante 7): quantos itens da lista
+    vieram do texto (para quem lê saber que o nome é o texto da âncora), quantos
+    links não eram material, e quantos blocos de texto não tinham link nenhum —
+    este último é o que avisa que a página tem texto que esta ferramenta não
+    mostra.
+    """
+    avisos: list[str] = []
+    if do_texto := sum(1 for i in mostrados if i.no_texto):
+        quais = "1 dos itens acima estava" if do_texto == 1 else f"{do_texto} dos itens acima estavam"
+        avisos.append(
+            f"{quais} no texto da página da disciplina, não publicado(s) como "
+            "arquivo ou link: o nome é o texto do link e o parêntese, quando há, "
+            "é o começo do bloco de texto onde ele estava."
+        )
+    if conteudo.links_ignorados:
+        avisos.append(
+            f"{conteudo.links_ignorados} link(s) no texto da página apontam para "
+            "dentro do próprio e-Disciplinas (outra atividade ou página do curso), "
+            "para e-mail ou para âncora da própria página, e não foram listados: "
+            "não são material."
+        )
+    if conteudo.textos_sem_link:
+        avisos.append(
+            f"{conteudo.textos_sem_link} bloco(s) de texto da página não têm link "
+            "nenhum e ficaram de fora: são texto, não arquivo nem link."
+        )
+    return avisos
 
 
 def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> RespostaMaterial:
@@ -441,15 +688,15 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         # Invariante 7: espaço vazio é resultado legítimo e rotulado, para não
         # se confundir com falha de credencial nem com sigla errada. Seis das
         # dez disciplinas do semestre não têm entrega nenhuma — vazio acontece.
-        return RespostaMaterial(
-            texto=(
-                f"{cabecalho}\n\nA disciplina existe e está acessível, mas não há "
-                "nenhum arquivo publicado no espaço dela."
-            ),
-            total=0,
-            mostrados=0,
-            vazio_por="sem_material",
+        texto = (
+            f"{cabecalho}\n\nA disciplina existe e está acessível, mas não há "
+            "nenhum arquivo publicado no espaço dela."
         )
+        # O vazio também tem de dizer o que a página tem e esta lista não: um
+        # texto sem link, ou só links para dentro do Moodle, é vazio legítimo —
+        # mas é vazio COM explicação, senão parece que a página está em branco.
+        texto += "".join(f"\n\n⚠ {a}" for a in _avisos_do_texto(conteudo, []))
+        return RespostaMaterial(texto=texto, total=0, mostrados=0, vazio_por="sem_material")
 
     if filtro and mostrados == 0:
         # "Nada com esse nome" ≠ "disciplina vazia". Dizer o total é o que
@@ -516,6 +763,7 @@ def material(cliente, disciplina: str, busca: str | None = None, agora=None) -> 
         )
     if conteudo.avisos:
         avisos.extend(conteudo.avisos)
+    avisos.extend(_avisos_do_texto(conteudo, [i for _, itens in secoes for i in itens]))
 
     linhas.extend(f"\n⚠ {a}" for a in avisos)
 
