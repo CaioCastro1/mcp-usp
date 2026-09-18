@@ -4140,3 +4140,69 @@ completas, `gate (3.11)` e `gate (3.14)` em 42–54s. O `gate.sh` local deixou d
 porta — que era o defeito de origem, porque ele só roda quando alguém lembra.
 
 ---
+
+### 18/09/2026 — o WSL lia o clipboard do lado errado, e o argumento já estava escrito
+
+Entrada curta de propósito: ela **completa** o registro do `fix/windows` do mesmo
+dia num ponto, e não o revisa.
+
+**O dado.** Uma terceira pessoa instalou no Windows e pediu ao agente dela para
+conectar. Além do que o `fix/windows` já fechou, o print traz uma segunda frase,
+dela: *"é MUITO texto que aparece quando ele é instalado, ninguém lê. não tem como
+ir aparecendo passo a passo gradualmente?"*
+
+**O defeito.** O `fix/windows` pôs o PowerShell como **último** candidato a leitor
+de clipboard — certo para Git Bash, onde ele é o único. No WSL não: sob WSLg
+(WSL2 com interface gráfica, padrão no Windows 11) `$DISPLAY` vem preenchido e
+`xclip` **passa**, então o leitor escolhido é o do lado Linux enquanto a pessoa
+copia no navegador do Windows. A vigia espera os 90 s por uma mudança do outro
+lado, calada.
+
+O que torna isso registrável não é o bug, é onde ele estava: **o argumento já
+estava escrito no mesmo desenho, para o lançador.** O §4 põe `wslview` na frente
+de `open` dizendo "com o WSLg, `xdg-open` abriria um navegador Linux, que não está
+logado na Senha Única". Mesmo `$DISPLAY`, mesmo lado errado, outra escolha — e o
+raciocínio não atravessou. É a forma de defeito que vale anotar: quando uma
+correção nasce de um argumento geral e é aplicada a um lugar só, os outros lugares
+não ficam errados por descuido, ficam errados **por construção**.
+
+E o README daquele PR já prometia o certo: "no WSL ele lê a área de transferência
+do Windows pelo `powershell.exe`". A frase estava no repositório antes de o código
+fazer jus a ela.
+
+**A decisão.** `e_wsl()` antes da cadeia gráfica, e só ali: fora do WSL nada muda,
+e o WIN3 continua valendo. W1, W2 e W4 medem a escolha com dublê, cada uma
+verificada por sabotagem. Não medido, igual ao que aquele desenho já diz: o que o
+`Get-Clipboard` faz num Windows real.
+
+**O que foi descartado, e é a parte que interessa.** A mesma mudança trazia um
+intervalo de vigia por leitor — 2 s para o PowerShell contra 0,5 s —, pelo
+argumento de que cada leitura sobe um processo e 180 arranques em 90 s é
+desperdício. Foi escrito, testado, e **tirado antes de entrar**: "200 a 800 ms de
+arranque" é estimativa e não medição, e mudar o padrão da vigia com base nela é o
+que este projeto não faz — o `--auto` segue fora do padrão até hoje por não ter
+medição contra a USP. O preço apareceu no ato: seis testes do `fix/windows`
+ficaram vermelhos, porque 2 s numa janela de 1 s dá zero tiques e a vigia deixa de
+ler. Quebrar teste alheio recém-escrito é sinal, não obstáculo. Fica no backlog
+com a medição a fazer.
+
+**O passo 2 virou etapas.** Sete das 23 linhas do bloco não eram do caminho feliz
+— o plano B do DevTools, que só interessa quando a página não renderiza, e o aviso
+do `urlscheme=http`, endereçado a quem edita a URL à mão. Viraram
+`dicas_quando_a_pagina_nao_coopera()`, que aparece quando a vigia vence ou quando
+o valor chega sem a forma. O que sobrou virou três paradas, uma por ação executada
+fora do terminal, só com `[ -t 0 ]`. Caiu junto a frase "não precisa de DevTools":
+ela só tranquiliza quem já sabe o que é DevTools, e é a outra pessoa que a mudança
+serve.
+
+O que prende isso são os **dois** lados — P1, que as dicas não aparecem no caminho
+feliz, e P2/P3, que aparecem quando deu errado. Sem o segundo, "mover" e "apagar"
+seriam a mesma coisa para a suíte.
+
+**A queixa dela não era sobre o script**, e essa distinção mudou a correção: na
+sessão dela quem falava era o agente, e o `token.sh` roda sem tty nesse caminho.
+Então o passo 3 do bloco colável do README passou a declarar o regime — *um passo
+por mensagem, espere eu responder* —, porque "explique passo a passo" um modelo
+cumpre entregando todos os passos numa mensagem só.
+
+---
