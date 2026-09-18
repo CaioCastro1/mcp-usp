@@ -74,7 +74,18 @@ def test_g2_e_no_mesmo_processo_nada_novo_ficou_chamavel():
         "Contar que a capacidade existe é informação; pôr um item chamável que "
         "sempre recusa é ensinar o modelo a procurar o jeito de passar."
     )
-    assert len(nomes) == 10, f"o servidor anuncia {len(nomes)}: {sorted(nomes)}"
+    # O que este teste protege é "a flag acrescenta EXATAMENTE as duas, e nada
+    # mais". Fixar o total em 10 dizia isso por tabela e amarrava a asserção a um
+    # número que não é assunto dela: a ferramenta `questionarios`, de leitura,
+    # entrou no mesmo dia e derrubou o teste sem que nada tivesse quebrado.
+    # Comparar os dois estados do fio diz o mesmo e não envelhece.
+    _, com_a_flag = _abrir("1")
+    a_mais = {f["name"] for f in com_a_flag} - nomes
+    assert a_mais == AS_DUAS, (
+        f"ligar {FLAG} acrescentou {sorted(a_mais)}, e deveria acrescentar "
+        f"exatamente {sorted(AS_DUAS)}. Ferramenta que aparece junto com a "
+        "escrita, sem ser de escrita, é efeito colateral de configuração."
+    )
     destrutivas = [
         f["name"]
         for f in ferramentas
