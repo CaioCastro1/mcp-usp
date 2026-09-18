@@ -9,6 +9,7 @@
 #       ./scripts/token.sh --navegador="Google Chrome"   # so com --auto
 #       USP_MCP_NAO_ABRIR=1 ./scripts/token.sh           # nunca abre navegador
 #       USP_MCP_VIGIA_SEGUNDOS=0 ./scripts/token.sh      # nao vigia o clipboard (ver abaixo)
+#       USP_MCP_SEM_PAUSA=1 ./scripts/token.sh           # sem as paradas do passo 2
 #
 # Em UMA invocacao sem terminal, que e como um agente de codigo roda isto:
 #
@@ -123,7 +124,7 @@ for arg in "$@"; do
     --manual) manual=1 ;;
     --auto) manual=0 ;;
     --navegador=*) navegador="${arg#--navegador=}" ;;
-    -h|--ajuda|--help) sed -n '2,79p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--ajuda|--help) sed -n '2,81p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;
   esac
 done
@@ -131,6 +132,22 @@ done
 titulo() { printf '\n\033[1m%s\033[0m\n' "$1"; }
 nota()   { printf '   %s\n' "$1"; }
 aviso()  { printf '   \033[33m! %s\033[0m\n' "$1"; }
+
+# Uma parada curta entre dois passos do caminho manual. So existe quando ha uma
+# PESSOA no terminal: sem tty (um agente rodando o script) nao ha Enter para
+# esperar, e o texto sai inteiro na ordem, para o agente repassar um passo por
+# mensagem. `USP_MCP_SEM_PAUSA=1` desliga, para quem ja sabe o caminho.
+#
+# A marca `[Enter]` no texto e o que a suite reconhece para responder (o arnes de
+# pty em tests/moodle/test_token_navegador.py); o prompt do passo 3 nao a usa,
+# porque la o que se digita e o payload e nao uma linha em branco.
+pausar() {
+  [ -t 0 ] || return 0
+  [ "${USP_MCP_SEM_PAUSA:-0}" = "1" ] && return 0
+  printf '\n   %s ' "$1"
+  IFS= read -r _ < /dev/tty || true
+  printf '\n'
+}
 
 # Saida da invocacao que ABRE o navegador e para, aguardando o payload. Nao e 0:
 # nada foi gravado, e 0 diria "token configurado" para quem so le o codigo — o
@@ -159,6 +176,18 @@ esac
 # seguidas nao recebe dez broncas, e o unico evento que ainda fala e o acerto.
 MAX_AVISOS_VIGIA=3
 
+# Estamos dentro do WSL? Sem spawn de processo, entao pode ser chamada a vontade.
+# `WSL_DISTRO_NAME` e definido pelo proprio WSL e e o sinal que a suite usa para
+# dirigir o teste; o `osrelease` cobre o shell que nasceu sem esse ambiente.
+e_wsl() {
+  [ -n "${WSL_DISTRO_NAME:-}" ] && return 0
+  [ -r /proc/sys/kernel/osrelease ] || return 1
+  case "$(tr '[:upper:]' '[:lower:]' < /proc/sys/kernel/osrelease 2>/dev/null)" in
+    *microsoft*) return 0 ;;
+  esac
+  return 1
+}
+
 # Qual ferramenta le o clipboard DESTA maquina. Vazio = nenhuma, e sem ela nao
 # ha vigia. `wl-paste` e `xclip` so contam com a sessao grafica que eles exigem:
 # num servidor sem interface eles existem no PATH e falham, e "existe" mentiria.
@@ -171,8 +200,24 @@ MAX_AVISOS_VIGIA=3
 # extensao; sem ela porque o Git Bash completa; `pwsh` e o PowerShell 7, que a
 # pessoa pode ter instalado. A escolha esta testada com dubles no PATH (WIN1-3);
 # o Get-Clipboard de verdade nao foi medido pelos autores (18/09/2026).
+# ULTIMO candidato, porem, vale em Git Bash e NAO vale no WSL, e a diferenca e a
+# correcao de 18/09 (§9): sob WSLg — o WSL2 com interface grafica, padrao no
+# Windows 11 — `$DISPLAY` vem preenchido e `xclip` PASSA no teste acima. O leitor
+# escolhido seria entao o do lado Linux, enquanto a pessoa copia o endereco no
+# navegador do WINDOWS: a vigia esperaria os 90 s inteiros por uma mudanca que
+# acontece do outro lado, calada. E o MESMO raciocinio que ja pos `wslview` na
+# frente de `open` no lancador (spec de 18/09, §4, "com o WSLg, xdg-open abriria
+# um navegador Linux") — ele valia para o leitor tambem, e faltava atravessar.
 CLIP=""
 achar_leitor_de_clipboard() {
+  if e_wsl; then
+    for candidato in powershell.exe powershell pwsh.exe pwsh; do
+      if command -v "$candidato" >/dev/null 2>&1; then CLIP="$candidato"; break; fi
+    done
+    # Sem interop (o `/etc/wsl.conf` permite desliga-lo) nao ha o que preferir, e
+    # cair na cadeia normal e melhor que nao ter leitor nenhum.
+    [ -n "$CLIP" ] && return
+  fi
   if command -v pbpaste >/dev/null 2>&1; then CLIP="pbpaste"
   elif command -v wl-paste >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then CLIP="wl-paste"
   elif command -v xclip >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then CLIP="xclip"
@@ -296,6 +341,21 @@ vigiar_clipboard() {
 # A saida da abertura que NAO chegou ao payload: diz o que sobra para a pessoa
 # e como entregar, e sai com SAIDA_AGUARDANDO. Usada pela vigia que venceu e
 # pela maquina onde nao ha vigia.
+# As duas saidas de emergencia do passo 2. Elas ficavam no caminho feliz, antes de
+# a pessoa ter feito qualquer coisa, e somavam 7 das 23 linhas do bloco: o plano B
+# do DevTools so interessa quando a pagina NAO renderiza, e o aviso do
+# `urlscheme=http` e enderecado a quem edita a URL a mao, coisa que ninguem
+# seguindo o script faz. Agora aparecem quando "deu errado" e fato e nao hipotese.
+dicas_quando_a_pagina_nao_coopera() {
+  nota ""
+  nota "Se a pagina nao apareceu e o navegador tentou abrir um app, o caminho e o"
+  nota "DevTools (Cmd+Opt+I) -> aba Network -> a linha bloqueada para"
+  nota "\`moodlemobile://token=…\` e o que copiar."
+  nota "Se voce editou a URL a mao: nao troque por urlscheme=http. Nessa forma o"
+  nota "base64 cai na posicao de host da URL, o Chrome minusculiza host, e base64 e"
+  nota "sensivel a caixa — o token chega corrompido COM A FORMA CERTA (§1.3)."
+}
+
 sair_aguardando() {
   nota "O proximo passo e da PESSOA, na pagina que acabou de abrir (ou na URL acima):"
   nota "  botao DIREITO no link azul 'Clique aqui se a aplicacao nao abrir"
@@ -554,36 +614,35 @@ fi
 if [ -z "$valor" ]; then
   titulo "2/7  (manual) abra esta URL no navegador LOGADO na Senha Unica"
   printf '\n   %s\n\n' "$url_manual"
+  # Ate 18/09 esta linha terminava em "nao precisa de DevTools". A tranquilizacao
+  # so serve para quem ja sabe o que e DevTools; para quem nao sabe, ela levanta
+  # uma pergunta em vez de responder — e o plano B que a justificava saiu daqui.
   nota "Com \`confirmed=1\` o Moodle nao redireciona: ele mostra uma pagina, e o"
-  nota "ENDERECO de um dos links dela e o token — nao precisa de DevTools."
-  nota ""
+  nota "ENDERECO de um dos links dela e a sua chave."
+  if [ -t 0 ]; then abrir_navegador "$url_manual"; fi
+  pausar "Aperte [Enter] quando a pagina tiver aberto."
+
   # Qual link. A instrucao antiga dizia "o link" e a pagina tem tres coisas
   # clicaveis: numa passagem real de um segundo usuario em 12/09/2026 o que foi
   # para o clipboard foi a URL da propria pagina. Nada ali se parece com um
   # token, e o texto do link certo promete ser um plano B dispensavel — por isso
   # ele e citado em voz alta, e por isso os dois chamarizes sao nomeados para
   # serem ignorados de proposito, em vez de ficarem de fora da instrucao.
+  titulo "2/7  na pagina, ache o link azul"
   nota "A pagina tem tres coisas, e so UMA interessa:"
   nota "  caixa verde  'O seu cadastro foi confirmado'   -> ignore"
   nota "  botao cinza  'Ambientes'                       -> ignore"
   nota "  link azul    'Clique aqui se a aplicacao nao abrir automaticamente'"
   nota "               -> E ESTE. O texto promete plano B e mente: e o unico"
   nota "                  lugar da pagina onde o token existe."
-  nota ""
+  pausar "Aperte [Enter] quando tiver achado o link azul."
+
+  titulo "2/7  copie o ENDERECO dele, sem clicar"
   aviso "NAO CLIQUE nesse link. Clicar tenta abrir o app e nao copia nada."
   nota "Botao DIREITO em cima dele -> 'Copiar endereco do link'. So isso."
-  nota ""
-  nota "Se a pagina nao aparecer e o navegador tentar abrir um app, ai o caminho e"
-  nota "o DevTools (Cmd+Opt+I) -> aba Network -> a linha bloqueada para"
-  nota "\`moodlemobile://token=…\` e o que copiar."
-  nota ""
-  nota "Nao troque por urlscheme=http: nessa forma o base64 cai na posicao de host"
-  nota "da URL, o Chrome minusculiza host, e base64 e sensivel a caixa — o token"
-  nota "chega corrompido com a forma certa (§1.3 do SPEC1.md)."
 
   titulo "3/7  cole a URL do link"
   if [ -t 0 ]; then
-    abrir_navegador "$url_manual"
     nota "Nada aparece na tela enquanto voce cola — o valor e a credencial e nao"
     nota "deve ficar no scrollback do terminal."
     printf '\n   Cole e aperte Enter (ou Enter direto para eu ler do clipboard): '
@@ -654,6 +713,7 @@ if [ -z "$valor" ]; then
       if ! vigiar_clipboard "$VIGIA_SEGUNDOS"; then
         titulo "3/7  vigia encerrada sem o endereco — rodada em duas etapas"
         nota "${VIGIA_SEGUNDOS} s e o clipboard nao mudou para \`$ESQUEMA\`. Parei de ler."
+        dicas_quando_a_pagina_nao_coopera
         sair_aguardando
       fi
       # `valor` veio da vigia: a conferencia abaixo e os passos 4-7 seguem como no
@@ -696,6 +756,7 @@ if [ -z "$valor" ]; then
     esac
     nota "Colar so o base64, sem o esquema na frente, tambem vale — o passo 4/7"
     nota "decide. Se nao for isso, refaca do passo 2."
+    dicas_quando_a_pagina_nao_coopera
   fi
 fi
 

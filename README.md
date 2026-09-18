@@ -81,9 +81,14 @@ Instale o usp-mcp neste computador e me conecte a ele.
 2. Registre os três servidores (moodle, jupiter, rucard) no meu Claude Code, no escopo
    de usuário, apontando para os comandos em ~/usp-mcp/.venv/bin/.
 3. O e-Disciplinas precisa de uma chave pessoal minha. Rode `./scripts/token.sh` e me
-   explique, passo a passo, o que eu preciso fazer no navegador. Não tente fazer esse
-   passo sozinho: ele exige que eu clique.
+   guie pelo navegador. Não tente fazer esse passo sozinho: ele exige que eu clique.
+   UM PASSO POR MENSAGEM: diga o que fazer, espere eu responder que fiz, e só então
+   mande o próximo. Não me mande a lista inteira de uma vez.
 4. No fim, chame a ferramenta `diagnostico` e me diga o que ficou funcionando.
+
+Me explique em português comum. Eu não sei o que são MCP, venv, token nem escopo de
+usuário — quando precisar de uma dessas palavras, diga numa frase o que ela significa
+antes de usar.
 ```
 
 ### O caminho manual
@@ -296,7 +301,16 @@ segundos sem o endereço, ele para de ler e diz como entregar depois:
 `powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh`). Para
 rodar sem essa vigia, defina `USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador
 sem ferramenta de clipboard (sem `pbpaste`, `wl-paste`, `xclip` nem PowerShell) a vigia não
-existe e o script diz isso. O que vale no Windows, e o que ainda não foi conferido lá, está
+existe e o script diz isso.
+
+Quando é você no Terminal, o script para entre um passo e o outro e espera um Enter:
+abrir a página, achar o link, copiar o endereço. É de propósito — as instruções todas de
+uma vez ninguém lê. `USP_MCP_SEM_PAUSA=1` tira as paradas para quem já sabe o caminho.
+
+No WSL, não instale `xclip` achando que resolve: ele lê a área de transferência do lado
+Linux, e a sua está do lado Windows. O script já prefere o caminho certo ali.
+
+Sobre o que vale no Windows, e o que ainda não foi conferido lá, está
 na subseção *No Windows*, acima.
 
 Ela fica guardada no arquivo `~/usp-mcp/.env`, na linha `MOODLE_TOKEN`. É o mesmo
