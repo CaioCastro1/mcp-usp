@@ -1,5 +1,12 @@
 # CONVENTIONS — padrões deste repo
 
+> **Este arquivo é de sessão de MANUTENÇÃO.** Ele supõe que você vai mexer no
+> código deste repositório: gate, formato de commit, fluxo de merge, sigla de
+> teste. Quem clonou para **usar** o projeto não precisa de nada daqui — o §0 do
+> `CLAUDE.md` e o `PAPEL-DA-SESSAO.md`, ao lado, dizem o que vale nesse caso.
+> (A pasta se chama `agents/` por acidente de origem, e o nome já enganou:
+> veja a mesma ressalva no `.github/CONTRIBUTING.md`.)
+>
 > Complementa o `CLAUDE.md` (regras não-negociáveis) e o `SPEC1.md` (autoridade).
 > Aqui vive o COMO. Seções que não se aplicam a este projeto foram apagadas em vez
 > de deixadas como `<TODO>` morto — banco de dados e frontend não existem aqui.

@@ -1,11 +1,39 @@
 # CLAUDE.md — usp-mcp
 
-> **Leia isto primeiro.** Este é o cérebro compartilhado de todas as sessões de IA.
-> É curto de propósito. Para detalhe profundo, siga os ponteiros em "Referências".
-> Toda comunicação com o Caio é em português.
+> **Leia isto primeiro.** Este é o cérebro compartilhado das sessões de IA que
+> **mantêm** este projeto. É curto de propósito. Para detalhe profundo, siga os
+> ponteiros em "Referências". Escreva sempre em português.
+>
+> **Comece pelo §0:** ele diz se a sua sessão é uma dessas. Se não for, quase
+> nada daqui para baixo se aplica a você.
 >
 > **`SPEC1.md` é a autoridade do projeto.** Este arquivo é o atalho operacional;
 > quando os dois divergirem, o `SPEC1.md` está certo e este aqui está desatualizado.
+
+## 0. Quem abriu esta pasta
+
+**O padrão é sessão de USO.** O repositório é público, e quem clona quase sempre
+quer perguntar do bandejão e do prazo de aula, não manter o projeto. Nessa
+sessão: ajude a **instalar**, a **configurar** e a **usar** — e não proponha
+mexer no código, não proponha PR, não decida nada sobre o projeto. Defeito do
+projeto vira **issue**, em <https://github.com/CaioCastro1/usp-mcp/issues>, nunca
+um commit. Instalar, criar o venv, rodar o `token.sh` e escrever no `.env`
+continuam sendo uso: a fronteira é o código versionado e as decisões, não o
+teclado.
+
+**Vira sessão de manutenção com uma frase** — "quero mexer no código", "abre uma
+PR" — e vale sem a frase quando o disco já respondeu: mais de uma linha em
+`git worktree list`, branch local fora da `main`, ou `fixtures/moodle/raw/`
+presente. Aí o resto deste arquivo vale inteiro. Quem está numa worktree com
+branch aberta não precisa ser perguntado.
+
+**Não tente descobrir o papel por outro caminho.** `.env` preenchido e `origin`
+apontando para o repositório do dono são o que **todo** clone tem, inclusive o de
+quem só usa. Permissão de push responde à pergunta errada: o papel é da sessão e
+não da pessoa, e o dono também pergunta do bandejão.
+
+Isto é um padrão, não uma cerca — contribuição é bem-vinda, e basta pedir. O
+detalhe está em `docs/agents/PAPEL-DA-SESSAO.md`.
 
 ## 1. O produto (30 segundos)
 
@@ -174,6 +202,7 @@ tanto quanto mudança de código: entra no `SPEC1.md` — fato no §1, decisão 
 
 | Assunto | Onde |
 |---|---|
+| Papel da sessão: uso × manutenção, e que sinal serve (§0) | `docs/agents/PAPEL-DA-SESSAO.md` |
 | Autoridade do projeto: fatos, invariantes, decisões | `SPEC1.md` |
 | Domínios do sistema (RUCard, Moodle, Jupiter) | `docs/domains/README.md` |
 | Convenções deste repo | `docs/agents/CONVENTIONS.md` |

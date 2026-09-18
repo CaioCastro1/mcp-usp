@@ -15,6 +15,14 @@ Leia também o [`CLAUDE.md`](../CLAUDE.md), que tem os comandos do dia a dia e a
 regras críticas em uma página. A autoridade sobre qualquer fato do projeto é o
 `SPEC1.md`.
 
+**Se você usa um assistente, diga que veio contribuir.** Desde 17/09/2026 o §0 do
+`CLAUDE.md` manda tratar toda sessão como sessão de uso enquanto ninguém disser o
+contrário — o padrão existe porque a maioria de quem clona quer perguntar do
+bandejão, e não porque a porta esteja fechada. Uma frase ("quero mexer no
+código", "vamos abrir uma PR") basta, e numa worktree ou numa branch sua nem isso
+é preciso. O raciocínio inteiro está em
+[`docs/agents/PAPEL-DA-SESSAO.md`](../docs/agents/PAPEL-DA-SESSAO.md).
+
 ## As quatro que não se negociam
 
 **1. `./scripts/gate.sh` verde antes de commitar.** O gate checa o `.env`, se
