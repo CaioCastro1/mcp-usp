@@ -587,10 +587,10 @@ Três coisas para saber antes de ligar:
 
 - Entregar para correção não tem desfazer, nem aqui nem pelo site.
 - Salvar rascunho só funciona em atividade de texto online. Enviar arquivo não existe neste
-  projeto, e é o formato mais comum na prática. Essa metade vai recusar a maioria dos casos,
-  dizendo o motivo.
+  projeto atualmente, mas está sendo implementado.
 - Trabalho em grupo é recusado, porque a entrega valeria também por pessoas que não estão
   na conversa.
+- O MCP não responde testes ou questionários valendo nota, ou com submissões limitadas.
 
 A confirmação em duas etapas protege contra acidente e contra frase ambígua. Ela não é um
 cadeado: quem roda o projeto dentro de um assistente que também tem acesso ao terminal
