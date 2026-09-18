@@ -36,7 +36,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# Onze funções, todas de leitura. Crescer isso é decisão de §9, não
+# Treze funções, todas de leitura. Crescer isso é decisão de §9, não
 # conveniência — a passagem de 1 para 4 está registrada lá (31/08), e as três
 # então novas existem porque `material` precisa traduzir sigla em `courseid`:
 # site_info dá o userid a partir do token, users_courses dá a lista, e
@@ -102,6 +102,23 @@ from dataclasses import dataclass
 # (`core_course_set_favourite_courses`, que o T5 usa justamente porque ela se
 # declara `read` e grava, e `core_course_view_course`), e nenhuma das duas casa
 # com o prefixo do verbo.
+#
+# A décima segunda e a décima terceira entraram em 17/09/2026, com
+# `questionarios`, e o desenho está em
+# `docs/superpowers/specs/2026-09-17-questionario-como-objeto-design.md`.
+# Questionário é OUTRO objeto do Moodle: `mod_assign_*` não o vê, e até então
+# `ja_entreguei` o recusava por escrito e mandava para `o_que_vence`, que só
+# sabe a data. `mod_quiz_get_quizzes_by_courses` diz que o questionário existe,
+# quando abre e fecha e quantas tentativas permite; `mod_quiz_get_user_attempts`
+# diz quantas o aluno FINALIZOU. São duas e não três: `get_user_best_grade`
+# ficou de fora porque a nota do questionário já sai em `notas`, e um segundo
+# número por outro caminho é o problema, não a solução.
+#
+# Esta é a família mais delicada da allowlist até aqui: as três escritas de
+# tentativa que o §2.2 recusa estão a um prefixo de distância, e duas LEITURAS
+# da família entraram no bloqueio permanente na mesma data (ver lá). Igualdade
+# exata de nome é o que libera; o prefixo `mod_quiz_get_` de P5 é teto e casa
+# com cinco funções que este projeto recusa.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "core_calendar_get_action_events_by_timesort",
@@ -115,6 +132,8 @@ ALLOWLIST: frozenset[str] = frozenset(
         "mod_forum_get_forums_by_courses",
         "mod_forum_get_forum_discussions",
         "core_course_get_updates_since",
+        "mod_quiz_get_quizzes_by_courses",
+        "mod_quiz_get_user_attempts",
     }
 )
 
@@ -186,6 +205,19 @@ BLOQUEIO_PERMANENTE: frozenset[str] = frozenset(
         # atividade. Nenhuma das duas tem desfazer pela API.
         "core_completion_mark_course_self_completed",
         "core_completion_update_activity_completion_status_manually",
+        # --- acrescentados em 17/09/2026, com `questionarios` (spec do dia) ----
+        # As PRIMEIRAS funções de LEITURA desta lista, e a mudança de caráter
+        # fica escrita: até aqui o §2.2 dizia "não escreve em nome do aluno";
+        # passa a dizer também "não lê o que não pode estar no contexto de um
+        # modelo". `get_attempt_data` devolve o enunciado das questões de uma
+        # tentativa EM ANDAMENTO; `get_attempt_summary` é a mesma tentativa,
+        # por questão, antes do envio (catálogo §3.8 e §6.10). Nenhuma escreve,
+        # e mesmo assim são a última coisa que se quer dentro do contexto de um
+        # modelo durante uma prova. A allowlist já as nega por omissão; esta é
+        # a segunda camada, e ela passou a ser necessária justamente porque o
+        # prefixo `mod_quiz_get_` entrou no teto de P5 e casa com as duas.
+        "mod_quiz_get_attempt_data",
+        "mod_quiz_get_attempt_summary",
     }
 )
 

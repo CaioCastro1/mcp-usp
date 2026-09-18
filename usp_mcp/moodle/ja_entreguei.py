@@ -260,11 +260,16 @@ def _formatar_linha(s: Situacao, agora: datetime) -> str:
     return linha
 
 
+# Até 17/09/2026 isto mandava para `o_que_vence`, que só sabe a data, e foi o
+# beco em que o dono caiu ao perguntar por um questionário. A recusa continua
+# (objeto diferente, funções diferentes, sem rascunho e com orçamento de
+# tentativa); o que muda é o destino dela.
 COBERTURA = (
     "Esta resposta cobre só TAREFA (`assign`) do e-Disciplinas. Questionário "
-    "não passa por aqui, e prova presencial que o professor não lançou no "
-    "Moodle não existe em lugar nenhum — use `o_que_vence` para ver o que tem "
-    "prazo, inclusive questionário."
+    "não passa por aqui: para saber se você já fez um questionário, se ainda "
+    "dá e quantas tentativas sobram, use `questionarios`; para o que tem "
+    "prazo, inclusive questionário, `o_que_vence`. Prova presencial que o "
+    "professor não lançou no Moodle não existe em lugar nenhum."
 )
 
 _SEM_NOTA = (
@@ -378,13 +383,20 @@ def ja_entreguei(
         #
         # O total também é uma afirmação, e o warning a enfraquece: a entrega
         # procurada pode estar exatamente entre as que não foram lidas.
+        #
+        # E a COBERTURA sai aqui também, desde 17/09/2026. Este é o ramo exato
+        # de quem pergunta por um questionário pelo nome ("já entreguei o
+        # Teste 12?"), e era o único que ficava mudo sobre questionário: listava
+        # as quatro entregas e parava (J26).
+        avisos = [_aviso_da_lista(nao_listadas)] if nao_listadas else []
+        avisos.append(COBERTURA)
         return RespostaJaEntreguei(
             texto=(
                 f"{cabecalho}\n\nNenhuma entrega com {entrega!r} no nome. A "
                 f"disciplina tem {len(todas)} entregas: "
                 + ", ".join(e.nome for e in todas)
                 + "."
-                + (f"\n\n⚠ {_aviso_da_lista(nao_listadas)}" if nao_listadas else "")
+                + "".join(f"\n\n⚠ {a}" for a in avisos)
             ),
             total=len(todas),
             consultadas=0,

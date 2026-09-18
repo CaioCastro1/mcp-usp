@@ -11,7 +11,7 @@ acreditar no declarado — o SDK deriva o schema da assinatura, e por isso nenhu
 descrição de parâmetro viajava enquanto a suíte inteira estava verde. E o
 registro em `main()` é um segundo lugar onde a condição podia ter sido esquecida:
 declarar as duas fora da lista e registrá-las mesmo assim daria um servidor que
-anuncia dez e aceita doze.
+anuncia onze e aceita treze.
 
 **Os dois processos sobem com o ambiente escrito à mão**, um com a flag em "1" e
 outro em "0". É o que torna estas duas asserções independentes de quem rodou a
@@ -54,11 +54,12 @@ def test_e14_sem_a_flag_as_duas_de_escrita_nao_aparecem():
         "nenhuma: ela ensina o modelo que o caminho existe e que falta achar o "
         "jeito de passar."
     )
-    assert len(nomes) == 10, (
+    # Onze desde 17/09/2026 (`questionarios`); eram dez.
+    assert len(nomes) == 11, (
         f"o servidor anuncia {len(nomes)} ferramentas sem a flag: {sorted(nomes)}"
     )
 
-    # E o padrão do projeto continua inteiro: nenhuma das dez se diz de escrita.
+    # E o padrão do projeto continua inteiro: nenhuma das onze se diz de escrita.
     escrevem_no_moodle = [
         f["name"]
         for f in ferramentas
@@ -69,7 +70,7 @@ def test_e14_sem_a_flag_as_duas_de_escrita_nao_aparecem():
     )
 
 
-def test_e14b_com_a_flag_as_duas_aparecem_e_sao_doze():
+def test_e14b_com_a_flag_as_duas_aparecem_e_sao_treze():
     """A outra metade, e sem ela E14 ficaria verde num servidor que nunca as
     expõe — o falso-verde de sempre, aqui na forma "a condição está sempre
     falsa"."""
@@ -80,6 +81,6 @@ def test_e14b_com_a_flag_as_duas_aparecem_e_sao_doze():
         "condição do `listar_ferramentas()` e o registro em `main()` são dois "
         "lugares diferentes, e os dois precisam concordar."
     )
-    assert len(nomes) == 12, (
+    assert len(nomes) == 13, (
         f"o servidor anuncia {len(nomes)} ferramentas com a flag: {sorted(nomes)}"
     )

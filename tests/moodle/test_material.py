@@ -349,14 +349,17 @@ def test_sigla_desconhecida_nao_chega_a_pedir_conteudo(disciplinas_brutas, conte
 def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
     """T77 — a superfície passou de 1 para 4 (§9, 31/08), de 4 para 5 (12/09),
     de 5 para 6, de 6 para 8 e de 8 para 10 (14/09: `ja_entreguei`, `notas` e
-    `avisos`).
+    `avisos`), de 10 para 11 (14/09, `o_que_mudou`) e de 11 para 13 (17/09,
+    `questionarios`).
 
     O teste continua travando o conjunto INTEIRO, que é o que impede a próxima
     sessão de acrescentar "só mais uma". Todas são leitura; nenhuma escreve, e
-    nenhuma está no bloqueio permanente do §2.2 — o que importa dizer das quatro
-    últimas, porque cada uma é vizinha de nome de funções que estão: as duas de
-    `mod_assign_` convivem com `submit_for_grading`, e as duas de `mod_forum_`
-    convivem com `add_discussion` e `delete_post`.
+    nenhuma está no bloqueio permanente do §2.2 — o que importa dizer das
+    vizinhas de nome de funções que estão: as duas de `mod_assign_` convivem
+    com `submit_for_grading`, as duas de `mod_forum_` convivem com
+    `add_discussion` e `delete_post`, e as duas de `mod_quiz_` convivem com as
+    três de tentativa, as mais perigosas da lista — e com duas LEITURAS que
+    entraram no bloqueio no mesmo dia que elas entraram aqui.
     """
     assert politica.ALLOWLIST == frozenset({
         "core_calendar_get_action_events_by_timesort",
@@ -370,6 +373,8 @@ def test_a_allowlist_cresce_por_decisao_e_so_com_leitura():
         "mod_forum_get_forums_by_courses",
         "mod_forum_get_forum_discussions",
         "core_course_get_updates_since",
+        "mod_quiz_get_quizzes_by_courses",
+        "mod_quiz_get_user_attempts",
     })
     assert not (politica.ALLOWLIST & politica.BLOQUEIO_PERMANENTE)
     for funcao in politica.ALLOWLIST:

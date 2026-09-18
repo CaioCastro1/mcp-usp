@@ -185,3 +185,40 @@ def test_e13_o_plano_de_uma_entrega_real_bate_com_o_site_sem_escrever(cliente_re
         agora=datetime.now(ZoneInfo("America/Sao_Paulo")),
     )
     assert "pluginfile.php" not in texto
+
+
+# --------------------------------------------------------------------------
+# QO28 — a hipótese principal do spec de 17/09 virada canário.
+#
+# `questionarios` nasceu ANTES da captura, e o desenho lê `attempts`, `timeopen`
+# e `timeclose` de `mod_quiz_get_quizzes_by_courses` como HIPÓTESE sobre o que
+# uma conta de aluno recebe. O código degrada declaradamente se não vierem
+# (QO12, QO14); este teste é o que diz, no dia em que rodar, se a degradação é
+# a exceção ou o caminho normal.
+#
+# UMA chamada, com escopo de UMA disciplina, nome literal (§3.1). Só a primeira
+# das duas funções: a segunda exige um `quizid` que sairia desta resposta, e
+# encadear as duas aqui seria a camada live começando a montar a ferramenta —
+# quem monta é o módulo, e o módulo já tem vinte testes offline.
+# --------------------------------------------------------------------------
+
+
+def test_qo28_a_conta_de_aluno_recebe_os_campos_que_questionarios_le(cliente_real):
+    from usp_mcp.moodle.questionarios import CAMPOS_LIDOS_DO_QUESTIONARIO
+
+    vivo = cliente_real.chamar(
+        "mod_quiz_get_quizzes_by_courses", **{"courseids[0]": 142036}
+    )
+
+    assert "quizzes" in vivo, f"a resposta não tem `quizzes`: {sorted(vivo)}"
+    if not vivo["quizzes"]:
+        pytest.fail(
+            "PTC3314 não tem mais questionário nenhum no e-Disciplinas. Troque a "
+            "disciplina deste canário — o boletim de 15/09 tinha treze."
+        )
+    faltando = set(CAMPOS_LIDOS_DO_QUESTIONARIO) - set(vivo["quizzes"][0])
+    assert not faltando, (
+        f"a conta de aluno NÃO recebe {sorted(faltando)} em "
+        "`mod_quiz_get_quizzes_by_courses`. A hipótese do spec de 17/09 caiu: a "
+        "degradação de QO12/QO14 é o caminho normal, e isso vai para o §9."
+    )

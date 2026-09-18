@@ -426,6 +426,9 @@ def test_at14_nada_em_atraso_nao_sai_mudo(disciplinas_brutas, entregas_ptc3314):
     assert r.faltando == 0
     assert r.vazio_por == "nada_em_atraso"
     assert "questionário" in r.texto.lower(), "não disse o que não cobre"
+    # 17/09/2026: "nada em atraso" sobre uma lista que não vê questionário só é
+    # honesto se disser onde o questionário vencido se vê.
+    assert "questionarios" in r.texto, "não disse onde ver questionário vencido"
 
 
 def test_at15_sem_disciplina_em_andamento_diz_o_que_fazer(disciplinas_brutas):

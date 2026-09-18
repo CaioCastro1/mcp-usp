@@ -40,15 +40,17 @@ from .material import material
 from .notas import notas
 from .o_que_mudou import o_que_mudou
 from .o_que_vence import o_que_vence
+from .questionarios import questionarios
 
 # URL default: mesma do §8 do SPEC1 e de scripts/ws.sh. MOODLE_URL sobrescreve
 # para quem precisa apontar para outro ambiente (não há esse caso hoje, mas
 # não custa não fixar o valor).
 _URL_PADRAO = "https://edisciplinas.usp.br"
 
-# Dez ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
-# terceira em 01/09, e da quarta à décima em 14/09). Os nomes vêm das perguntas
-# do dono, não das funções do Moodle por trás.
+# Onze ferramentas (§5: crescer é decisão de §9 — a segunda entrou em 31/08, a
+# terceira em 01/09, da quarta à décima em 14/09, e a décima primeira em
+# 17/09). Os nomes vêm das perguntas do dono, não das funções do Moodle por
+# trás.
 _NOME_FERRAMENTA = "o_que_vence"
 _NOME_MATERIAL = "material"
 _NOME_ARQUIVO = "baixar_arquivo"
@@ -59,6 +61,7 @@ _NOME_AVISOS = "avisos"
 _NOME_MUDOU = "o_que_mudou"
 _NOME_DISCIPLINAS = "disciplinas"
 _NOME_ATRASADAS = "atrasadas"
+_NOME_QUESTIONARIOS = "questionarios"
 
 # As duas de 15/09/2026, e as únicas que escrevem. Só aparecem com
 # `USP_MCP_ENTREGA=1` — ver `_ferramentas_de_entrega`.
@@ -194,8 +197,8 @@ def listar_ferramentas() -> list[dict]:
     o modelo escolher a ferramenta certa diante de uma pergunta em português.
 
     **Depende do ambiente desde 15/09/2026**, e é a única função deste projeto
-    que depende: com `USP_MCP_ENTREGA=1` a lista tem doze itens, sem ela tem
-    dez. Continua pura (lê `os.environ`, não escreve em lugar nenhum) e
+    que depende: com `USP_MCP_ENTREGA=1` a lista tem treze itens, sem ela tem
+    onze. Continua pura (lê `os.environ`, não escreve em lugar nenhum) e
     continua não exigindo o SDK. Quem carrega o `.env` antes de perguntar é
     `main()`, no começo do processo — aqui dentro um `carregar_env()` seria
     efeito colateral numa função que a suíte inteira chama.
@@ -208,7 +211,9 @@ def listar_ferramentas() -> list[dict]:
                 "e-Disciplinas (Moodle da USP): tarefas e questionários que "
                 "vencem dentro de uma janela de dias a partir de agora. Use "
                 "para responder perguntas como 'o que eu tenho para entregar', "
-                "'o que vence essa semana' ou 'tem alguma tarefa vencendo'."
+                "'o que vence essa semana' ou 'tem alguma tarefa vencendo'. Diz "
+                "o que vence e quando, não se já foi feito: para isso, "
+                "`ja_entreguei` (tarefa) e `questionarios` (questionário)."
             ),
             "inputSchema": {
                 "type": "object",
@@ -377,8 +382,11 @@ def listar_ferramentas() -> list[dict]:
                 "'entreguei dentro do prazo?'. Diz também a data do envio, o "
                 "nome do arquivo enviado, se já foi corrigida e se houve "
                 "prorrogação de prazo para você. Cobre só TAREFA: questionário "
-                "e prova presencial não passam por aqui — para o que TEM prazo, "
-                "inclusive questionário, use `o_que_vence`. Não traz a nota. "
+                "não passa por aqui — para saber se já fez um questionário, se "
+                "ainda dá e quantas tentativas sobram, use `questionarios`; "
+                "para o que TEM prazo, inclusive questionário, `o_que_vence`. "
+                "Prova presencial que o professor não lançou não existe em "
+                "lugar nenhum. Não traz a nota. "
                 "Custa uma chamada ao Moodle por entrega consultada, então "
                 "pergunte por uma disciplina de cada vez."
             ),
@@ -571,9 +579,11 @@ def listar_ferramentas() -> list[dict]:
                 "não entregou; diga que não há registro e sugira confirmar. "
                 "Entrega já corrigida sem envio registrado a própria resposta "
                 "separa, e não conta como falta. Custa uma chamada ao Moodle "
-                "para listar as entregas e mais uma por entrega vencida. Para "
-                "ver TODAS as entregas de uma disciplina, vencidas ou não, use "
-                "`ja_entreguei`; para o que ainda vai vencer, `o_que_vence`."
+                "para listar as entregas e mais uma por entrega vencida. Não vê "
+                "QUESTIONÁRIO: para questionário que fechou sem você fazer, use "
+                "`questionarios` com a disciplina. Para ver TODAS as entregas "
+                "de uma disciplina, vencidas ou não, use `ja_entreguei`; para o "
+                "que ainda vai vencer, `o_que_vence`."
             ),
             "inputSchema": {
                 "type": "object",
@@ -592,6 +602,58 @@ def listar_ferramentas() -> list[dict]:
                 "required": [],
                 "additionalProperties": False,
             },
+            "annotations": SO_LEITURA,
+        },
+        {
+            "name": _NOME_QUESTIONARIOS,
+            "description": (
+                "Diz, para cada questionário de uma disciplina do e-Disciplinas "
+                "(Moodle da USP), se você já FEZ — isto é, se tem tentativa "
+                "finalizada —, se ainda está no prazo ou já fechou, e quantas "
+                "tentativas você usou e ainda pode usar. Use para 'já fiz o "
+                "teste 12?', 'ainda dá para fazer o questionário de PTC3314?', "
+                "'quantas tentativas eu tenho?', 'perdi algum questionário?'. É "
+                "o par de `ja_entreguei` para questionário: aquela cobre "
+                "tarefa, esta cobre questionário, e nenhuma cobre a outra. Só "
+                "LÊ: não abre, não responde e não finaliza questionário, e não "
+                "há configuração que a faça fazer isso. Tentativa em andamento "
+                "não conta como feita. Não traz a nota — ela sai em `notas`. "
+                "Custa uma chamada ao Moodle para listar os questionários e "
+                "mais uma por questionário consultado, com teto declarado na "
+                "resposta; pergunte pelo nome (`questionario`) para gastar só "
+                "duas."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "disciplina": {
+                        "type": "string",
+                        "description": (
+                            "Sigla da disciplina como no e-Disciplinas, por "
+                            "exemplo PTC3314. Espaço e caixa não importam. "
+                            "Aceita também o RÓTULO inteiro (PTC3314-2026), "
+                            "que é o que distingue duas matrículas da mesma "
+                            "sigla, e casa com pedaço do nome."
+                        ),
+                    },
+                    "questionario": {
+                        "type": "string",
+                        "description": (
+                            "Pedaço do nome do questionário — 'Teste 12', "
+                            "'semanal 3'. Opcional: sem ele vêm todos os "
+                            "questionários da disciplina, e a saída diz se "
+                            "algum ficou sem estado por teto de consultas."
+                        ),
+                    },
+                },
+                "required": ["disciplina"],
+                "additionalProperties": False,
+            },
+            # Nenhum identificador de tentativa ou de questionário entra por
+            # aqui, e é regra e não estilo: o único caminho natural para
+            # descobrir um id de tentativa é a função que fabrica um, e ela
+            # está no bloqueio permanente. Sem o id no vocabulário da
+            # ferramenta, não existe pergunta cujo próximo passo encoste nela.
             "annotations": SO_LEITURA,
         },
         *_ferramentas_de_entrega(),
@@ -670,6 +732,13 @@ def chamar_ferramenta(
 
     if nome == _NOME_ATRASADAS:
         return atrasadas(cliente, argumentos.get("disciplina")).texto
+
+    if nome == _NOME_QUESTIONARIOS:
+        return questionarios(
+            cliente,
+            argumentos["disciplina"],
+            questionario=argumentos.get("questionario"),
+        ).texto
 
     if nome == _NOME_DISCIPLINAS:
         return minhas_disciplinas(
@@ -779,6 +848,7 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
     porta_mudou = portas[_NOME_MUDOU]
     porta_disciplinas = portas[_NOME_DISCIPLINAS]
     porta_atrasadas = portas[_NOME_ATRASADAS]
+    porta_questionarios = portas[_NOME_QUESTIONARIOS]
     descritor = portas[_NOME_FERRAMENTA]
     # `instructions` viaja no `initialize`, uma vez por conexão, e é o canal de
     # INFORMAÇÃO que o `tools/list` não é: nada ali é chamável. É por ele que o
@@ -956,6 +1026,22 @@ def main() -> None:  # pragma: no cover — casca stdio; ver nota abaixo.
 
     anotar(_atrasadas, porta_atrasadas["inputSchema"], {"disciplina": str | None})
     _registrar(porta_atrasadas, _atrasadas)
+
+    def _questionarios(disciplina, questionario=None) -> str:
+        # `disciplina` SEM default e `questionario` COM, como em `ja_entreguei`:
+        # é a assinatura que o SDK lê para decidir o que é obrigatório no fio,
+        # e o `inputSchema` declara os dois do mesmo jeito (H6, 31/08).
+        return _chamar(
+            porta_questionarios["name"],
+            {"disciplina": disciplina, "questionario": questionario},
+        )
+
+    anotar(
+        _questionarios,
+        porta_questionarios["inputSchema"],
+        {"disciplina": str, "questionario": str | None},
+    )
+    _registrar(porta_questionarios, _questionarios)
 
     # ------------------------------------------------- as duas de escrita
     #
@@ -1157,6 +1243,10 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
     def _sonda_atrasadas(disciplina: str | None = None) -> str:
         return ""
 
+    @servidor.tool(name="questionarios", description="verificação")
+    def _sonda_questionarios(disciplina: str, questionario: str | None = None) -> str:
+        return ""
+
     # As duas de escrita só entram na conta quando existem. `listar_ferramentas`
     # não as devolve com a flag desligada, e o laço abaixo só cobra sonda do que
     # ela devolveu — registrá-las sempre criaria duas ferramentas de verificação
@@ -1182,6 +1272,7 @@ def _auto_verificar() -> int:  # pragma: no cover — utilitário de linha de co
         "o_que_mudou": _sonda_mudou,
         "disciplinas": _sonda_disciplinas,
         "atrasadas": _sonda_atrasadas,
+        "questionarios": _sonda_questionarios,
         "entregar": _sonda_entregar,
         "salvar_rascunho": _sonda_rascunho,
     }

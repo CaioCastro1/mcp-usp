@@ -121,6 +121,17 @@ FUNCOES_POR_FERRAMENTA: dict[str, tuple[str, ...]] = {
         "core_course_get_updates_since",
         "core_course_get_contents",
     ),
+    # `questionarios` (17/09) exige as duas de quiz JUNTAS, como `avisos` exige
+    # as duas de fórum: `get_user_attempts` pede um `quizid`, e o único lugar de
+    # onde ele sai é `get_quizzes_by_courses`. Um site com só a segunda não
+    # responde meia pergunta — não responde nenhuma. As duas primeiras são a
+    # resolução de sigla, que toda ferramenta com escopo de disciplina exige.
+    "questionarios": (
+        "core_webservice_get_site_info",
+        "core_enrol_get_users_courses",
+        "mod_quiz_get_quizzes_by_courses",
+        "mod_quiz_get_user_attempts",
+    ),
 }
 
 

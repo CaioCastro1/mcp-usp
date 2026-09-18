@@ -424,7 +424,8 @@ def _bloco_compacto(disciplinas) -> list[str]:
 _COMO_USAR = (
     "Para perguntar sobre uma delas, use a SIGLA ou o RÓTULO INTEIRO (o que "
     "está entre parênteses): `material`, `notas`, `avisos`, `ja_entreguei`, "
-    "`atrasadas` e `o_que_mudou` aceitam os dois. Quando a mesma sigla aparece "
+    "`atrasadas`, `questionarios` e `o_que_mudou` aceitam os dois. Quando a "
+    "mesma sigla aparece "
     "em mais de um ano, só o rótulo distingue as duas matrículas."
 )
 
