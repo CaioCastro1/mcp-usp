@@ -214,6 +214,18 @@ aperte Enter.
 O script confere o que você copiou, testa a chave contra a USP e só então guarda. Se você
 copiou o endereço errado, ele avisa e não estraga nada. A chave nunca aparece na tela.
 
+Se quem roda o script é o assistente, e não você no Terminal, não há Enter para apertar:
+o script fica de vigia no clipboard por até 90 segundos, lendo o que está lá a cada meio
+segundo, e segue sozinho assim que aparecer um endereço que comece com
+`moodlemobile://token=`. Ele avisa disso antes de começar. Só esse endereço faz o script
+agir; qualquer outra coisa que você copiar nesse intervalo ele ignora, sem guardar,
+mostrar ou dizer o tamanho, e o que já estava no clipboard antes não conta. Se você
+copiar o endereço errado, ele diz o que veio errado e continua esperando. Passados os 90
+segundos sem o endereço, ele para de ler e diz como entregar depois:
+`pbpaste | ~/usp-mcp/scripts/token.sh`. Para rodar sem essa vigia, defina
+`USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador sem ferramenta de clipboard
+(sem `pbpaste`, `wl-paste` nem `xclip`) a vigia não existe e o script diz isso.
+
 Ela fica guardada no arquivo `~/usp-mcp/.env`, na linha `MOODLE_TOKEN`. É o mesmo
 arquivo que o programa lê, então não há nada para copiar de um lugar para outro: feche e
 abra o assistente e o e-Disciplinas passa a responder. Você não precisa abrir esse

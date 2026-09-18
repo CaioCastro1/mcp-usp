@@ -362,8 +362,12 @@ def test_o_base64_nu_continua_passando_depois_da_checagem_de_ida():
 # fluxo em duas etapas —, entao TODO teste que passa pelo passo 3 precisa do `open`
 # dublado de `navegador_dublado`, senao abre o navegador de quem roda a suite. O
 # que abre, quando abre e o passaporte guardado entre as duas invocacoes estao em
-# tests/moodle/test_token_navegador.py. Continua fora de alcance ler um clipboard
-# de verdade, e a captura automatica (`--auto`) segue exigindo tty.
+# tests/moodle/test_token_navegador.py. Desde 17/09 a invocacao de abertura tambem
+# FICA DE VIGIA no clipboard, lendo `pbpaste` a cada 0,5 s — e por isso TODO teste
+# que passa por ela precisa do `pbpaste` dublado de `clipboard_dublado`, senao le o
+# clipboard de quem roda a suite (ha uma pessoa usando esta maquina). O clipboard
+# de verdade continua fora de alcance, de proposito; a captura automatica
+# (`--auto`) segue exigindo tty.
 
 
 @pytest.fixture
@@ -423,21 +427,82 @@ def navegador_dublado(raiz):
     return binario
 
 
-def token_sh(raiz, colado, path=None, env=None, navegador=True, args=()):
-    """Roda o `token.sh` com o valor vindo do stdin. Nada aqui toca a rede, e
-    nada abre navegador: com `navegador=True` (o padrao) o `open` do PATH e o
-    dube de `navegador_dublado`. So o teste da maquina sem `open` desliga isso,
-    e ele passa um PATH minimo que nao tem `open` nenhum.
+MARCADOR_PAYLOAD = "{PAYLOAD}"
+
+
+def clipboard_dublado(raiz, moodle_url="https://exemplo.invalid"):
+    """Um `pbpaste` de mentira em `raiz/bin`, com ROTEIRO. Nunca o clipboard real.
+
+    Ha uma pessoa usando a maquina em que a suite roda, e o clipboard dela nao e
+    insumo de teste — nem para ler. O dube le `raiz/clipboard/<n>`, onde n e o
+    numero da leitura (0 = a primeira), e vale o arquivo de indice mais alto <= n:
+    o conteudo "fica" ate ser trocado, como num clipboard de verdade. Sem arquivo
+    nenhum, imprime vazio.
+
+    O marcador `{PAYLOAD}` num arquivo do roteiro vira o endereco do link DESTA
+    rodada, calculado do passaporte que o script acabou de guardar em
+    `.cache/passaporte` — e o que permite testar a vigia numa invocacao so, com
+    um passaporte que o teste nao conhece de antemao. A formula e a do passo 5,
+    para que "confere" seja confere de verdade.
+
+    Cada leitura deixa uma linha em `raiz/pbpaste.log` com o INDICE, e so ele:
+    o log nunca carrega conteudo, para que um teste de vazamento possa varrer a
+    raiz inteira.
+    """
+    binario = raiz / "bin"
+    binario.mkdir(exist_ok=True)
+    programa = raiz / "pbpaste.py"
+    programa.write_text(
+        "import base64, hashlib, pathlib, re, sys\n"
+        f"raiz = pathlib.Path({str(raiz)!r})\n"
+        "d, c = raiz / 'clipboard', raiz / 'pbpaste.n'\n"
+        "n = int(c.read_text()) if c.exists() else 0\n"
+        "c.write_text(str(n + 1))\n"
+        "with (raiz / 'pbpaste.log').open('a') as log:\n"
+        "    log.write(f'{n}\\n')\n"
+        "for i in range(n, -1, -1):\n"
+        "    f = d / str(i)\n"
+        "    if f.exists():\n"
+        "        texto = f.read_text(encoding='utf-8')\n"
+        f"        if {MARCADOR_PAYLOAD!r} in texto:\n"
+        "            p = re.search(r'passaporte=(\\d+)', (raiz / '.cache' / 'passaporte').read_text()).group(1)\n"
+        f"            siteid = hashlib.md5(({moodle_url!r} + p).encode()).hexdigest()\n"
+        f"            b64 = base64.b64encode(':::'.join((siteid, {WSTOKEN!r}, {PRIVATE!r})).encode()).decode()\n"
+        f"            texto = texto.replace({MARCADOR_PAYLOAD!r}, 'moodlemobile://token=' + b64)\n"
+        "        sys.stdout.write(texto)\n"
+        "        break\n",
+        encoding="utf-8",
+    )
+    falso = binario / "pbpaste"
+    falso.write_text(f"#!/bin/sh\nexec '{sys.executable}' '{programa}'\n", encoding="utf-8")
+    falso.chmod(0o755)
+    return binario
+
+
+def token_sh(raiz, colado, path=None, env=None, navegador=True, clipboard=True, args=()):
+    """Roda o `token.sh` com o valor vindo do stdin. Nada aqui toca a rede, nada
+    abre navegador e nada le o clipboard de verdade: com `navegador=True` (o
+    padrao) o `open` do PATH e o dube de `navegador_dublado`, e com
+    `clipboard=True` (o padrao) o `pbpaste` e o de `clipboard_dublado`. So os
+    testes da maquina sem ferramenta desligam isso, e eles passam um PATH minimo
+    que nao tem `open` nem `pbpaste` nenhum.
+
+    A vigia dura 1 s por padrao aqui (USP_MCP_VIGIA_SEGUNDOS=1), e nao os 90 s
+    do script: quem quer outro limite passa o seu em `env`. O roteiro do
+    clipboard, quando ha, e escrito pelo teste antes de chamar.
 
     `SSH_CONNECTION`/`SSH_TTY` saem do ambiente porque o script, ao ve-las, se
-    recusa a abrir navegador — certo numa sessao SSH de verdade, e ruido numa
-    suite rodada por SSH que quer ver o dube ser chamado.
+    recusa a abrir navegador e a vigiar — certo numa sessao SSH de verdade, e
+    ruido numa suite rodada por SSH que quer ver o dube ser chamado.
     """
     ambiente = {k: v for k, v in os.environ.items() if k not in ("SSH_CONNECTION", "SSH_TTY")}
     if path is not None:
         ambiente["PATH"] = path
     if navegador:
         ambiente["PATH"] = f"{navegador_dublado(raiz)}:{ambiente.get('PATH', '')}"
+    if clipboard:
+        ambiente["PATH"] = f"{clipboard_dublado(raiz)}:{ambiente.get('PATH', '')}"
+    ambiente["USP_MCP_VIGIA_SEGUNDOS"] = "1"
     if env:
         ambiente.update(env)
     return subprocess.run(
