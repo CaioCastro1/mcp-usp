@@ -176,15 +176,85 @@ estiver quando rodar o comando.
 comandos que apareceram no passo anterior. Onde essa configuração se escreve muda de
 assistente para assistente, e quem diz é a documentação de cada um.
 
-No Linux, o começo do caminho é `/home/` em vez de `/Users/` nos dois blocos. Os comandos
-desta seção foram escritos para Mac e Linux; no Windows os caminhos são outros e este guia
-ainda não os cobre.
+No Linux, o começo do caminho é `/home/` em vez de `/Users/` nos dois blocos. No Windows os
+caminhos são outros, e a subseção *No Windows*, logo abaixo, diz o que muda e o que ainda
+não foi conferido por ninguém.
 
 Feche e abra o assistente. Pronto: bandejão e JupiterWeb já respondem. O e-Disciplinas
 ainda vai reclamar que falta a chave, e é a próxima seção.
 
 Se algo não funcionar, peça ao assistente para rodar a ferramenta `diagnostico`. Ela diz o
 que está no lugar e o que não está.
+
+### No Windows
+
+Os três programas são Python puro, sem uma linha específica de sistema operacional, e a
+pasta onde guardam arquivos baixados existe no Windows também. Não há razão conhecida para
+não funcionarem lá. Mas há uma diferença entre "não há razão conhecida" e "alguém viu
+funcionar": **nenhum dos autores rodou o projeto no Windows**, e tudo nesta subseção foi
+escrito num Mac, lendo documentação. Se você for a primeira pessoa a tentar, o que
+funcionou e o que não funcionou é exatamente o relato que uma issue pede.
+
+O que muda na instalação: o ambiente isolado que o Python cria no Windows não tem a pasta
+`bin`, tem `Scripts`, e os comandos são um pouco diferentes. No PowerShell:
+
+```powershell
+git clone https://github.com/CaioCastro1/usp-mcp.git $HOME\usp-mcp
+python -m venv $HOME\usp-mcp\.venv
+& $HOME\usp-mcp\.venv\Scripts\pip install -e $HOME\usp-mcp
+Copy-Item $HOME\usp-mcp\.env.example $HOME\usp-mcp\.env
+```
+
+Os três comandos instalados ficam em `$HOME\usp-mcp\.venv\Scripts\`, com a extensão
+`.exe`: `usp-mcp-rucard.exe`, `usp-mcp-jupiter.exe` e `usp-mcp-moodle.exe`. É para eles
+que o assistente aponta. No Claude Desktop o arquivo de configuração fica em
+`%APPDATA%\Claude\claude_desktop_config.json`, e dentro de JSON cada barra invertida se
+escreve dobrada:
+
+```json
+"usp-rucard": { "command": "C:\\Users\\SEU-USUARIO\\usp-mcp\\.venv\\Scripts\\usp-mcp-rucard.exe" }
+```
+
+No Claude Code é o mesmo comando dos outros sistemas, com o caminho do Windows:
+
+```powershell
+claude mcp add usp-rucard --scope user -- C:\Users\SEU-USUARIO\usp-mcp\.venv\Scripts\usp-mcp-rucard.exe
+```
+
+Com isso, bandejão e JupiterWeb devem responder. De novo: em teoria; ninguém conferiu.
+
+O e-Disciplinas é o ponto fraco. O script que obtém a chave, `scripts/token.sh`, é escrito
+em bash, e o Windows não tem bash. O caminho é o **Git Bash**, que vem junto com o Git para
+Windows: abra-o e rode
+
+```bash
+bash ~/usp-mcp/scripts/token.sh
+```
+
+Desde 18/09/2026 o script sabe achar o Python de `.venv\Scripts`, ler a área de
+transferência pelo PowerShell (`Get-Clipboard`) e abrir o navegador pelo `rundll32`. Antes
+disso a vigia descrita na seção *Configuração* não existia no Windows, e foi isso que o
+dono do projeto encontrou ao instalar lá. Essas três escolhas estão testadas com dublês: o
+que está provado é que o script escolhe a ferramenta certa quando ela existe, não que a
+ferramenta faz o que se espera num Windows real. Se a vigia não funcionar, o fluxo em dois
+passos continua valendo: copie o endereço do link e, no Git Bash, rode
+
+```bash
+powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh
+```
+
+O WSL também roda o script, e ele reconhece esse caso: lê a área de transferência do
+Windows pelo `powershell.exe` e abre o navegador do Windows pelo `wslview`. Mas o clone, o
+ambiente isolado e o `.env` que o script grava têm de ser os mesmos que o assistente usa, e
+um ambiente isolado criado dentro do WSL não serve a um assistente rodando no Windows. Quem
+instalar pelo WSL tem de instalar tudo lá e apontar o assistente para lá. Isso tampouco foi
+conferido.
+
+Duas coisas seguem sem adaptação, de propósito, porque são de quem mantém o projeto e não
+de quem usa: `scripts/gate.sh` e os demais scripts de `scripts/` ainda procuram
+`.venv/bin/python`. Se você usar o caminho rápido do começo desta seção, diga ao
+assistente que está no Windows: o `gate.sh` do passo 1 vai falhar por isso, e o passo 3
+precisa do Git Bash.
 
 ## Configuração
 
@@ -222,9 +292,12 @@ agir; qualquer outra coisa que você copiar nesse intervalo ele ignora, sem guar
 mostrar ou dizer o tamanho, e o que já estava no clipboard antes não conta. Se você
 copiar o endereço errado, ele diz o que veio errado e continua esperando. Passados os 90
 segundos sem o endereço, ele para de ler e diz como entregar depois:
-`pbpaste | ~/usp-mcp/scripts/token.sh`. Para rodar sem essa vigia, defina
-`USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador sem ferramenta de clipboard
-(sem `pbpaste`, `wl-paste` nem `xclip`) a vigia não existe e o script diz isso.
+`pbpaste | ~/usp-mcp/scripts/token.sh` (no Windows, pelo Git Bash:
+`powershell -NoProfile -Command Get-Clipboard | bash ~/usp-mcp/scripts/token.sh`). Para
+rodar sem essa vigia, defina `USP_MCP_VIGIA_SEGUNDOS=0` antes do comando. Num computador
+sem ferramenta de clipboard (sem `pbpaste`, `wl-paste`, `xclip` nem PowerShell) a vigia não
+existe e o script diz isso. O que vale no Windows, e o que ainda não foi conferido lá, está
+na subseção *No Windows*, acima.
 
 Ela fica guardada no arquivo `~/usp-mcp/.env`, na linha `MOODLE_TOKEN`. É o mesmo
 arquivo que o programa lê, então não há nada para copiar de um lugar para outro: feche e

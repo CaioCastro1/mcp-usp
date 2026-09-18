@@ -3,6 +3,7 @@
 #
 # Uso:  ./scripts/token.sh              # guiado, interativo
 #       pbpaste | ./scripts/token.sh    # se voce ja copiou a URL do redirect
+#       powershell -NoProfile -Command Get-Clipboard | ./scripts/token.sh   # o mesmo, em Windows
 #       ./scripts/token.sh --sobrescrever   # trocar token que ja funciona, sem perguntar
 #       ./scripts/token.sh --auto           # tenta capturar o redirect sozinho (ver abaixo)
 #       ./scripts/token.sh --navegador="Google Chrome"   # so com --auto
@@ -18,9 +19,9 @@
 # sozinho ate gravar; se a pessoa copiar a coisa errada, o script diz o que veio
 # errado e continua esperando. O que ja estava no clipboard nao conta, e o que
 # nao tem a forma certa nao e guardado, impresso nem medido. A vigia e anunciada
-# antes de comecar, no texto que a pessoa le. Sem pbpaste/wl-paste/xclip (ou em
-# sessao SSH, onde o clipboard alcancavel e o da maquina remota) nao ha vigia, e
-# o script cai no fluxo em DUAS invocacoes, que continua existindo:
+# antes de comecar, no texto que a pessoa le. Sem pbpaste/wl-paste/xclip/PowerShell
+# (ou em sessao SSH, onde o clipboard alcancavel e o da maquina remota) nao ha
+# vigia, e o script cai no fluxo em DUAS invocacoes, que continua existindo:
 #
 #       ./scripts/token.sh              # abre o navegador na pagina certa e sai com 3
 #       pbpaste | ./scripts/token.sh    # depois que a pessoa copiou o endereco do link
@@ -29,6 +30,14 @@
 # 10 minutos; a segunda o reaproveita, e a conferencia do passo 5 continua valendo
 # entre as duas. Saida 3 = "aguardando o payload", nao erro: nada foi gravado. A
 # vigia que encerra sem o endereco sai do mesmo jeito, com 3.
+#
+# Windows (desde 18/09/2026): o script continua bash e roda no Git Bash ou no
+# WSL. O que muda e o candidato de cada escolha: o clipboard vem do PowerShell
+# (`Get-Clipboard`), o navegador abre por `wslview` (WSL) ou `rundll32`, e o
+# Python e o de `.venv/Scripts/python.exe`. A ESCOLHA esta testada com dubles no
+# PATH (tests/moodle/test_token_windows.py); o comportamento num Windows real NAO
+# foi medido pelos autores. O que conferir esta em
+# docs/superpowers/specs/2026-09-18-windows-design.md.
 #
 # Sete passos, na ordem em que estao no desenho de 10/09/2026
 # (docs/superpowers/specs/2026-09-10-script-token-moodle-design.md):
@@ -72,8 +81,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PY=".venv/bin/python"
-[ -x "$PY" ] || PY="python3"
+# Qual Python. O venv e por diretorio (§3 do CLAUDE.md) e o script prefere o
+# dele. Em Windows (Git Bash) o venv nao tem bin/: e .venv/Scripts/python.exe.
+# E fora do venv `python3` pode nao existir la — o instalador do python.org so
+# cria `python` —, entao ele e o ultimo candidato. Sem nenhum, parar AQUI com a
+# causa, em vez de morrer em "command not found" no primeiro passo que o usa
+# (Invariante 6).
+PY=""
+for candidato in .venv/bin/python .venv/Scripts/python.exe; do
+  if [ -x "$candidato" ]; then PY="$candidato"; break; fi
+done
+if [ -z "$PY" ]; then
+  if command -v python3 >/dev/null 2>&1; then PY="python3"
+  elif command -v python >/dev/null 2>&1; then PY="python"
+  else
+    echo "nao achei Python: nem .venv/bin/python, nem .venv/Scripts/python.exe, nem python3/python no PATH." >&2
+    echo "Crie o venv (README, secao Instalando) ou instale o Python 3.11+ e rode de novo." >&2
+    exit 1
+  fi
+fi
 
 FN="core_webservice_get_site_info"
 
@@ -97,7 +123,7 @@ for arg in "$@"; do
     --manual) manual=1 ;;
     --auto) manual=0 ;;
     --navegador=*) navegador="${arg#--navegador=}" ;;
-    -h|--ajuda|--help) sed -n '2,70p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--ajuda|--help) sed -n '2,79p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "opcao desconhecida: $arg (use --ajuda)" >&2; exit 2 ;;
   esac
 done
@@ -136,20 +162,40 @@ MAX_AVISOS_VIGIA=3
 # Qual ferramenta le o clipboard DESTA maquina. Vazio = nenhuma, e sem ela nao
 # ha vigia. `wl-paste` e `xclip` so contam com a sessao grafica que eles exigem:
 # num servidor sem interface eles existem no PATH e falham, e "existe" mentiria.
+#
+# Windows (Git Bash ou WSL) nao tem nenhum dos tres. O que tem e o PowerShell,
+# que vem com o sistema e le o clipboard com `Get-Clipboard`. Ele e o ULTIMO
+# candidato: onde um dos tres existe e funciona, o leitor e o de sempre. No WSL
+# o `powershell.exe` alcanca o clipboard do Windows, que e onde a pessoa copiou
+# o link. Quatro nomes: com `.exe` porque no WSL o Linux nao completa a
+# extensao; sem ela porque o Git Bash completa; `pwsh` e o PowerShell 7, que a
+# pessoa pode ter instalado. A escolha esta testada com dubles no PATH (WIN1-3);
+# o Get-Clipboard de verdade nao foi medido pelos autores (18/09/2026).
 CLIP=""
 achar_leitor_de_clipboard() {
   if command -v pbpaste >/dev/null 2>&1; then CLIP="pbpaste"
   elif command -v wl-paste >/dev/null 2>&1 && [ -n "${WAYLAND_DISPLAY:-}" ]; then CLIP="wl-paste"
   elif command -v xclip >/dev/null 2>&1 && [ -n "${DISPLAY:-}" ]; then CLIP="xclip"
+  else
+    for candidato in powershell.exe powershell pwsh.exe pwsh; do
+      if command -v "$candidato" >/dev/null 2>&1; then CLIP="$candidato"; break; fi
+    done
   fi
 }
 # Imprime o clipboard. Falha (clipboard vazio no X11 devolve erro) vira vazio:
 # vazio nao e conteudo, e a vigia o ignora.
+#
+# PowerShell: `-NoProfile` pula o perfil da pessoa, que e o que mais custa no
+# arranque de cada leitura. O Get-Clipboard termina a linha em CRLF; o `\r` sai
+# aqui para que a comparacao com o marco e a checagem do prefixo vejam o mesmo
+# texto que um `pbpaste` devolveria.
 ler_clipboard() {
   case "$CLIP" in
     pbpaste)  pbpaste ;;
     wl-paste) wl-paste ;;
     xclip)    xclip -selection clipboard -o ;;
+    powershell.exe|powershell|pwsh.exe|pwsh)
+              "$CLIP" -NoProfile -Command Get-Clipboard | tr -d '\r' ;;
   esac 2>/dev/null || true
 }
 # Sem espaco/quebra de linha nas pontas. So bash, sem processo: roda por leitura.
@@ -257,6 +303,7 @@ sair_aguardando() {
   nota "Com o endereco no clipboard, rode:"
   nota "  pbpaste | ./scripts/token.sh"
   nota "  (Linux: wl-paste | ./scripts/token.sh  ou  xclip -selection clipboard -o | ./scripts/token.sh)"
+  nota "  (Windows, no Git Bash ou WSL: powershell -NoProfile -Command Get-Clipboard | ./scripts/token.sh)"
   nota "Ou rode ./scripts/token.sh de novo para eu voltar a vigiar o clipboard."
   nota "Se passou --sobrescrever agora, passe de novo."
   nota "O passaporte desta rodada esta em $ARQ_PASSAPORTE por ${VALIDADE_PASSAPORTE}s e"
@@ -288,16 +335,39 @@ abrir_navegador() {
     nota "Abra a URL acima no navegador da SUA maquina, logado na Senha Unica."
     return 0
   fi
-  if command -v open >/dev/null 2>&1; then
+  # A ordem, e o porque de cada posicao:
+  #   - `wslview` primeiro: so existe no WSL, e la e o unico que abre o navegador
+  #     do WINDOWS, que e onde a pessoa esta logada na Senha Unica. Tem de vir
+  #     antes do `open` porque no Ubuntu `/usr/bin/open` e o `openvt` do console
+  #     (pacote kbd), que nao abre URL nenhuma — e antes do `xdg-open` porque,
+  #     com o WSLg, este abriria um navegador Linux, que nao esta logado.
+  #   - `open` e `xdg-open` como sempre foram.
+  #   - `rundll32` por ultimo: e o ShellExecute do Windows por linha de comando,
+  #     existe em todo Windows e recebe a URL como ARGUMENTO — sem passar pelo
+  #     `cmd.exe /c start`, que trataria o `&` da URL como separador de comando.
+  #     E o caminho do Git Bash, e do WSL sem wslview. Com `.exe` primeiro pelo
+  #     mesmo motivo do leitor de clipboard.
+  # A escolha esta testada com dubles (WIN6); abrir de verdade em Windows nao
+  # foi medido pelos autores (18/09/2026).
+  if command -v wslview >/dev/null 2>&1; then
+    lancador="wslview"
+  elif command -v open >/dev/null 2>&1; then
     lancador="open"
   elif command -v xdg-open >/dev/null 2>&1 && [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then
     lancador="xdg-open"
+  elif command -v rundll32.exe >/dev/null 2>&1; then
+    lancador="rundll32.exe"
+  elif command -v rundll32 >/dev/null 2>&1; then
+    lancador="rundll32"
   else
-    aviso "nao ha como abrir navegador desta maquina (sem \`open\`/\`xdg-open\`, ou sem sessao grafica)."
+    aviso "nao ha como abrir navegador desta maquina (sem \`open\`/\`xdg-open\`/\`wslview\`/\`rundll32\`, ou sem sessao grafica)."
     nota "Abra a URL acima onde voce tem um navegador logado na Senha Unica."
     return 0
   fi
-  "$lancador" "$url" >/dev/null 2>&1 &
+  case "$lancador" in
+    rundll32*) "$lancador" url.dll,FileProtocolHandler "$url" >/dev/null 2>&1 & ;;
+    *)         "$lancador" "$url" >/dev/null 2>&1 & ;;
+  esac
   pid=$!
   for _ in 1 2 3 4 5 6 7 8 9 10; do
     kill -0 "$pid" 2>/dev/null || break
@@ -525,7 +595,7 @@ if [ -z "$valor" ]; then
         valor=$(ler_clipboard)
         [ -n "$valor" ] && nota "li do clipboard (\`$CLIP\`)."
       else
-        nota "sem pbpaste/wl-paste/xclip nesta maquina"
+        nota "sem pbpaste/wl-paste/xclip/powershell nesta maquina"
       fi
     fi
   else
@@ -557,7 +627,7 @@ if [ -z "$valor" ]; then
         # pessoa. Vigiar o clipboard errado esperaria para sempre por nada.
         sem_vigia="sessao SSH: o clipboard que eu leria e o da maquina remota, e voce vai copiar na sua. Sem vigia."
       elif [ -z "$CLIP" ]; then
-        sem_vigia="sem pbpaste/wl-paste/xclip nesta maquina (ou sem sessao grafica): nao ha clipboard para vigiar."
+        sem_vigia="sem pbpaste/wl-paste/xclip/powershell nesta maquina (ou sem sessao grafica): nao ha clipboard para vigiar."
       fi
 
       if [ -n "$sem_vigia" ]; then
